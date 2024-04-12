@@ -9,7 +9,7 @@ const route = useRoute();
 const router = useRouter();
 const transitionName = computed(() => {
   // 根据实际路由路径来决定过渡效果
-  console.log(route.path.startsWith('/teacher') ? 'slide-left' : 'slide-right')
+  // console.log(route.path.startsWith('/teacher') ? 'slide-left' : 'slide-right')
   return route.path.startsWith('/teacher') ? 'slide-left' : 'slide-right';
 });
 </script>

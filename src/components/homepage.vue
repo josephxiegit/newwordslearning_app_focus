@@ -1,12 +1,6 @@
 <script setup>
-import {
-  watch,
-  onMounted,
-  ref,
-  getCurrentInstance,
-  onBeforeUpdate,
-} from "vue";
-import { showFailToast, showToast } from 'vant';
+import { watch, onMounted, ref, getCurrentInstance, onBeforeUpdate } from "vue";
+import { showFailToast, showToast, showLoadingToast, showDialog } from "vant";
 
 import { useRouter } from "vue-router";
 const router = useRouter();
@@ -155,7 +149,6 @@ const clickSubmitUser = (action, done) => {
         clickScroll();
       } else {
         async function submitData() {
-          console.log(1111);
           let params = new URLSearchParams();
           params.append("method", "updateData");
           params.append("data", JSON.stringify(compareResult));
@@ -251,22 +244,22 @@ const showTitleDialog = ref(false);
 const passwordTeacher = ref("");
 const titleClickHandler = () => {
   showTitleDialog.value = true;
-}
+};
 const clickTitleDialog = (action, done) => {
   // 输入用户名后，确认提交
   if (action === "confirm") {
     if (passwordTeacher.value.trim()) {
       // 如果用户名有效，这里可以执行提交逻辑
       console.log("提交教师密码：", passwordTeacher.value);
-      if(passwordTeacher.value == "ss1234567890") {
+      if (passwordTeacher.value == "ss1234567890") {
         router.push({
           path: "/teacher",
         });
       } else {
-        showFailToast('密码错误');
+        showFailToast("密码错误");
       }
     } else {
-      showFailToast('密码不能为空');
+      showFailToast("密码不能为空");
     }
   } else {
     // 如果用户点击取消或遮罩层，直接关闭对话框
@@ -275,10 +268,79 @@ const clickTitleDialog = (action, done) => {
 };
 
 // 地狱模式
-const onClick = () => {
-      showToast('地狱无限模式，等待上线...');
+const showAccountPop = ref(true);
+const userAccount = ref("");
+const passwordAccount = ref("");
+const showHell = () => {
+  showAccountPop.value = true;
 };
+const submitAccount = () => {
+  async function submitAccountData() {
+    let params = new URLSearchParams();
+    params.append("method", "getUserData");
+    params.append("user", userAccount.value);
+    params.append("password", passwordAccount.value);
+    return await axios.post("words/", params).then((ret) => {
+      // console.log(ret.data);
+      return ret.data;
+    });
+  }
 
+  if (passwordAccount.value.trim() && userAccount.value.trim()) {
+    submitAccountData().then((res) => {
+      if (res == "用户名不存在") {
+        showFailToast("用户名不存在");
+      } else if (res == "密码错误") {
+        showFailToast("密码错误");
+      } else {
+        showDialog({
+          title: "做题须知",
+          theme: "round-button",
+          messageAlign: "left",
+          message:
+            "\n1. 选择任务列表中的任务。\n\n2. 从六个选项中选择一个或多个你认为正确的答案。提交你的答案后，系统会显示正确答案，确认无误后请点击继续。\n\n3. 完全正确的试卷将获得一个星星，收集满三颗星星即视为任务完成。",
+        });
+
+        async function userTestUpdate() {
+          let params = new URLSearchParams();
+          params.append("method", "userTestUpdate");
+          return await axios.post("words/", params).then((ret) => {
+            return ret.data;
+          });
+        }
+        if (userAccount.value == "user" || userAccount.value == "teacher") {
+          userTestUpdate().then(() => {
+            router.push({
+              path: "/studentAccountList",
+              state: {
+                data: JSON.stringify(res),
+              },
+            });
+          });
+        } else {
+          router.push({
+            path: "/studentAccountList",
+            state: {
+              data: JSON.stringify(res),
+            },
+          });
+        }
+      }
+    });
+  } else {
+    showFailToast("账号密码不能为空");
+  }
+};
+const pushUserTest = () => {
+  let res = new Promise((resolve, reject) => {
+    userAccount.value = "user";
+    passwordAccount.value = "password";
+    resolve("ok");
+  });
+  res.then((res) => {
+    submitAccount();
+  });
+};
 
 onMounted(async () => {
   async function queryLogout() {
@@ -324,15 +386,57 @@ onMounted(async () => {
       :before-close="clickTitleDialog"
       show-cancel-button
     >
-      <van-field v-model="passwordTeacher" type="password" placeholder="请输入密码" />
+      <van-field
+        v-model="passwordTeacher"
+        type="password"
+        placeholder="请输入密码"
+      />
     </van-dialog>
 
-    <van-floating-bubble
-      axis="xy"
-      magnetic="x"
-      icon="chat" 
-      @click="onClick" 
-    />
+    <!-- 地狱模式 -->
+    <van-floating-bubble axis="xy" magnetic="x" icon="chat" @click="showHell" />
+
+    <van-popup
+      closeable
+      v-model:show="showAccountPop"
+      position="bottom"
+      :style="{ height: '90%' }"
+      :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
+    >
+      <van-cell-group inset style="margin-top: 0.5rem">
+        <div style="font-weight: 700; font-size: 20; margin: 20px">
+          请输入账户名和密码
+        </div>
+        <van-field
+          v-model="userAccount"
+          label="用户"
+          placeholder="请输入用户名"
+        />
+        <van-field
+          v-model="passwordAccount"
+          type="password"
+          label="密码"
+          placeholder="请输入密码"
+        />
+      </van-cell-group>
+      <div style="margin: 10px">
+        <van-button type="success" plain block @click="submitAccount"
+          >提交</van-button
+        >
+        <van-button type="primary" plain block @click="showAccountPop == false"
+          >关闭</van-button
+        >
+        <van-button type="danger" plain block @click="pushUserTest"
+          >点击体验</van-button
+        >
+      </div>
+      <div style="display: flex; justify-content: flex-end; width: 90%;margin-top: 20%;">
+        <div tyle="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 10%;">
+          <div style="text-align: right; width: 100%;font-size: smaller;font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">扫码背单词</div>
+          <div style="font-size: smaller;font-family:'Times New Roman', Times, serif">Designed by xie</div>
+        </div>
+      </div>
+    </van-popup>
 
     <!-- 加载数据遮罩层 -->
     <van-overlay :show="showGetWords">

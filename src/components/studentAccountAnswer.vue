@@ -9,10 +9,12 @@ import {
 } from "vue";
 import { showDialog, showToast } from "vant";
 import { useRouter } from "vue-router";
+const instance = getCurrentInstance();
+const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
 const compareResult = ref([]);
 const userSelected = ref([]);
-const user = ref();
+const nid = ref("");
 const trueCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "true").length;
 });
@@ -22,6 +24,60 @@ const halfCount = computed(() => {
 const falseCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "false").length;
 });
+// 继续跳转做题
+const gotoNext = () => {
+  console.log(compareResult.value);
+  console.log(nid.value);
+  const rate = trueCount.value === compareResult.value.length ? 1 : 0;
+  async function updateAccountData() {
+    // 更新attempt和rate
+    let params = new URLSearchParams();
+    params.append("method", "updateUserData");
+    params.append("nid", nid.value);
+    params.append("rate", rate);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  async function refreshAccountData() {
+    // 重新查找用户数据
+    let params = new URLSearchParams();
+    params.append("method", "refreshUserData");
+    params.append("nid", nid.value);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  async function handleAccountData() {
+    try {
+      const updateResult = await updateAccountData();
+      // console.log(updateResult);
+      const refreshResult = await refreshAccountData();
+      // console.log(refreshResult);
+      // return refreshResult;
+      return {
+        refreshResult: refreshResult,
+        rate: updateResult["rate"],
+      };
+    } catch (error) {
+      console.error("Error handling account data:", error);
+    }
+  }
+
+  async function updateAndNavigate() {
+    // 导航到页面
+    const data = await handleAccountData();
+    console.log(data);
+    router.push({
+      path: "/studentAccountList",
+      state: {
+        data: JSON.stringify(data["refreshResult"]),
+        flagRate: data["rate"],
+      },
+    });
+  }
+  updateAndNavigate();
+};
 
 // 切换显示
 const showAll = ref(true); // 控制是否显示所有数据项的布尔变量
@@ -78,22 +134,30 @@ const scrollToItem = (index) => {
 
 // 弹出欢迎
 const showWelcome = ref(false);
+const showStar = ref(false);
 const keywordsHighlight = "左上角👀";
 const textHighlight = "点击左上角👀，查看错题";
-const keywordsHighlight2 = "下拉导航";
-const textHighlight2 = "底部下拉导航快速定位";
+const keywordsHighlight2 = "右上角继续";
+const textHighlight2 = "确认并背诵单词后，点击右上角继续";
+const keywordsHighlight3 = "下拉导航";
+const textHighlight3 = "底部下拉导航快速定位";
 onMounted(async () => {
-  // showWelcome.value = true;
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
-    user.value = history.state.user;
     userSelected.value = JSON.parse(history.state.userSelected);
-
+    nid.value = history.state.nid;
     resolve(compareResult.value);
   });
   res.then((res) => {
     console.log("compareResult", res);
-    showWelcome.value = true;
+    if (trueCount.value == compareResult.value.length) {
+      showStar.value = true;
+      setTimeout(() => {
+        showStar.value = false; // 3秒后隐藏星星
+      }, 5000);
+    } else {
+      showWelcome.value = true;
+    }
   });
 });
 </script>
@@ -124,20 +188,25 @@ onMounted(async () => {
         </div>
         <div class="custom-content">
           <van-highlight
+            :keywords="keywordsHighlight3"
+            :source-string="textHighlight3"
+            highlight-class="custom-class"
+          />
+        </div>
+        <div class="custom-content">
+          <van-highlight
             :keywords="keywordsHighlight2"
             :source-string="textHighlight2"
             highlight-class="custom-class"
           />
         </div>
+
       </template>
     </van-dialog>
 
     <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar
-        title="背诵答案"
-        :right-text="`${user}`"
-      >
+      <van-nav-bar title="背诵答案" right-text="继续" @click-right="gotoNext()">
         <template #left>
           <div
             style="
@@ -168,11 +237,7 @@ onMounted(async () => {
       :anchors="anchorsScrolls"
       v-show="showScroll"
     >
-      <van-cell
-        title="上拉查看导航"
-        value="点击跳转"
-        style="color: blue; font-weight: bold"
-      />
+      <van-cell title="上拉查看导航" value="点击跳转" style="color: blue; font-weight: bold" />
       <van-cell-group
         v-for="(item, index) in filteredCompareResult"
         :key="index"
@@ -181,7 +246,7 @@ onMounted(async () => {
           @click="scrollToItem(item.序号)"
           is-link
           :title="item.序号 + '. ' + item.英文"
-          :value="item.答案.join('; ')"
+          :value="item.答案"
           size="large"
           :style="{
             color:
@@ -215,7 +280,6 @@ onMounted(async () => {
               <div>{{ item.序号 + ". " + item.英文 }}</div>
             </template>
           </van-cell>
-          <!-- 显示对应的中文选项 -->
           <van-cell-group>
             <van-cell
               v-for="(chinese, index2) in item.中文"
@@ -234,18 +298,18 @@ onMounted(async () => {
                 />
               </template>
             </van-cell>
-            <!-- 条件渲染显示答案 -->
             <van-cell v-if="item.flag !== 'true'" class="answer-cell">
               <template #title>
-                <div style="text-align: left">
-                  答案：{{ item.答案.join("；") }}
-                </div>
+                <div style="text-align: left">答案：{{ item.答案 }}</div>
               </template>
             </van-cell>
           </van-cell-group>
         </div>
       </van-cell-group>
     </van-checkbox-group>
+
+    <!-- 星星动画容器 -->
+    <div id="star-animation" class="star-container" v-if="showStar">★</div>
   </div>
 </template>
 
@@ -320,5 +384,31 @@ onMounted(async () => {
   justify-content: center; /* 使flex项在容器中居中 */
   text-align: left; /* 文本左对齐 */
   width: 100%; /* 可以根据需要调整宽度 */
+}
+
+.star-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0); /* 开始时大小为0 */
+  font-size: 5rem; /* 星星的基础大小 */
+  color: gold;
+  opacity: 0; /* 开始时透明度为0 */
+  animation: starFadeInOut 5s forwards; /* 动画名称，持续时间，以及动画结束时的状态 */
+}
+
+@keyframes starFadeInOut {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(4); /* 中间点时最大 */
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5); /* 结束时缩小并消失 */
+  }
 }
 </style>

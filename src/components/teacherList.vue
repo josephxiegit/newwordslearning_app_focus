@@ -8,6 +8,7 @@ import {
   computed,
 } from "vue";
 import { useRouter } from "vue-router";
+import { showToast } from "vant";
 
 const router = useRouter();
 const instance = getCurrentInstance();
@@ -77,6 +78,83 @@ const goback = () => {
     path: "/teacher",
   });
 };
+
+// 切换显示
+const showAll = ref(true);
+function toggleShowAll() {
+  // 切换 showAll 的值
+  showAll.value = !showAll.value;
+  showScroll.value = !showScroll.value;
+  if (showScroll.value) {
+    showToast({
+      message: "下拉导航可用",
+      position: "bottom",
+    });
+  } else {
+    showToast({
+      message: "下拉导航隐藏",
+      position: "bottom",
+    });
+  }
+}
+
+// 预览跳转功能
+const myList = ref([]);
+const showScroll = ref(true);
+const anchorsScrolls = [
+  65,
+  Math.round(0.25 * window.innerHeight),
+  Math.round(0.55 * window.innerHeight),
+];
+const heightScroll = ref(anchorsScrolls[0]);
+const setItemRef = (el) => {
+  if (el) {
+    myList.value.push(el);
+  }
+};
+const scrollToItem = (index) => {
+  // console.log('index: ', index);
+  index = index * 6 + 20;
+  if (myList.value[index]) {
+    const item = myList.value[index - 1];
+    // console.log('item: ', item);
+    const top = item.getBoundingClientRect().top + window.scrollY - 40; // 获取元素的顶部位置并向上偏移10px
+    // console.log('top: ', top);
+    window.scrollTo({
+      top: top,
+      behavior: "smooth",
+    });
+  }
+};
+const modifiedFilteredAnswerList = computed(() => {
+  return filteredAnswerList.value.map((item) => {
+    const allTrue = item.userObj.every((user) => user.flag === "true");
+    const allFalse = item.userObj.every((user) => user.flag === "false");
+
+    let color = "orange"; // Default to orange
+    if (allTrue) color = "green";
+    else if (allFalse) color = "red";
+
+    return { ...item, color }; // Add color property to each item
+  });
+});
+function countFalseFlags(userObjs) {
+  return userObjs.filter(userObj => userObj.flag !== "true").length;
+}
+
+
+
+const filteredAnswerList = computed(() => {
+  // 根据 showAll 的值过滤 compareResult 数据
+  if (showAll.value) {
+    return answerList.value;
+  } else {
+    // 当 showAll 为 false 时，过滤掉 flag 为 true 的项
+    return answerList.value.filter((item) =>
+      item.userObj.some((user) => user.flag !== "true")
+    );
+  }
+});
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
     const data = JSON.parse(history.state.data); // 更改变量名以避免混淆
@@ -106,12 +184,20 @@ const transitionName = computed(() => {
 
 <template>
   <div>
+    <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar
-        title="教师统计列表"
-        left-text="后退"
-        @click-left="goback()"
-      />
+      <van-nav-bar title="教师统计列表" left-text="后退" @click-left="goback()">
+        <template #right>
+          <span style="margin-right: 8px; color: rgb(64, 135, 242)"
+            >{{ filteredAnswerList.length }}词</span
+          >
+          <van-icon
+            :name="showAll ? 'eye-o' : 'eye'"
+            @click="toggleShowAll"
+            size="25"
+          />
+        </template>
+      </van-nav-bar>
     </div>
     <!-- 显示统计 -->
     <div class="student_statics_card">
@@ -132,12 +218,36 @@ const transitionName = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- 预览滚动 -->
+    <van-floating-panel
+      v-model:height="heightScroll"
+      :anchors="anchorsScrolls"
+      v-show="showScroll"
+    >
+      <van-cell title="上拉查看导航" style="color: blue; font-weight: bold" />
+      <van-cell-group
+        v-for="(item, index) in modifiedFilteredAnswerList"
+        :key="index"
+      >
+        <van-cell
+          @click="scrollToItem(item.序号)"
+          is-link
+          :title="`${item.序号}. ${item.英文}: ${countFalseFlags(item.userObj)}人`"
+          :value="item.答案.join('; ')"
+          size="large"
+          :style="{ color: item.color }"
+        />
+      </van-cell-group>
+    </van-floating-panel>
+
     <!-- 显示列表 -->
-    <van-cell-group>
+    <van-cell-group style="margin-bottom: 150px">
       <van-cell
-        v-for="(item, index) in answerList"
+        v-for="(item, index) in filteredAnswerList"
         :key="index"
         class="group-cell"
+        :ref="setItemRef"
       >
         <template #title>
           <!-- 英文和数字加粗加大字号 -->
@@ -150,6 +260,7 @@ const transitionName = computed(() => {
             :key="index2"
             class="chinese-option"
             :class="{ 'correct-answer': item.答案.includes(chinese) }"
+            :ref="setItemRef"
           >
             <van-cell>
               <template #title>
@@ -176,6 +287,7 @@ const transitionName = computed(() => {
         </template>
       </van-cell>
     </van-cell-group>
+
   </div>
 </template>
 

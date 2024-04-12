@@ -45,8 +45,6 @@ const groupItems = (originalData) => {
   groupedData.value = Array.from(itemSignatureMap.values());
 };
 
-
-
 // 统计true占比
 function getStatiscTrue(item_list) {
   let totalTrue = item_list.length;
@@ -181,7 +179,7 @@ const finishMultiSelect = () => {
           return "ok";
         })
         .then(() => {
-          toast.clear();
+          // toast.clear();
         });
       // 切换回非多选模式
       toggleMultiSelectMode();
@@ -194,7 +192,7 @@ onMounted(async () => {
     message: "加载中...",
     forbidClick: true,
   });
-  
+
   let res = new Promise((resolve, reject) => {
     getListData();
     resolve("ok");
@@ -219,42 +217,49 @@ const reloadPage = () => {
 
 <template>
   <div>
-      <div class="nav-bar-container">
-        <van-nav-bar
-          title="教师统计"
-          :right-text="isMultiSelectMode ? '删除' : '刷新'"
-          :left-text="isMultiSelectMode ? '取消' : '多选'"
-          @click-left="toggleMultiSelectMode"
-          @click-right="isMultiSelectMode ? finishMultiSelect() : reloadPage()"
-        />
-      </div>
+    <div class="nav-bar-container">
+      <van-nav-bar
+        title="教师统计"
+        :right-text="isMultiSelectMode ? '删除' : '刷新'"
+        :left-text="isMultiSelectMode ? '取消' : '多选'"
+        @click-left="toggleMultiSelectMode"
+        @click-right="isMultiSelectMode ? finishMultiSelect() : reloadPage()"
+      />
+    </div>
 
-      <van-cell-group v-model="selectedItems">
-        <div v-for="(item, index) in originalData" :key="index">
-          <van-cell
-            :title="`${item.item_list[0].英文} ${item.item_list[0].中文[0]}`"
-            is-link
-            :value="`用户：${item.username}`"
-            :label="`${item.item_list.length}词 ｜ ${item.create_time.slice(
-              0,
-              10
-            )}｜${item.trueRate}`"
-            clickable
-            @click="
-              isMultiSelectMode ? selectItem(index) : gotoTeacherList(index)
-            "
-          >
-            <template #right-icon>
-              <van-checkbox
-                v-if="isMultiSelectMode"
-                :checked="selectedItems.includes(index)"
-                @click.stop="selectItem(index)"
-              />
-            </template>
-          </van-cell>
-        </div>
-      </van-cell-group>
-   </div>
+    <router-view />
+    <van-tabbar route>
+      <van-tabbar-item icon="home-o" replace to="/teacher">首页</van-tabbar-item>
+      <van-tabbar-item icon="friends-o" replace to="/xlsmList">用户</van-tabbar-item>
+      <van-tabbar-item icon="search" replace to="/teacherComment">试题</van-tabbar-item>
+    </van-tabbar>
+
+    <van-cell-group v-model="selectedItems">
+      <div v-for="(item, index) in originalData" :key="index">
+        <van-cell
+          :title="`${item.item_list[0].英文} ${item.item_list[0].中文[0]}`"
+          is-link
+          :value="`用户：${item.username}`"
+          :label="`${item.item_list.length}词 ｜ ${item.create_time.slice(
+            0,
+            10
+          )}｜${item.trueRate}`"
+          clickable
+          @click="
+            isMultiSelectMode ? selectItem(index) : gotoTeacherList(index)
+          "
+        >
+          <template #right-icon>
+            <van-checkbox
+              v-if="isMultiSelectMode"
+              :checked="selectedItems.includes(index)"
+              @click.stop="selectItem(index)"
+            />
+          </template>
+        </van-cell>
+      </div>
+    </van-cell-group>
+  </div>
 </template>
 
 
@@ -275,5 +280,4 @@ const reloadPage = () => {
 .van-checkbox {
   margin-left: 16px;
 }
-
 </style>

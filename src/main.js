@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, reactive, provide } from 'vue'
 // import './style.css'
 import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router';
@@ -7,6 +7,11 @@ import HomePage from './components/homepage.vue';
 import Teacher from './components/teacher.vue';
 import TeacherList from './components/teacherList.vue';
 import StudentAnswer from './components/studentAnswer.vue';
+import StudentAccountList from './components/studentAccountList.vue';
+import StudentAccountItem from './components/studentAccountItem.vue';
+import StudentAccountAnswer from './components/studentAccountAnswer.vue';
+import XlsmList from './components/xlsmList.vue';
+import TeacherComment from './components/teacherComment.vue';
 import 'vant/lib/index.css';
 
 
@@ -42,11 +47,45 @@ const routes = [
         }
     },
     {
-        path: '/student',
-        name: 'student',
-        // component: Student,
+        path: '/teacherComment',
+        name: 'teacherComment',
+        component: TeacherComment,
         meta: {
-            index: 1
+            index: 2
+        }
+    },
+    {
+        path: '/studentAccountList',
+        name: 'studentAccountList',
+        component: StudentAccountList,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/studentAccountItem',
+        name: 'studentAccountItem',
+        component: StudentAccountItem,
+        meta: {
+            index: 1,
+
+        }
+    },
+    {
+        path: '/studentAccountAnswer',
+        name: 'studentAccountAnswer',
+        component: StudentAccountAnswer,
+        meta: {
+            index: 1,
+        }
+    },
+    {
+        path: '/xlsmList',
+        name: 'xlsmList',
+        component: XlsmList,
+        meta: {
+            index: 1,
         }
     },
     {
@@ -54,7 +93,8 @@ const routes = [
         name: 'studentAnswer',
         component: StudentAnswer,
         meta: {
-            index: 2
+            index: 2,
+            preventBack: true
         }
     },
 ];
@@ -69,16 +109,31 @@ router.beforeEach((to, from, next) => {
         // 检测到刷新行为，可以通过判断 to 和 from 是否相同，或者其他方式
         // 这里以to和from完全相同来模拟刷新行为的检测
         if (to.fullPath === from.fullPath) {
-          // 重定向到根目录
-          next('/');
-        } 
+            // 重定向到根目录
+            next('/');
+        }
     }
+
     if (from.path === '/studentAnswer' && to.meta.preventBack) {
+        // console.log(1111);
+        next(false);
+    }
+    if (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') {
+        // console.log(3333);
+        next(false);
+    }
+    if (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') {
+        // console.log(4444);
+        next(false);
+    }
+    if (from.path === '/studentAccountItem' && to.meta.preventBack) {
+        // console.log(555);
         next(false);
     } else {
+        // console.log(666);
         next(); // 确保正常的路由跳转继续进行
     }
-  
+
 });
 // 判断手机还是电脑
 function _isMobile() {
@@ -88,16 +143,51 @@ function _isMobile() {
 }
 console.log(_isMobile());
 
+// 定义全局变量
+const globalState = reactive({
+    user: '',
+    password: ''
+});
 
-import { Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Loading, Dialog, Field, Notify, Toast, FloatingBubble, Image as VanImage } from 'vant';
+
+import {
+    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay,
+    Loading, Dialog, Field, Notify, Toast, FloatingBubble,
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker,
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky
+} from 'vant';
 import 'vant/lib/index.css';
 
 
 
 // 创建Vue应用实例
 const app = createApp(App);
+app.provide('globalState', globalState);
 // 使用Vant组件
-app.use(Button).use(Checkbox).use(CheckboxGroup).use(NavBar).use(Cell).use(CellGroup).use(Overlay).use(Loading).use(Dialog).use(Field).use(Notify).use(Toast).use(FloatingBubble).use(VanImage);
+app.use(Button)
+    .use(Checkbox)
+    .use(CheckboxGroup)
+    .use(NavBar)
+    .use(Cell)
+    .use(CellGroup)
+    .use(Overlay)
+    .use(Loading)
+    .use(Dialog)
+    .use(Field)
+    .use(Notify)
+    .use(Toast)
+    .use(FloatingBubble)
+    .use(VanImage)
+    .use(Popup)
+    .use(Rate)
+    .use(Tabbar)
+    .use(TabbarItem)
+    .use(Picker)
+    .use(SwipeCell)
+    .use(Icon)
+    .use(FloatingPanel)
+    .use(Sticky)
+    .use(Highlight);
 // 使用vue-router
 app.use(router);
 app.use(axiosPlugin);
