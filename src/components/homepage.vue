@@ -1,8 +1,25 @@
 <script setup>
-import { watch, onMounted, ref, getCurrentInstance, onBeforeUpdate } from "vue";
-import { showFailToast, showToast, showLoadingToast, showDialog } from "vant";
+import {
+  watch,
+  onMounted,
+  ref,
+  getCurrentInstance,
+  onBeforeUpdate,
+  computed,
+  onUnmounted,
+} from "vue";
+import Typed from "typed.js";
 
+import {
+  showFailToast,
+  showToast,
+  showLoadingToast,
+  showDialog,
+  showSuccessToast,
+} from "vant";
+import { Base64 } from "js-base64";
 import { useRouter } from "vue-router";
+import QuickSwitchingText from "./QuickSwitchingText.vue";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -193,6 +210,11 @@ const setItemRef = (el) => {
   }
 };
 const scrollToItem = (index) => {
+  // 检查是否点击的是列表中的最后两个选项
+  if (index >= synonymsOptions.value.length - 2) {
+    heightScroll.value = 65;
+  }
+
   if (myList.value[index]) {
     const item = myList.value[index];
     const top = item.getBoundingClientRect().top + window.scrollY - 50; // 获取元素的顶部位置并向上偏移10px
@@ -212,25 +234,38 @@ const clickScroll = () => {
 // 点击选项
 const resultDataTempt = ref([]);
 const completeCount = ref("0");
+const selectedIndexes = ref({});
 const toggleCheckChinese = (index, index2) => {
-  const checkboxRef = checkboxRefs.value[`${index}-${index2}`];
+  const key = `${index}-${index2}`;
+  const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
-    checkboxRef.toggle(); // 直接调用复选框的 toggle 方法
+    checkboxRef.toggle();
   }
+  selectedIndexes.value[key] = !selectedIndexes.value[key];
+
+  // 更新选择结果
+  const selectedChineses = selectedResults.value[index] || [];
+  if (selectedIndexes.value[key]) {
+    selectedChineses.push(synonymsOptions.value[index].中文[index2]);
+  } else {
+    const removeIndex = selectedChineses.indexOf(
+      synonymsOptions.value[index].中文[index2]
+    );
+    selectedChineses.splice(removeIndex, 1);
+  }
+  selectedResults.value[index] = selectedChineses;
+
   // 合并答案和选项
   mergedData.value = mergeAnswerAndSynonym();
-  // console.log("合并答案和选项：", mergedData.value);
 
   // 将用户选择转化为中文
   const synonymsSelectedChinese = convertSelections(
     synonymsSelected.value,
     synonymsOptions.value
   );
-  // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
 
   // 将中文用户选择和选项答案合并
   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-  // console.log("synonymAndSelections", synonymAndSelections);
   completeCount.value = resultDataTempt.value.reduce((count, item) => {
     if (item.用户选择[0] !== "无") {
       return count + 1;
@@ -238,26 +273,41 @@ const toggleCheckChinese = (index, index2) => {
     return count;
   }, 0);
 };
-
+function isSelected(index, index2) {
+  return selectedIndexes.value[`${index}-${index2}`];
+}
 // 点击题目
 const showTitleDialog = ref(false);
 const passwordTeacher = ref("");
 const titleClickHandler = () => {
   showTitleDialog.value = true;
 };
+
 const clickTitleDialog = (action, done) => {
   // 输入用户名后，确认提交
   if (action === "confirm") {
     if (passwordTeacher.value.trim()) {
-      // 如果用户名有效，这里可以执行提交逻辑
-      console.log("提交教师密码：", passwordTeacher.value);
-      if (passwordTeacher.value == "ss1234567890") {
-        router.push({
-          path: "/teacher",
+      async function verifyTeacherPassword() {
+        let params = new URLSearchParams();
+        params.append("method", "verifyTeacherPassword");
+        params.append("password", passwordTeacher.value.trim());
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data;
         });
-      } else {
-        showFailToast("密码错误");
       }
+      verifyTeacherPassword().then((res) => {
+        // console.log("res: ", res);
+        if (res == "ok") {
+          localStorage.setItem(
+            "teacherPassword",
+            Base64.encode(passwordTeacher.value)
+          );
+          showSuccessToast("密码正确");
+        } else {
+          showFailToast("密码错误");
+          localStorage.removeItem("teacherPassword");
+        }
+      });
     } else {
       showFailToast("密码不能为空");
     }
@@ -266,6 +316,37 @@ const clickTitleDialog = (action, done) => {
     showTitleDialog.value = false;
   }
 };
+
+// 预览跳转功能
+const selectedResults = ref({}); // 用于存储每个单词的选择结果
+const showScroll = ref(true);
+const lowerAnchor = 65; // 最低高度
+const middleAnchor = Math.round(0.4 * window.innerHeight); // 中间高度
+const anchorsScrolls = [
+  lowerAnchor,
+  middleAnchor,
+  Math.round(0.65 * window.innerHeight),
+];
+const heightScroll = ref(lowerAnchor);
+const closePanel = () => {
+  if (heightScroll.value === lowerAnchor) {
+    heightScroll.value = middleAnchor;
+  } else {
+    heightScroll.value = lowerAnchor;
+  }
+};
+const buttonText = computed(() => {
+  // 计算按钮文本
+  return heightScroll.value === lowerAnchor ? "显示导航" : "关闭导航";
+});
+const buttonStyle = computed(() => {
+  // 计算按钮样式
+  return {
+    marginBottom: "10px",
+    fontWeight: "bold",
+    color: heightScroll.value === lowerAnchor ? "green" : "red",
+  };
+});
 
 // 地狱模式
 const showAccountPop = ref(true);
@@ -342,7 +423,89 @@ const pushUserTest = () => {
   });
 };
 
+const typed = ref(null);
+const pRef = ref(null);
+const showSwitchingText = ref(false);
+const typedContainer = ref(null);
+const quickSwitchingTextRef = ref(null);
+const wordList = [
+  "有趣",
+  "有料",
+  "高效",
+  "上瘾",
+  "一词多义",
+  "天津定制",
+  "课堂同步",
+  "私人定制",
+  "个性化单词",
+  "高考3500",
+  "天津3500",
+  "外研社专属",
+  "天津英语",
+  "中考英语",
+  "高考英语",
+];
 onMounted(async () => {
+  // await nextTick();
+  // const options = {
+  //   strings: ["每天10分钟", "扫码背单词"],
+  //   typeSpeed: 140,
+  //   backSpeed: 60,
+  //   showCursor: false,
+  //   onComplete: () => {
+  //     // 动画结束后等待1.5秒然后显示词汇切换动画
+  //     setTimeout(() => {
+  //       showSwitchingText.value = true;
+  //       quickSwitchingTextRef.value?.restart();
+  //     }, 1500);
+  //   },
+  //   onStringTyped: (arrayPos, self) => {
+  //     // 当"每天10分钟"动画结束后，立即开始显示词汇切换动画
+  //     if (arrayPos === 0) {
+  //       showSwitchingText.value = true;
+  //       quickSwitchingTextRef.value?.restart();
+  //       // 并让下一个动画立刻开始 所以设置打字速度为0
+  //       self.options.typeSpeed = 140;
+  //       self.options.backSpeed = 60;
+  //     } else if (arrayPos === 1) {
+  //       // 当"扫码背单词"动画结束后，暂停1.5秒再启动"每天10分钟"动画和词汇切换动画
+  //       self.options.typeSpeed = 140;
+  //       self.options.backSpeed = 60;
+  //       showSwitchingText.value = true;
+  //     }
+  //     setTimeout(() => {
+  //       self.reset();
+  //     }, 3000);
+  //   },
+  // };
+  // new Typed(typedContainer.value, options);
+
+  // 开场动画
+  const options = {
+    strings: ["每天10分钟", "扫码背单词"],
+    typeSpeed: 140, // 第一个字符串的打字速度
+    backSpeed: 60, // 默认退格速度
+    showCursor: false,
+    onComplete: (self) => {
+      setTimeout(() => {
+        self.reset();
+        self.start();
+      }, 1500); // 动画结束后等待3秒重置并重新开始
+    },
+    onStringTyped: (arrayPos, self) => {
+      // arrayPos 是当前字符串的索引，self 是 Typed 实例
+      if (arrayPos === 0) {
+        // 第一个字符串打完后设置第二个字符串的速度
+        self.options.typeSpeed = 120; // 第二个字符串的打字速度
+        self.options.backSpeed = 50; // 第二个字符串的退格速度
+      } else if (arrayPos === 1) {
+        // 第二个字符串打完后恢复第一个字符串的速度和退格速度
+        self.options.typeSpeed = 140;
+        self.options.backSpeed = 60;
+      }
+    },
+  };
+  typed.value = new Typed(pRef.value, options);
   async function queryLogout() {
     let params = new URLSearchParams();
     params.append("method", "queryData");
@@ -363,6 +526,9 @@ onMounted(async () => {
 
   showGetWords.value = true;
   queryLogout();
+});
+onUnmounted(() => {
+  // typed?.destroy();
 });
 </script>
 
@@ -385,6 +551,7 @@ onMounted(async () => {
       title="输入密码"
       :before-close="clickTitleDialog"
       show-cancel-button
+      style="margin-bottom: 2rem"
     >
       <van-field
         v-model="passwordTeacher"
@@ -400,42 +567,122 @@ onMounted(async () => {
       closeable
       v-model:show="showAccountPop"
       position="bottom"
-      :style="{ height: '90%' }"
+      :style="{ height: '100%' }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
     >
-      <van-cell-group inset style="margin-top: 0.5rem">
-        <div style="font-weight: 700; font-size: 20; margin: 20px">
-          请输入账户名和密码
+      
+        <!-- 滚动动画 -->
+        <!-- <QuickSwitchingText 
+          class="content" 
+          style="
+            font-size: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 40%;
+          "
+          finalText="扫码背单词" :textList="wordList" :duration="1900" ref="quickSwitchingTextRef" /> -->
+        <!-- 打字动画 -->
+        <div
+          ref="pRef"
+          style="
+            font-size: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 40%;
+          "
+        ></div>
+
+        <!-- <div>
+          <div style="font-size: 40px; margin-top: 40%">
+            <!-- 打字动画 -->
+            <!-- <div
+              v-if="!showSwitchingText"
+              ref="typedContainer"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            ></div> -->
+            <!-- 多词切换动画 -->
+            <!-- <QuickSwitchingText
+              v-else
+              ref="quickSwitchingTextRef"
+              class="content"
+              finalText="扫码背单词"
+              :duration="1900"
+              :textList="wordList"
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            /> -->
+          
+        
+      
+
+        <!-- designed by xie -->
+        <div
+          class="logo"
+          data-text="♠ Designed by xie ♠"
+          style="margin-top: 60%"
+        >
+          ♠ Designed by xie ♠
         </div>
-        <van-field
-          v-model="userAccount"
-          label="用户"
-          placeholder="请输入用户名"
-        />
-        <van-field
-          v-model="passwordAccount"
-          type="password"
-          label="密码"
-          placeholder="请输入密码"
-        />
-      </van-cell-group>
-      <div style="margin: 10px">
-        <van-button type="success" plain block @click="submitAccount"
-          >提交</van-button
-        >
-        <van-button type="primary" plain block @click="showAccountPop == false"
-          >关闭</van-button
-        >
-        <van-button type="danger" plain block @click="pushUserTest"
-          >点击体验</van-button
-        >
-      </div>
-      <div style="display: flex; justify-content: flex-end; width: 90%;margin-top: 20%;">
-        <div tyle="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 10%;">
-          <div style="text-align: right; width: 100%;font-size: smaller;font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">扫码背单词</div>
-          <div style="font-size: smaller;font-family:'Times New Roman', Times, serif">Designed by xie</div>
+
+        <div style="position: fixed; bottom: 0; width: 100%">
+          <van-cell-group inset style="margin-top: 80px">
+            <div style="font-weight: 700; font-size: 20; margin: 20px">
+              请输入账户名和密码
+            </div>
+            <van-field
+              v-model="userAccount"
+              label="用户"
+              placeholder="请输入用户名"
+            />
+            <van-field
+              v-model="passwordAccount"
+              type="password"
+              label="密码"
+              placeholder="请输入密码"
+            />
+          </van-cell-group>
+          <div style="margin: 10px">
+            <van-button type="success" plain block @click="submitAccount"
+              >提交</van-button
+            >
+            <van-button
+              type="primary"
+              plain
+              block
+              @click="showAccountPop == false"
+              >关闭</van-button
+            >
+          </div>
+          <div
+            style="
+              display: flex;
+              justify-content: flex-end;
+              width: 96%;
+              margin-top: 5%;
+              margin-bottom: 5%;
+            "
+          >
+            <div>
+              <van-button
+                type="warning"
+                plain
+                @click="pushUserTest"
+                size="normal"
+                style="margin-top: 5%; margin-bottom: 5%"
+                >点击体验</van-button
+              >
+            </div>
+          </div>
         </div>
-      </div>
     </van-popup>
 
     <!-- 加载数据遮罩层 -->
@@ -463,8 +710,52 @@ onMounted(async () => {
       <span>试题未完成，不能提交</span>
     </van-notify>
 
+    <!-- 预览滚动 -->
+    <van-floating-panel
+      v-model:height="heightScroll"
+      :anchors="anchorsScrolls"
+      v-show="showScroll"
+      :content-draggable="false"
+    >
+      <van-button
+        plain
+        type="default"
+        block
+        style="margin-bottom: 0px; font-weight: bold; height: 6%"
+        :style="buttonStyle"
+        @click="closePanel"
+        >{{ buttonText }}</van-button
+      >
+      <van-cell
+        title="上拉增大导航"
+        value="点击跳转"
+        style="color: blue; font-weight: bold"
+      />
+      <van-cell-group v-for="(item, index) in synonymsOptions" :key="index">
+        <van-cell
+          @click="scrollToItem(item.序号 - 1)"
+          is-link
+          :title="item.序号 + '. ' + item.英文"
+          size="large"
+          :style="{
+            color:
+              selectedResults[index] && selectedResults[index].length > 0
+                ? 'red'
+                : '',
+          }"
+        >
+          <template #default>
+            <span
+              v-if="selectedResults[index] && selectedResults[index].length"
+              >{{ selectedResults[index].join("; ") }}</span
+            >
+          </template>
+        </van-cell>
+      </van-cell-group>
+    </van-floating-panel>
+
     <!-- 显示列表单词 -->
-    <van-checkbox-group v-model="synonymsSelected">
+    <van-checkbox-group v-model="synonymsSelected" style="margin-bottom: 80px">
       <van-cell-group>
         <div
           v-for="(item, index) in synonymsOptions"
@@ -486,6 +777,7 @@ onMounted(async () => {
               :key="index2"
               clickable
               @click="toggleCheckChinese(index, index2)"
+              :class="isSelected(index, index2) ? 'selected-cell' : ''"
               class="chinese-cell"
             >
               <template #title>
@@ -495,7 +787,7 @@ onMounted(async () => {
                 <van-checkbox
                   :name="`${index + 1}-${index2 + 1}`"
                   :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
-                  @click.stop
+                  @click.stop.prevent="toggleCheckChinese(index, index2)"
                 />
               </template>
             </van-cell>
@@ -510,6 +802,56 @@ onMounted(async () => {
 
 
 <style>
+.logo {
+  font-size: 20px;
+  font-family: "SourceHanSansCN-Bold" !important;
+  font-weight: 700;
+  color: #222;
+  position: fixed;
+  bottom: 60%;
+  width: 100%;
+  text-align: center; /* 水平居中文本 */
+  /* display: flex; */
+  justify-content: center; /* Flexbox 水平居中所有内容 */
+  overflow: hidden; /* 防止超出内容影响布局 */
+}
+
+.logo::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 50%; /* 修改为垂直居中 */
+  left: 50%; /* 水平居中 */
+  transform: translate(-50%, -50%); /* 使用 translate 调整精确位置 */
+  background-image: linear-gradient(
+    to right,
+    rgb(236, 72, 153),
+    rgb(239, 68, 68),
+    rgb(234, 179, 8)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  clip-path: ellipse(60px 60px at 50% 50%); /* 初始位置调整为中心 */
+  animation: move 5s linear infinite;
+  white-space: nowrap; /* 防止文本折行 */
+}
+
+@keyframes move {
+  0%,
+  100% {
+    clip-path: ellipse(60px 60px at 0% 50%);
+  }
+  50% {
+    clip-path: ellipse(60px 60px at 100% 50%);
+  }
+}
+
+.selected-cell {
+  font-weight: bold;
+  color: #1a89fa !important;
+  background-color: #c0c6cc !important;
+}
+
 .bold-title div {
   font-weight: bold; /* 加粗英文和序号 */
   font-size: large;
@@ -525,6 +867,7 @@ onMounted(async () => {
 
 .chinese-cell {
   border-bottom: 0.5px solid #eee; /* 中文选项之间的分割线 */
+  cursor: pointer;
 }
 
 .chinese-cell:last-of-type {
@@ -554,4 +897,8 @@ onMounted(async () => {
   top: 0;
   z-index: 100;
 }
+/* .content span {
+  font-size: 50px;
+  font-weight: bold;
+} */
 </style>

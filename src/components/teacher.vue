@@ -97,7 +97,12 @@ function getListData() {
     .then((res) => {
       originalData.value = [];
       for (let i = 0; i < res.length; i++) {
-        const jsonString = res[i].item_list.replace(/'/g, '"');
+        // const jsonString = res[i].item_list.replace(/'/g, '"');
+        let jsonString = res[i].item_list.replace(/(\W)'|'(\W)/g, '$1"$2');
+        jsonString = jsonString.replace(
+          /([{,]\s*)'([^']+?)'(\s*[:])/g,
+          '$1"$2"$3'
+        );
         const trueRate = getStatiscTrue(JSON.parse(jsonString));
         originalData.value.push({
           create_time: res[i].create_time,
@@ -188,18 +193,16 @@ const finishMultiSelect = () => {
 };
 
 onMounted(async () => {
-  const toast = showLoadingToast({
-    message: "加载中...",
-    forbidClick: true,
-  });
+  // const toast = showLoadingToast({
+  //   message: "加载中...",
+  //   forbidClick: true,
+  // });
 
   let res = new Promise((resolve, reject) => {
     getListData();
     resolve("ok");
   });
-  res.then(() => {
-    toast.clear();
-  });
+  res.then(() => {});
   // getListData();
 });
 
@@ -229,12 +232,25 @@ const reloadPage = () => {
 
     <router-view />
     <van-tabbar route>
-      <van-tabbar-item icon="home-o" replace to="/teacher">首页</van-tabbar-item>
-      <van-tabbar-item icon="friends-o" replace to="/xlsmList">用户</van-tabbar-item>
-      <van-tabbar-item icon="search" replace to="/teacherComment">试题</van-tabbar-item>
+      <van-tabbar-item icon="home-o" replace to="/teacher"
+        >首页</van-tabbar-item
+      >
+      <van-tabbar-item icon="friends-o" replace to="/xlsmList"
+        >用户xlsm</van-tabbar-item
+      >
+      <van-tabbar-item icon="search" replace to="/teacherComment"
+        >试题</van-tabbar-item
+      >
+      <van-tabbar-item icon="list-switch" replace to="/logList"
+        >日志</van-tabbar-item
+      >
+      <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
+        >单词本</van-tabbar-item
+      >
     </van-tabbar>
 
-    <van-cell-group v-model="selectedItems">
+    <!-- 数据列表 -->
+    <van-cell-group v-model="selectedItems" style="margin-bottom: 80px">
       <div v-for="(item, index) in originalData" :key="index">
         <van-cell
           :title="`${item.item_list[0].英文} ${item.item_list[0].中文[0]}`"

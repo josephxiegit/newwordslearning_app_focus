@@ -12,8 +12,10 @@ import StudentAccountItem from './components/studentAccountItem.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
+import LogList from './components/logList.vue';
+import TextbookList from './components/textbookList.vue';
+import Typed1 from './components/typed1.vue';
 import 'vant/lib/index.css';
-
 
 // 定义你的路由配置
 const routes = [
@@ -30,6 +32,17 @@ const routes = [
             preventBack: true
         }
     },
+    
+    // {
+    //     path: '/',
+    //     redirect: '/Typed1'
+    // },
+    // {
+    //     path: '/homepage',
+    //     name: 'typed1',
+    //     component: Typed1,
+    // },
+
     {
         path: '/teacher',
         name: 'teacher',
@@ -73,6 +86,24 @@ const routes = [
         }
     },
     {
+        path: '/logList',
+        name: 'logList',
+        component: LogList,
+        meta: {
+            index: 2,
+
+        }
+    },
+    {
+        path: '/textbookList',
+        name: 'textbookList',
+        component: TextbookList,
+        meta: {
+            index: 2,
+
+        }
+    },
+    {
         path: '/studentAccountAnswer',
         name: 'studentAccountAnswer',
         component: StudentAccountAnswer,
@@ -103,36 +134,36 @@ const router = createRouter({
     history: createWebHistory(),
     routes, // 使用路由配置
 });
+
 // 设置全局前置守卫
 router.beforeEach((to, from, next) => {
-    if (from.path === '/homepage') {
-        // 检测到刷新行为，可以通过判断 to 和 from 是否相同，或者其他方式
-        // 这里以to和from完全相同来模拟刷新行为的检测
-        if (to.fullPath === from.fullPath) {
-            // 重定向到根目录
-            next('/');
+    let localTeacherPassword = window.localStorage.getItem('teacherPassword');
+    localTeacherPassword = atob(localTeacherPassword);
+    // console.log('localTeacherPassword: ', localTeacherPassword);
+    
+
+    if (localTeacherPassword == "ss27834894") {
+        next();
+    } else {
+        if (from.path === '/homepage') {
+            if (to.fullPath === from.fullPath) {
+                // 重定向到根目录
+                next('/');
+            }
+        };
+        if ((from.path === '/studentAnswer' && to.meta.preventBack) ||
+            (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') ||
+            (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
+            (from.path === '/studentAccountItem' && to.meta.preventBack)) {
+            // 如果满足以上任何条件，阻止导航
+            next(false);
+        } else {
+            // 其他情况，正常进行路由导航
+            next();
         }
     }
 
-    if (from.path === '/studentAnswer' && to.meta.preventBack) {
-        // console.log(1111);
-        next(false);
-    }
-    if (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') {
-        // console.log(3333);
-        next(false);
-    }
-    if (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') {
-        // console.log(4444);
-        next(false);
-    }
-    if (from.path === '/studentAccountItem' && to.meta.preventBack) {
-        // console.log(555);
-        next(false);
-    } else {
-        // console.log(666);
-        next(); // 确保正常的路由跳转继续进行
-    }
+
 
 });
 // 判断手机还是电脑
@@ -141,7 +172,7 @@ function _isMobile() {
     // console.log(flag)
     return flag;
 }
-console.log(_isMobile());
+// console.log(_isMobile());
 
 // 定义全局变量
 const globalState = reactive({
@@ -152,9 +183,9 @@ const globalState = reactive({
 
 import {
     Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay,
-    Loading, Dialog, Field, Notify, Toast, FloatingBubble,
-    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky
+    Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle,
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText,
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -166,6 +197,7 @@ app.provide('globalState', globalState);
 // 使用Vant组件
 app.use(Button)
     .use(Checkbox)
+    .use(Circle)
     .use(CheckboxGroup)
     .use(NavBar)
     .use(Cell)
@@ -187,7 +219,13 @@ app.use(Button)
     .use(Icon)
     .use(FloatingPanel)
     .use(Sticky)
-    .use(Highlight);
+    .use(Highlight)
+    .use(Collapse)
+    .use(Search)
+    .use(Tag)
+    .use(Badge)
+    .use(RollingText)
+    .use(CollapseItem);
 // 使用vue-router
 app.use(router);
 app.use(axiosPlugin);

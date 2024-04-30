@@ -26,19 +26,10 @@ const falseCount = computed(() => {
 });
 // 继续跳转做题
 const gotoNext = () => {
-  console.log(compareResult.value);
-  console.log(nid.value);
-  const rate = trueCount.value === compareResult.value.length ? 1 : 0;
-  async function updateAccountData() {
-    // 更新attempt和rate
-    let params = new URLSearchParams();
-    params.append("method", "updateUserData");
-    params.append("nid", nid.value);
-    params.append("rate", rate);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
+  // console.log(compareResult.value);
+  // console.log(nid.value);
+  // console.log(rate.value);
+
   async function refreshAccountData() {
     // 重新查找用户数据
     let params = new URLSearchParams();
@@ -48,35 +39,15 @@ const gotoNext = () => {
       return ret.data;
     });
   }
-  async function handleAccountData() {
-    try {
-      const updateResult = await updateAccountData();
-      // console.log(updateResult);
-      const refreshResult = await refreshAccountData();
-      // console.log(refreshResult);
-      // return refreshResult;
-      return {
-        refreshResult: refreshResult,
-        rate: updateResult["rate"],
-      };
-    } catch (error) {
-      console.error("Error handling account data:", error);
-    }
-  }
-
-  async function updateAndNavigate() {
-    // 导航到页面
-    const data = await handleAccountData();
-    console.log(data);
+  refreshAccountData().then((res) => {
     router.push({
       path: "/studentAccountList",
       state: {
-        data: JSON.stringify(data["refreshResult"]),
-        flagRate: data["rate"],
+        data: JSON.stringify(res),
+        flagRate: rate.value,
       },
     });
-  }
-  updateAndNavigate();
+  });
 };
 
 // 切换显示
@@ -94,6 +65,7 @@ function toggleShowAll() {
   // 切换 showAll 的值
   showAll.value = !showAll.value;
   showScroll.value = !showScroll.value;
+  myList.value = [];
   if (showScroll.value) {
     showToast({
       message: "下拉导航可用",
@@ -112,8 +84,8 @@ const myList = ref([]);
 const showScroll = ref(true);
 const anchorsScrolls = [
   65,
-  Math.round(0.25 * window.innerHeight),
-  Math.round(0.55 * window.innerHeight),
+  Math.round(0.4 * window.innerHeight),
+  Math.round(0.65 * window.innerHeight),
 ];
 const heightScroll = ref(anchorsScrolls[0]);
 const setItemRef = (el) => {
@@ -122,6 +94,10 @@ const setItemRef = (el) => {
   }
 };
 const scrollToItem = (index) => {
+  // 检查是否点击的是列表中的最后两个选项
+  if (index >= filteredCompareResult.value.length - 1) {
+    heightScroll.value = 65;
+  }
   if (myList.value[index]) {
     const item = myList.value[index - 1];
     const top = item.getBoundingClientRect().top + window.scrollY - 40; // 获取元素的顶部位置并向上偏移10px
@@ -141,10 +117,12 @@ const keywordsHighlight2 = "右上角继续";
 const textHighlight2 = "确认并背诵单词后，点击右上角继续";
 const keywordsHighlight3 = "下拉导航";
 const textHighlight3 = "底部下拉导航快速定位";
+const rate = ref("");
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
     userSelected.value = JSON.parse(history.state.userSelected);
+    rate.value = history.state.rate;
     nid.value = history.state.nid;
     resolve(compareResult.value);
   });
@@ -200,7 +178,6 @@ onMounted(async () => {
             highlight-class="custom-class"
           />
         </div>
-
       </template>
     </van-dialog>
 
@@ -236,8 +213,13 @@ onMounted(async () => {
       v-model:height="heightScroll"
       :anchors="anchorsScrolls"
       v-show="showScroll"
+      :content-draggable="false"
     >
-      <van-cell title="上拉查看导航" value="点击跳转" style="color: blue; font-weight: bold" />
+      <van-cell
+        title="上拉查看导航"
+        value="点击跳转"
+        style="color: blue; font-weight: bold"
+      />
       <van-cell-group
         v-for="(item, index) in filteredCompareResult"
         :key="index"
@@ -292,9 +274,9 @@ onMounted(async () => {
               </template>
               <template #right-icon>
                 <van-checkbox
-                  :name="`${index + 1}-${index2 + 1}`"
+                  :name="`${item.序号}-${index2 + 1}`"
                   :disabled="true"
-                  :checked="userSelected.includes(`${index + 1}-${index2 + 1}`)"
+                  :checked="userSelected.includes(`${item.序号}-${index2 + 1}`)"
                 />
               </template>
             </van-cell>

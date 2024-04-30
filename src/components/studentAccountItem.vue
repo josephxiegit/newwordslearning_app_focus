@@ -1,6 +1,18 @@
 <script setup>
-import { watch, onMounted, ref, getCurrentInstance, onBeforeUpdate } from "vue";
-import { showFailToast, showToast, showLoadingToast } from "vant";
+import {
+  watch,
+  onMounted,
+  ref,
+  getCurrentInstance,
+  onBeforeUpdate,
+  computed,
+} from "vue";
+import {
+  showFailToast,
+  showDialog,
+  showConfirmDialog,
+  showLoadingToast,
+} from "vant";
 
 import { useRouter } from "vue-router";
 const router = useRouter();
@@ -96,36 +108,30 @@ const compareAndAddFlag = (dictArray) => {
     };
   });
 };
-
 const clickSubmitUser = (action, done) => {
   // 输入用户名后，确认提交
   if (action === "confirm") {
-    // console.log("用户选择的内容:", synonymsSelected.value);
-
     // 合并答案和选项
     mergedData.value = mergeAnswerAndSynonym();
-    // console.log("合并答案和选项：", mergedData.value);
 
     // 将用户选择转化为中文
     const synonymsSelectedChinese = convertSelections(
       synonymsSelected.value,
       synonymsOptions.value
     );
-    // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
 
     // 将中文用户选择和选项答案合并
     const synonymAndSelections = mergeSynonymAndSelections(
       synonymsSelectedChinese
     );
-    // console.log("synonymAndSelections", synonymAndSelections);
 
     // 比对结果给出flag
     const compareResult = compareAndAddFlag(synonymAndSelections);
-    // console.log("compareResult", compareResult);
 
-    const containsUnselected = compareResult.some((item) =>
+    let containsUnselected = compareResult.some((item) =>
       item.用户选择.includes("无")
     );
+    // containsUnselected = false;
     console.log("containsUnselected", containsUnselected);
 
     if (containsUnselected) {
@@ -139,15 +145,56 @@ const clickSubmitUser = (action, done) => {
       showDialogSubmit.value = false;
       clickScroll();
     } else {
-      // 跳转答案
-      router.push({
-        path: "/studentAccountAnswer",
-        state: {
-          compareResult: JSON.stringify(compareResult),
-          userSelected: JSON.stringify(synonymsSelected.value),
-          nid: nid.value
-        },
-      });
+      const trueCount = compareResult.filter(
+        (item) => item.flag === "true"
+      ).length;
+      const rate = trueCount === compareResult.length ? 1 : 0;
+      async function updateAccountData() {
+        // 更新attempt和rate
+        let params = new URLSearchParams();
+        params.append("method", "updateUserData");
+        params.append("nid", nid.value);
+        params.append("rate", rate);
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data;
+        });
+      }
+
+      // console.log('compareResult: ', compareResult);
+      // console.log('synonymsSelected: ', synonymsSelected.value);
+
+      async function updateAccountlog() {
+        // 结果存储到日志
+        let params = new URLSearchParams();
+        params.append("method", "updateUserlog");
+        params.append("log", JSON.stringify(compareResult));
+        params.append("title", titleData.value);
+        params.append("username", username.value);
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data;
+        });
+      }
+      Promise.all([updateAccountData(), updateAccountlog()])
+        .then((results) => {
+          const accountDataResult = results[0]; // updateAccountData 的结果
+          const accountLogResult = results[1]; // updateAccountlog 的结果
+          console.log(accountDataResult);
+          console.log(accountLogResult);
+
+          // 执行页面跳转
+          router.push({
+            path: "/studentAccountAnswer",
+            state: {
+              compareResult: JSON.stringify(compareResult),
+              userSelected: JSON.stringify(synonymsSelected.value),
+              nid: nid.value,
+              rate: accountDataResult.rate,
+            },
+          });
+        })
+        .catch((error) => {
+          console.error("An error occurred:", error);
+        });
     }
   } else {
     // 如果用户点击取消或遮罩层，直接关闭对话框
@@ -163,6 +210,10 @@ const setItemRef = (el) => {
   }
 };
 const scrollToItem = (index) => {
+  // 检查是否点击的是列表中的最后两个选项
+  if (index >= synonymsOptions.value.length - 2) {
+    heightScroll.value = 65;
+  }
   if (myList.value[index]) {
     const item = myList.value[index];
     const top = item.getBoundingClientRect().top + window.scrollY - 50; // 获取元素的顶部位置并向上偏移10px
@@ -179,14 +230,61 @@ const clickScroll = () => {
   scrollToItem(indexNoEmpty);
 };
 
+// 预览跳转功能
+const selectedResults = ref({}); // 用于存储每个单词的选择结果
+const showScroll = ref(true);
+const lowerAnchor = 65; // 最低高度
+const middleAnchor = Math.round(0.4 * window.innerHeight); // 中间高度
+const anchorsScrolls = [
+  lowerAnchor,
+  middleAnchor,
+  Math.round(0.65 * window.innerHeight),
+];
+const heightScroll = ref(lowerAnchor);
+const closePanel = () => {
+  if (heightScroll.value === lowerAnchor) {
+    heightScroll.value = middleAnchor;
+  } else {
+    heightScroll.value = lowerAnchor;
+  }
+};
+const buttonText = computed(() => {
+  // 计算按钮文本
+  return heightScroll.value === lowerAnchor ? "显示导航" : "关闭导航";
+});
+const buttonStyle = computed(() => {
+  // 计算按钮样式
+  return {
+    marginBottom: "10px",
+    fontWeight: "bold",
+    color: heightScroll.value === lowerAnchor ? "green" : "red",
+  };
+});
+
 // 点击选项
 const resultDataTempt = ref([]);
+const selectedIndexes = ref({});
 const completeCount = ref("0");
 const toggleCheckChinese = (index, index2) => {
-  const checkboxRef = checkboxRefs.value[`${index}-${index2}`];
+  const key = `${index}-${index2}`;
+  const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
-    checkboxRef.toggle(); // 直接调用复选框的 toggle 方法
+    checkboxRef.toggle();
   }
+  selectedIndexes.value[key] = !selectedIndexes.value[key];
+
+  // 更新选择结果
+  const selectedChineses = selectedResults.value[index] || [];
+  if (selectedIndexes.value[key]) {
+    selectedChineses.push(synonymsOptions.value[index].中文[index2]);
+  } else {
+    const removeIndex = selectedChineses.indexOf(
+      synonymsOptions.value[index].中文[index2]
+    );
+    selectedChineses.splice(removeIndex, 1);
+  }
+  selectedResults.value[index] = selectedChineses;
+
   // 合并答案和选项
   mergedData.value = mergeAnswerAndSynonym();
   // console.log("合并答案和选项：", mergedData.value);
@@ -208,12 +306,90 @@ const toggleCheckChinese = (index, index2) => {
     return count;
   }, 0);
 };
+function isSelected(index, index2) {
+  return selectedIndexes.value[`${index}-${index2}`];
+}
 
+// 场外支援
+const flagHelp = ref(true);
+const helpOutside = () => {
+  if (flagHelp.value) {
+    showConfirmDialog({
+      title: "场外支援",
+      theme: "round-button",
+      message: "只有一次求助机会，确认使用吗？",
+    }).then(() => {
+      // 合并答案和选项
+      mergedData.value = mergeAnswerAndSynonym();
+
+      // 将用户选择转化为中文
+      const synonymsSelectedChinese = convertSelections(
+        synonymsSelected.value,
+        synonymsOptions.value
+      );
+
+      // 将中文用户选择和选项答案合并
+      const synonymAndSelections = mergeSynonymAndSelections(
+        synonymsSelectedChinese
+      );
+
+      // 比对结果给出flag
+      const compareResult = compareAndAddFlag(synonymAndSelections);
+      console.log("compareResult: ", compareResult);
+
+      const containsUnselected = compareResult.some((item) =>
+        item.用户选择.includes("无")
+      );
+      if (containsUnselected) {
+        showFailToast("需要全部完成");
+        return;
+      } else {
+        const countFlags = compareResult.reduce(
+          (acc, item) => {
+            if (item.flag === "false") {
+              acc.falseCount += 1;
+            } else if (item.flag === "half") {
+              acc.halfCount += 1;
+            }
+            return acc;
+          },
+          { falseCount: 0, halfCount: 0 }
+        );
+        // console.log(countFlags);
+        if (countFlags.falseCount == 0 && countFlags.halfCount == 0) {
+          showDialog({
+            title: "恭喜，全对了",
+            theme: "round-button",
+            message: "可以提交答案了！",
+          });
+        } else {
+          showDialog({
+            title: "再加油",
+            theme: "round-button",
+            message: `错误: ${countFlags.falseCount}\n半对：${countFlags.halfCount}`,
+          });
+        }
+        flagHelp.value = false;
+      }
+    });
+  } else {
+    showDialog({
+      message: "每次挑战只有一次机会！",
+    });
+  }
+};
+
+const titleData = ref("");
+const username = ref("");
 onMounted(async () => {
   const data = JSON.parse(history.state.data);
   nid.value = history.state.nid;
   synonymsOptions.value = data.synonyms;
   answers.value = data.answers;
+  titleData.value = data.title;
+  username.value = data.username;
+  console.log("username: ", username.value);
+
   console.log(synonymsOptions);
 });
 </script>
@@ -224,9 +400,9 @@ onMounted(async () => {
       <van-nav-bar
         title="学生题目"
         right-text="提交"
-        :left-text="`点击：${completeCount}/${synonymsOptions.length}`"
+        :left-text="`场外支援：${completeCount}/${synonymsOptions.length}`"
         @click-right="submitSelection()"
-        @click-left="clickScroll()"
+        @click-left="helpOutside()"
       >
       </van-nav-bar>
     </div>
@@ -243,8 +419,52 @@ onMounted(async () => {
       <span>试题未完成，不能提交</span>
     </van-notify>
 
+    <!-- 预览滚动 -->
+    <van-floating-panel
+      v-model:height="heightScroll"
+      :anchors="anchorsScrolls"
+      v-show="showScroll"
+      :content-draggable="false"
+    >
+      <van-button
+        plain
+        type="default"
+        block
+        style="margin-bottom: 0px; font-weight: bold; height: 6%"
+        :style="buttonStyle"
+        @click="closePanel"
+        >{{ buttonText }}</van-button
+      >
+      <van-cell
+        title="上拉增大导航"
+        value="点击跳转"
+        style="color: blue; font-weight: bold"
+      />
+      <van-cell-group v-for="(item, index) in synonymsOptions" :key="index">
+        <van-cell
+          @click="scrollToItem(item.序号 - 1)"
+          is-link
+          :title="item.序号 + '. ' + item.英文"
+          size="large"
+          :style="{
+            color:
+              selectedResults[index] && selectedResults[index].length > 0
+                ? 'red'
+                : '',
+          }"
+        >
+          <template #default>
+            <span
+              v-if="selectedResults[index] && selectedResults[index].length"
+              >{{ selectedResults[index].join("; ") }}</span
+            >
+          </template>
+        </van-cell>
+      </van-cell-group>
+    </van-floating-panel>
+
     <!-- 显示列表单词 -->
-    <van-checkbox-group v-model="synonymsSelected">
+    <van-checkbox-group v-model="synonymsSelected" style="margin-bottom: 80px">
       <van-cell-group>
         <div
           v-for="(item, index) in synonymsOptions"
@@ -266,6 +486,7 @@ onMounted(async () => {
               :key="index2"
               clickable
               @click="toggleCheckChinese(index, index2)"
+              :class="isSelected(index, index2) ? 'selected-cell' : ''"
               class="chinese-cell"
             >
               <template #title>
@@ -275,7 +496,7 @@ onMounted(async () => {
                 <van-checkbox
                   :name="`${index + 1}-${index2 + 1}`"
                   :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
-                  @click.stop
+                  @click.stop.prevent="toggleCheckChinese(index, index2)"
                 />
               </template>
             </van-cell>
@@ -290,6 +511,12 @@ onMounted(async () => {
 
 
 <style>
+.selected-cell {
+  font-weight: bold;
+  color: #1a89fa !important;
+  background-color: #c0c6cc !important;
+}
+
 .bold-title div {
   font-weight: bold; /* 加粗英文和序号 */
   font-size: large;

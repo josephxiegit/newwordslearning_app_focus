@@ -38,6 +38,8 @@ function toggleShowAll() {
   // 切换 showAll 的值
   showAll.value = !showAll.value;
   showScroll.value = !showScroll.value;
+  myList.value = [];
+
   if (showScroll.value) {
     showToast({
       message: "下拉导航可用",
@@ -56,8 +58,8 @@ const myList = ref([]);
 const showScroll = ref(true);
 const anchorsScrolls = [
   65,
-  Math.round(0.25 * window.innerHeight),
-  Math.round(0.55 * window.innerHeight),
+  Math.round(0.4 * window.innerHeight),
+  Math.round(0.65 * window.innerHeight),
 ];
 const heightScroll = ref(anchorsScrolls[0]);
 const setItemRef = (el) => {
@@ -66,6 +68,10 @@ const setItemRef = (el) => {
   }
 };
 const scrollToItem = (index) => {
+  // 检查是否点击的是列表中的最后两个选项
+  if (index >= filteredCompareResult.value.length - 1) {
+    heightScroll.value = 65;
+  }
   if (myList.value[index]) {
     const item = myList.value[index - 1];
     const top = item.getBoundingClientRect().top + window.scrollY - 40; // 获取元素的顶部位置并向上偏移10px
@@ -134,10 +140,7 @@ onMounted(async () => {
 
     <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar
-        title="背诵答案"
-        :right-text="`${user}`"
-      >
+      <van-nav-bar title="背诵答案" :right-text="`${user}`">
         <template #left>
           <div
             style="
@@ -167,6 +170,7 @@ onMounted(async () => {
       v-model:height="heightScroll"
       :anchors="anchorsScrolls"
       v-show="showScroll"
+      :content-draggable="false"
     >
       <van-cell
         title="上拉查看导航"
@@ -228,9 +232,9 @@ onMounted(async () => {
               </template>
               <template #right-icon>
                 <van-checkbox
-                  :name="`${index + 1}-${index2 + 1}`"
+                  :name="`${item.序号}-${index2 + 1}`"
                   :disabled="true"
-                  :checked="userSelected.includes(`${index + 1}-${index2 + 1}`)"
+                  :checked="userSelected.includes(`${item.序号}-${index2 + 1}`)"
                 />
               </template>
             </van-cell>

@@ -12,13 +12,14 @@ import {
   showSuccessToast,
   showFailToast,
   showLoadingToast,
-  showConfirmDialog,
+  showConfirmDialog
 } from "vant";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 
 const originalData = ref([]);
+const filterXlsmData = ref([]);
 
 // 跳转明细
 async function queryData() {
@@ -30,8 +31,11 @@ async function queryData() {
 }
 function getListData() {
   queryData().then((res) => {
-    originalData.value = res;
-    console.log(res);
+    originalData.value = [...res];
+    filterXlsmData.value = [...res];
+    console.log("filterXlsmData: ", filterXlsmData.value);
+
+    // filterData();
   });
 }
 
@@ -55,7 +59,13 @@ const deleteItem = (item, index) => {
     theme: "round-button",
   }).then(() => {
     DeleteUserData().then((ret) => {
-      reloadPage()
+      if (valueSearchStudent.value == "" && valueSearchXlsm.value == "") {
+        reloadPage();
+      } else {
+        showSuccessToast("处于筛选状态")
+        filterData();
+      }
+      
     });
   });
 };
@@ -76,21 +86,102 @@ const editItem = (item, index) => {
     theme: "round-button",
   }).then(() => {
     clearUserRateAndAttempt().then((ret) => {
-      reloadPage()
+      reloadPage();
     });
   });
 };
 
-onMounted(async () => {
-  // const toast = showLoadingToast({
-  //   message: "加载中...",
-  //   forbidClick: true,
-  // });
+// 筛选
+const showFliterBox = ref(false);
+const valueSearchStudent = ref("");
+const valueSearchXlsm = ref("");
+const clearFilterData = () => {
+  valueSearchStudent.value = "";
+  valueSearchXlsm.value = "";
+};
+function processData(res) {
+  return res.map((item) => {
+    const {
+      title,
+      username,
+      answers,
+      synonyms,
+      create_time,
+      rate,
+      attempt,
+      nid,
+    } = item;
+    let dataAnswers = answers.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
+    dataAnswers = dataAnswers.replace(
+      /([{,]\s*)'([^']+?)'(\s*[:])/g,
+      '$1"$2"$3'
+    );
+    const parsedAnswers = JSON.parse(dataAnswers);
 
+    let dataSynonyms = synonyms.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
+    dataSynonyms = dataSynonyms.replace(
+      /([{,]\s*)'([^']+?)'(\s*[:])/g,
+      '$1"$2"$3'
+    );
+    const parsedSynonyms = JSON.parse(dataSynonyms);
+    return {
+      title,
+      username,
+      answers: parsedAnswers,
+      synonyms: parsedSynonyms,
+      create_time,
+      rate,
+      attempt,
+      nid,
+    };
+  });
+}
+const filterData = () => {
+  if (valueSearchStudent.value == "" && valueSearchXlsm.value == "") {
+    return;
+  }
+  async function filterData() {
+    let params = new URLSearchParams();
+    params.append("method", "filterTeacherComment");
+    params.append("filterStudent", valueSearchStudent.value);
+    params.append("filterXlsm", valueSearchXlsm.value);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  filterData().then((res) => {
+    console.log("res: ", res);
+
+    const newFilteredFiles = [];
+    res.forEach((item) => {
+      newFilteredFiles.push({
+        nid: item.pk,
+        ...item.fields,
+      });
+    });
+
+    let data = processData(newFilteredFiles);
+    filterXlsmData.value = [...data];
+    console.log("filterXlsmData: ", filterXlsmData.value);
+  });
+};
+
+const filteredStudent = () => {
+  filterData();
+  // showFliterBox.value = false;
+};
+
+// 筛选rate plus
+const showRatePlus = computed(() => {
+  return filterXlsmData.value.map((item) => item.rate > 3);
+});
+
+onMounted(async () => {
   let res = new Promise((resolve, reject) => {
     getListData();
     resolve("ok");
   });
+  res.then(() => {});
 });
 
 // 刷新页面
@@ -111,7 +202,9 @@ const reloadPage = () => {
       <van-nav-bar
         title="学生答题统计"
         right-text="刷新"
+        left-text="筛选"
         @click-right="reloadPage"
+        @click-left="showFliterBox = true"
       />
     </div>
 
@@ -121,16 +214,64 @@ const reloadPage = () => {
         >首页</van-tabbar-item
       >
       <van-tabbar-item icon="friends-o" replace to="/xlsmList"
-        >用户</van-tabbar-item
+        >用户xlsm</van-tabbar-item
       >
       <van-tabbar-item icon="search" replace to="/xlsmList"
         >试题</van-tabbar-item
       >
+      <van-tabbar-item icon="list-switch" replace to="/logList"
+        >日志</van-tabbar-item
+      >
+      <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
+        >单词本</van-tabbar-item
+      >
     </van-tabbar>
 
-    <van-cell-group>
+    <!-- 筛选数据 -->
+    <van-popup
+      v-model:show="showFliterBox"
+      position="center"
+      :style="{ height: '40%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset style="">
+        <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+          筛选试题
+        </div>
+        <!-- 关键词筛选 -->
+        <van-field
+          v-model="valueSearchStudent"
+          label="学生"
+          placeholder="请输入学生姓名"
+        />
+        <!-- 试题 -->
+        <van-field
+          v-model="valueSearchXlsm"
+          label="试题"
+          placeholder="请输入试题"
+        />
+        <van-button
+          @click="filteredStudent()"
+          type="success"
+          block
+          style="margin-top: 1rem"
+          >筛选试题</van-button
+        >
+        <van-button
+          @click="clearFilterData()"
+          type="primary"
+          block
+          style="margin-top: 0.2rem"
+          >清除筛选</van-button
+        >
+      </van-cell-group>
+    </van-popup>
+
+    <!-- 数据列表 -->
+    <van-cell-group style="margin-bottom: 80px">
       <van-swipe-cell
-        v-for="(item, index) in originalData"
+        v-for="(item, index) in filterXlsmData"
         :key="index"
         stop-propagation
       >
@@ -143,11 +284,36 @@ const reloadPage = () => {
           />
         </template>
         <van-cell
-          :title="item.username"
-          is-link
           :label="item.title"
-          :value="`尝试${item.attempt}次 | 成功${item.rate}次`"
+          style="padding-top: 0.5rem; padding-bottom: 0.5rem"
         >
+          <template #title>
+            <van-tag color="#ffe1e1" text-color="#ad0000" plain>{{
+              item.username
+            }}</van-tag>
+          </template>
+          <template #value>
+            <div style="display: flex; justify-content: space-between">
+              <div style="display: flex">
+                <van-rate
+                  v-model="item.rate"
+                  :size="18"
+                  icon="like"
+                  void-icon="like-o"
+                  :count="3"
+                />
+                <div
+                  v-if="showRatePlus[index]"
+                  style="margin-top: 4%; font-size: 12px; margin-left: 0.2rem"
+                >
+                  +{{ item.rate - 3 }}
+                </div>
+              </div>
+              <div style="font-size: 15px; color: black; font-weight: 700">
+                {{ item.attempt }}次
+              </div>
+            </div>
+          </template>
         </van-cell>
         <template #right>
           <van-button
