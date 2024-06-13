@@ -9,6 +9,9 @@ import {
 } from "vue";
 import { showDialog, showToast } from "vant";
 import { useRouter } from "vue-router";
+import WolfBack from "./wolfBack.vue";
+import VictorySheep from "./victorySheep.vue";
+import HalfTrue from "./HalfTrue.vue";
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
@@ -26,9 +29,6 @@ const falseCount = computed(() => {
 });
 // 继续跳转做题
 const gotoNext = () => {
-  // console.log(compareResult.value);
-  // console.log(nid.value);
-  // console.log(rate.value);
 
   async function refreshAccountData() {
     // 重新查找用户数据
@@ -110,31 +110,60 @@ const scrollToItem = (index) => {
 
 // 弹出欢迎
 const showWelcome = ref(false);
+const showWelcomeHalf = ref(false);
 const showStar = ref(false);
-const keywordsHighlight = "左上角👀";
-const textHighlight = "点击左上角👀，查看错题";
-const keywordsHighlight2 = "右上角继续";
-const textHighlight2 = "确认并背诵单词后，点击右上角继续";
-const keywordsHighlight3 = "下拉导航";
-const textHighlight3 = "底部下拉导航快速定位";
 const rate = ref("");
+const halfTrue = ref("");
+const wolfBackRef = ref(null);
+const halfTrueRef = ref(null);
+const victorySheepRef = ref(null);
+function showAnimationShine() {
+  wolfBackRef.value.show();
+
+  setTimeout(() => {
+    wolfBackRef.value.hide();
+  }, 4000);
+}
+function showAnimationHalfTrue() {
+  halfTrueRef.value.show();
+
+  setTimeout(() => {
+    halfTrueRef.value.hide();
+  }, 4000);
+}
+function showAnimationShineVictory() {
+  victorySheepRef.value.show();
+
+  setTimeout(() => {
+    victorySheepRef.value.hide();
+  }, 8000);
+}
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
     userSelected.value = JSON.parse(history.state.userSelected);
     rate.value = history.state.rate;
     nid.value = history.state.nid;
+    halfTrue.value = history.state.halfTrue;
     resolve(compareResult.value);
   });
   res.then((res) => {
     console.log("compareResult", res);
+    console.log('trueCount.value: ', trueCount.value);
+    console.log('compareResult.value: ', compareResult.value.length);
     if (trueCount.value == compareResult.value.length) {
-      showStar.value = true;
-      setTimeout(() => {
-        showStar.value = false; // 3秒后隐藏星星
-      }, 5000);
+      // showStar.value = true;
+      // setTimeout(() => {
+      //   showStar.value = false; // 3秒后隐藏星星
+      // }, 5000);
+      showAnimationShineVictory();
+    } else if (halfTrue.value == 0.5) {
+      showWelcomeHalf.value = true;
+      showAnimationHalfTrue();
     } else {
       showWelcome.value = true;
+      showAnimationShine();
+      
     }
   });
 });
@@ -147,9 +176,10 @@ onMounted(async () => {
       v-model:show="showWelcome"
       title="完成试题"
       theme="round-button"
+      class="custom-dialog"
     >
       <template #title>
-        <div class="custom-title">恭喜完成了{{ compareResult.length }}道题</div>
+        <div class="custom-title">很遗憾！下次加油哦</div>
       </template>
       <template #default>
         <div class="custom-content">
@@ -157,30 +187,27 @@ onMounted(async () => {
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
         </div>
-        <div class="custom-content">
-          <van-highlight
-            :keywords="keywordsHighlight"
-            :source-string="textHighlight"
-            highlight-class="custom-class"
-          />
-        </div>
-        <div class="custom-content">
-          <van-highlight
-            :keywords="keywordsHighlight3"
-            :source-string="textHighlight3"
-            highlight-class="custom-class"
-          />
-        </div>
-        <div class="custom-content">
-          <van-highlight
-            :keywords="keywordsHighlight2"
-            :source-string="textHighlight2"
-            highlight-class="custom-class"
-          />
-        </div>
       </template>
     </van-dialog>
 
+    <!-- 弹出提示 -->
+    <van-dialog
+      v-model:show="showWelcomeHalf"
+      title="完成试题"
+      theme="round-button"
+      class="custom-dialog"
+    >
+      <template #title>
+        <div class="custom-title">还不错！获得1/2奖励</div>
+      </template>
+      <template #default>
+        <div class="custom-content">
+          <div class="result-row">正确{{ trueCount }}道题</div>
+          <div class="result-row">半对{{ halfCount }}道题目</div>
+          <div class="result-row">错误{{ falseCount }}道题</div>
+        </div>
+      </template>
+    </van-dialog>
     <!-- 标题 -->
     <div class="nav-bar-container">
       <van-nav-bar title="背诵答案" right-text="继续" @click-right="gotoNext()">
@@ -243,7 +270,7 @@ onMounted(async () => {
     </van-floating-panel>
 
     <!-- 列表 -->
-    <van-checkbox-group v-model="userSelected" style="margin-bottom: 150px">
+    <van-checkbox-group v-model="userSelected" class="checkbox-container">
       <van-cell-group>
         <div
           v-for="(item, index) in filteredCompareResult"
@@ -277,6 +304,7 @@ onMounted(async () => {
                   :name="`${item.序号}-${index2 + 1}`"
                   :disabled="true"
                   :checked="userSelected.includes(`${item.序号}-${index2 + 1}`)"
+                  
                 />
               </template>
             </van-cell>
@@ -289,16 +317,42 @@ onMounted(async () => {
         </div>
       </van-cell-group>
     </van-checkbox-group>
-
+    <div class="bottom-placeholder"></div>
     <!-- 星星动画容器 -->
-    <div id="star-animation" class="star-container" v-if="showStar">★</div>
+    <!-- <div id="star-animation" class="star-container" v-if="showStar">★</div> -->
+    <WolfBack ref="wolfBackRef" />
+    <VictorySheep ref="victorySheepRef" />
+    <HalfTrue ref="halfTrueRef" />
   </div>
+
+  
 </template>
 
 
 
 
 <style>
+.checkbox-container {
+  width: 100%;
+  margin: 0 auto;
+  
+  
+}
+@media (min-width: 431px) {
+  .checkbox-container {
+    width: 90%;
+    box-shadow: -5px 0 8px rgba(0, 0, 0, 0.2), 5px 0 8px rgba(0, 0, 0, 0.2);
+    padding: 10px; 
+    margin-top:10px
+  }
+}
+
+.bottom-placeholder {
+  height: 80px;
+}
+
+
+
 .border-cell {
   border-top: 4px solid #eee; /* 每组的顶部边框加粗 */
 }
@@ -393,4 +447,8 @@ onMounted(async () => {
     transform: translate(-50%, -50%) scale(0.5); /* 结束时缩小并消失 */
   }
 }
+
+/* .custom-dialog {
+  top: 0% !important;
+} */
 </style>

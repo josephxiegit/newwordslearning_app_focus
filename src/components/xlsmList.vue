@@ -239,52 +239,6 @@ const showAccountItem = (item, index) => {
 
 // 地点
 const columnsLocation = ref([]);
-// const columnsLocation = [
-//   {
-//     text: "王串场",
-//     value: "王串场",
-//   },
-//   {
-//     text: "小树林",
-//     value: "小树林",
-//   },
-//   {
-//     text: "朗图",
-//     value: "朗图",
-//   },
-//   {
-//     text: "海光寺",
-//     value: "海光寺",
-//   },
-//   {
-//     text: "上门",
-//     value: "上门",
-//   },
-//   {
-//     text: "惠学教育",
-//     value: "惠学教育",
-//   },
-//   {
-//     text: "中山路春柳公寓",
-//     value: "中山路春柳公寓",
-//   },
-//   {
-//     text: "网课",
-//     value: "网课",
-//   },
-//   {
-//     text: "新东方",
-//     value: "新东方",
-//   },
-//   {
-//     text: "尚佳教育",
-//     value: "尚佳教育",
-//   },
-//   {
-//     text: "张鑫",
-//     value: "张鑫",
-//   },
-// ];
 async function queryLocations() {
   let params = new URLSearchParams();
   params.append("method", "queryLocations");
@@ -294,7 +248,6 @@ async function queryLocations() {
 }
 const showNewStudentAndQueryLocations = () => {
   showNewStudent.value = true;
-
 };
 
 // 增加新生
@@ -369,6 +322,58 @@ function clearStudent() {
   valueLocation.value = "";
 }
 
+// 增加分组
+const titlecatalogue = ref("日常任务");
+const showCatalogue = ref(false);
+const checkedListCatalogue = ref("");
+const newCatalogue = ref("");
+const listCatalogue = ref([]);
+const toggleListCatalogue = (index) => {
+  checkedListCatalogue.value = listCatalogue.value[index];
+  titlecatalogue.value = checkedListCatalogue.value;
+};
+const confirmNewCatalogue = () => {
+  if (newCatalogue.value != "") {
+    titlecatalogue.value = newCatalogue.value;
+    checkedListCatalogue.value = -1;
+    showCatalogue.value = false;
+  } else {
+    showFailToast("不能为空");
+  }
+};
+const clearNewCatalogue = () => {
+  newCatalogue.value = "";
+  checkedListCatalogue.value = listCatalogue.value[0];
+};
+const reviseCatalogue = () => {
+  if (!studentsSelected.value || studentsSelected.value.length === 0) {
+    showFailToast("没有选中学生");
+    return;
+  } else {
+    console.log(studentsSelected.value);
+    listCatalogue.value = [];
+    showCatalogue.value = true;
+    async function queryUserCatalogue() {
+      let params = new URLSearchParams();
+      params.append("method", "queryUserCatalogue");
+      params.append("students", JSON.stringify(studentsSelected.value));
+      // const studentsSelected = ["liushanmei", "liuweixuan"];
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
+    }
+    queryUserCatalogue().then((res) => {
+      console.log("res: ", res);
+      listCatalogue.value = res;
+      listCatalogue.value = listCatalogue.value.filter(
+        (item) => item !== "日常任务"
+      );
+      listCatalogue.value.unshift("日常任务");
+      checkedListCatalogue.value = listCatalogue.value[0];
+    });
+  }
+};
+
 // 增加新试题
 const addNewStudentList = () => {
   showConfirmDialog({
@@ -391,6 +396,7 @@ const addNewStudentList = () => {
         let params = new URLSearchParams();
         params.append("studentList", JSON.stringify(studentsSelected.value));
         params.append("title", JSON.stringify(selectXlsm.value));
+        params.append("catalogue", titlecatalogue.value);
 
         params.append("method", "addStudentXlsm");
         return await axios.post("words/", params).then((ret) => {
@@ -568,14 +574,26 @@ const toggleMultiSelect = () => {
       closeable
     >
       <div style="">
-        <div
-          style="
-            font-size: 20px;
-            font-weight: 700;
-            margin: 1rem 1rem 0.5rem 1rem;
-          "
-        >
-          用户列表
+        <div style="display: flex">
+          <div
+            style="
+              font-size: 20px;
+              font-weight: 700;
+              margin: 1rem 1rem 0.2rem 1rem;
+            "
+          >
+            用户列表
+          </div>
+          <div
+            style="
+              font-size: 13px;
+              font-weight: 700;
+              margin: 1.5rem 0 0 0.2rem;
+              color: gray;
+            "
+          >
+            分组：{{ titlecatalogue }}
+          </div>
         </div>
         <div
           style="
@@ -618,6 +636,13 @@ const toggleMultiSelect = () => {
         </div>
         <div>
           <van-button
+            @click="reviseCatalogue"
+            color="#7232dd"
+            size="small"
+            style="margin-right: 0.1rem; margin-bottom: 0.4rem"
+            >修改分组</van-button
+          >
+          <van-button
             @click="addNewStudentList"
             type="warning"
             size="small"
@@ -633,6 +658,64 @@ const toggleMultiSelect = () => {
           >
         </div>
       </div>
+
+      <!-- 修改分组catalogue -->
+      <van-popup
+        v-model:show="showCatalogue"
+        position="bottom"
+        :style="{ height: '60%' }"
+        closeable
+      >
+        <van-cell-group inset style="">
+          <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+            确认分组
+          </div>
+        </van-cell-group>
+
+        <van-radio-group v-model="checkedListCatalogue">
+          <van-field
+            v-model="newCatalogue"
+            name="新分组"
+            label="新分组"
+            placeholder="输入新组名"
+          >
+            <template #label>
+              <div style="margin-left: 1rem">新分组</div>
+            </template>
+            <template #button>
+              <van-button
+                size="small"
+                type="primary"
+                @click="confirmNewCatalogue"
+                square
+                >确认</van-button
+              >
+              <van-button
+                size="small"
+                type="warning"
+                @click="clearNewCatalogue"
+                square
+                >清除</van-button
+              >
+            </template>
+          </van-field>
+          <van-cell-group
+            inset
+            v-for="(item, index) in listCatalogue"
+            :key="index"
+          >
+            <van-cell
+              :title="item"
+              clickable
+              @click="toggleListCatalogue(index)"
+            >
+              <template #right-icon>
+                <van-radio :name="item" />
+              </template>
+            </van-cell>
+          </van-cell-group>
+        </van-radio-group>
+      </van-popup>
       <!-- 筛选新生 -->
       <van-popup
         v-model:show="showFliterStudent"

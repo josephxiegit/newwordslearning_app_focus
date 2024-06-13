@@ -33,67 +33,97 @@ async function queryData() {
     return ret.data;
   });
 }
+
+function formatDateString(dateString) {
+  const date = new Date(dateString);
+
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // getMonth() 返回的月份是从0开始的
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+
+  return `${year}年${month.toString().padStart(2, "0")}月${day
+    .toString()
+    .padStart(2, "0")}日${hours}时${minutes}分`;
+}
+
 function processData(res) {
   return res.map((item) => {
-    // try {
-      const { title, username, log, create_time, nid } = item; // 使用解构赋值提取所需字段
-      let dataString = log.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
-      dataString = dataString.replace(
-        /([{,]\s*)'([^']+?)'(\s*[:])/g,
-        '$1"$2"$3'
-      );
-      // console.log('dataString: ', dataString);
+    const { title, username, log, create_time, nid, swipe } = item;
+    const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
-      const parsedLog = JSON.parse(dataString); // 解析 log 字段
+    let dataString = log.replace(/(\W)'|'(\W)/g, '$1"$2');
+    dataString = dataString.replace(
+      /([{,]\s*)'([^']+?)'(\s*[:])/g,
+      '$1"$2"$3'
+    );
 
-      // 计算每个 log 项中 flag 为 "false" 或 "half" 的个数
+    try {
+      const parsedLog = JSON.parse(dataString); // 尝试解析 log 字段
+
       const falseCount = parsedLog.reduce((count, logItem) => {
-        return (
-          count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
-        );
+        return count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0);
       }, 0);
 
-      // 将 falseCount 添加到 log 数组中
-      parsedLog.falseCount = falseCount;
+      parsedLog.falseCount = falseCount; // 添加 falseCount 到 parsedLog 中
 
-      return { title, username, log: parsedLog, create_time, falseCount, nid }; // 返回新对象并包括 falseCount
-  });
+      return { title, username, log: parsedLog, create_time: formattedCreateTime, falseCount, nid, swipe };
+    } catch (error) {
+      console.error("Error parsing JSON data: ", error);
+      return null; // 返回 null 或适当的错误处理代码
+    }
+  }).filter(item => item !== null); // 过滤掉任何因错误而生成的 null 项
 }
 
 function getListData() {
-  queryData().then((res) => {
-    console.log(res);
-    let data = processData(res);
-
-    filteredFiles.value = [...data];
-    originalData.value = [...data]; // 使用扩展运算符进行深拷贝
-    console.log("originalData: ", originalData.value);
-
-    // applySearchFilter();
-    return filteredFiles.value;
-  });
-}
-
-// 刷新页面
-function refreshData() {
-  let res = new Promise((resolve, reject) => {
-    if (valueSearchStudent.value == "" && valueSearchLog.value == "") {
-      getListData();
-    } else {
-      filteredStudent();
-    }
-
-    resolve("ok");
-  });
+  filteredFiles.value = [];
+  pageIndex.value = 0;
+  finished.value = false;
+  loading.value = false;
+  onLoad();
 }
 
 // 筛选日志
 const showFliterBox = ref(false);
 const valueSearchStudent = ref("");
 const valueSearchLog = ref("");
+const valueAliasLog = ref("");
+const loading = ref(false);
+const finished = ref(false);
+const pageIndex = ref(0);
+
+const onLoad = async () => {
+  if (loading.value || finished.value) {
+    return;
+  }
+  try {
+    const params = new URLSearchParams();
+    params.append("method", "filterLog");
+    // params.append("alias", title);
+    params.append("filterStudent", valueSearchStudent.value);
+    params.append("filterXlsm", valueSearchLog.value);
+    params.append("page", pageIndex.value + 1); // 请求下一页的数据
+    params.append("page_size", 20); // 每页数据大小
+
+    const response = await axios.post("words/", params);
+    let moreData = response.data.data;
+    console.log("moreData: ", moreData);
+    moreData = processData(moreData);
+    filteredFiles.value.push(...moreData);
+    pageIndex.value++;
+    finished.value = !response.data.has_more;
+  } catch (error) {
+    console.error("Failed to fetch data:", error);
+  }
+  loading.value = false;
+  return filteredFiles.value;
+};
+
 const clearFilterData = () => {
   valueSearchStudent.value = "";
   valueSearchLog.value = "";
+  valueAliasLog.value = "";
 };
 const filteredStudent = () => {
   if (valueSearchStudent.value == "" && valueSearchLog.value == "") {
@@ -104,16 +134,17 @@ const filteredStudent = () => {
     params.append("method", "filterLog");
     params.append("filterStudent", valueSearchStudent.value);
     params.append("filterXlsm", valueSearchLog.value);
+    params.append("alias", valueAliasLog.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
   }
   filterData().then((res) => {
     console.log("res: ", res);
-    let data = processData(res);
+    let data = processData(res.data);
     filteredFiles.value = [...data];
     showFliterBox.value = false;
-    // filteredFiles.value = newFilteredFiles;
+   
   });
 };
 
@@ -123,9 +154,11 @@ const detailName = ref("");
 const detailDate = ref("");
 const detailXlsmName = ref("");
 const detailRate = ref("");
+const detailMode = ref("");
 const detailList = ref([]);
 const toggleDetail = (index) => {
   const detail = filteredFiles.value[index];
+  detailMode.value = detail['swipe'];
   detailName.value = detail["username"];
   detailDate.value = detail["create_time"];
   detailXlsmName.value = detail["title"];
@@ -135,13 +168,7 @@ const toggleDetail = (index) => {
   console.log("detail: ", detail);
   showDetail.value = true;
 };
-// const isCorrectAnswer = (userChoices, answerString) => {
-//   const answers = answerString.split("；"); // 将答案字符串分割成数组
-//   if (userChoices.length !== answers.length) {
-//     return false; // 如果两个数组长度不相等，直接返回false
-//   }
-//   return userChoices.every((choice, index) => choice === answers[index]);
-// };
+
 const isCorrectAnswer = (userChoices, answerString) => {
   const answers = answerString.split("；").sort(); // 将答案字符串分割成数组并排序
   const sortedUserChoices = [...userChoices].sort(); // 复制用户选择数组并排序
@@ -152,7 +179,6 @@ const isCorrectAnswer = (userChoices, answerString) => {
 
   return sortedUserChoices.every((choice, index) => choice === answers[index]);
 };
-
 
 // 删除日志
 const deleteItem = (item, index) => {
@@ -177,7 +203,7 @@ const deleteItem = (item, index) => {
       .then((res) => {
         console.log("res: ", res);
         showSuccessToast("删除成功");
-        refreshData();
+        getListData();
         filteredStudent();
       })
       .catch((err) => {
@@ -188,7 +214,6 @@ const deleteItem = (item, index) => {
 };
 
 onMounted(async () => {
-  refreshData();
 });
 
 // 刷新页面
@@ -237,10 +262,9 @@ const reloadPage = () => {
     <!-- 筛选数据 -->
     <van-popup
       v-model:show="showFliterBox"
-      position="center"
-      :style="{ height: '40%' }"
+      position="bottom"
+      :style="{ height: '50%' }"
       closeable
-      :overlay="false"
       :lock-scroll="false"
     >
       <van-cell-group inset style="">
@@ -258,6 +282,11 @@ const reloadPage = () => {
           v-model="valueSearchLog"
           label="试题"
           placeholder="请输入试题"
+        />
+        <van-field
+          v-model="valueAliasLog"
+          label="分组"
+          placeholder="请输入分组"
         />
         <van-button
           @click="filteredStudent()"
@@ -277,7 +306,14 @@ const reloadPage = () => {
     </van-popup>
 
     <!-- 日志列表 -->
-    <van-cell-group style="margin-bottom: 80px">
+    <!-- <van-cell-group style="margin-bottom: 80px"> -->
+    <van-list
+        v-model="loading"
+        :finished="finished"
+        finished-text="没有更多了"
+        @load="onLoad"
+        style="margin-bottom: 80px"
+      >
       <van-swipe-cell
         v-for="(item, index) in filteredFiles"
         :key="index"
@@ -292,8 +328,8 @@ const reloadPage = () => {
           />
         </template>
         <van-cell
-          :title="`${item.title}`"
-          :label="item.create_time.slice(0, 10)"
+          :title="`${item.title} | ${item.swipe}`"
+          :label="item.create_time"
           is-link
           @click="toggleDetail(index)"
         >
@@ -307,7 +343,7 @@ const reloadPage = () => {
           </template>
         </van-cell>
       </van-swipe-cell>
-    </van-cell-group>
+    </van-list>
 
     <!-- 日志详情 -->
     <van-popup
@@ -321,7 +357,7 @@ const reloadPage = () => {
         <div>
           <div style="display: flex; justify-content: space-between">
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
-              {{ detailName }}
+              {{ detailName }} | {{ detailMode }}
             </div>
             <div
               style="

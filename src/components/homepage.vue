@@ -19,11 +19,14 @@ import {
 } from "vant";
 import { Base64 } from "js-base64";
 import { useRouter } from "vue-router";
+import loading from "./loading.vue";
 import QuickSwitchingText from "./QuickSwitchingText.vue";
+
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const title = ref("");
+const isLoading = ref(false);
 
 const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
@@ -350,37 +353,50 @@ const buttonStyle = computed(() => {
 
 // 地狱模式
 const showAccountPop = ref(true);
+const missyouFlag = ref(false);
+const missDays = ref(2);
 const userAccount = ref("");
 const passwordAccount = ref("");
 const showHell = () => {
   showAccountPop.value = true;
 };
-const submitAccount = () => {
-  async function submitAccountData() {
-    let params = new URLSearchParams();
-    params.append("method", "getUserData");
-    params.append("user", userAccount.value);
-    params.append("password", passwordAccount.value);
-    return await axios.post("words/", params).then((ret) => {
-      // console.log(ret.data);
-      return ret.data;
-    });
-  }
+async function submitAccountData() {
+  let params = new URLSearchParams();
+  params.append("method", "getUserData");
+  params.append("user", userAccount.value);
 
+  params.append("password", passwordAccount.value);
+
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
+}
+const submitAccount = () => {
+  // isLoading.value = true;
   if (passwordAccount.value.trim() && userAccount.value.trim()) {
     submitAccountData().then((res) => {
+      // console.log('res: ', res);
       if (res == "用户名不存在") {
         showFailToast("用户名不存在");
       } else if (res == "密码错误") {
         showFailToast("密码错误");
       } else {
-        showDialog({
-          title: "做题须知",
-          theme: "round-button",
-          messageAlign: "left",
-          message:
-            "\n1. 选择任务列表中的任务。\n\n2. 从六个选项中选择一个或多个你认为正确的答案。提交你的答案后，系统会显示正确答案，确认无误后请点击继续。\n\n3. 完全正确的试卷将获得一个星星，收集满三颗星星即视为任务完成。",
-        });
+        // showDialog({
+        //   title: "做题须知",
+        //   theme: "round-button",
+        //   messageAlign: "left",
+        //   message:
+        //     "\n1. 选择任务列表中的任务。\n\n2. 从六个选项中选择一个或多个你认为正确的答案。提交你的答案后，系统会显示正确答案，确认无误后请点击继续。\n\n3. 完全正确的试卷将获得一个星星，收集满三颗星星即视为任务完成。",
+        // });
+
+        async function missTask() {
+          let params = new URLSearchParams();
+          params.append("method", "missTask");
+          params.append("user", userAccount.value);
+          return await axios.post("words/", params).then((ret) => {
+            return ret.data;
+          });
+        }
 
         async function userTestUpdate() {
           let params = new URLSearchParams();
@@ -389,23 +405,58 @@ const submitAccount = () => {
             return ret.data;
           });
         }
-        if (userAccount.value == "user" || userAccount.value == "teacher") {
-          userTestUpdate().then(() => {
-            router.push({
-              path: "/studentAccountList",
-              state: {
-                data: JSON.stringify(res),
-              },
-            });
-          });
-        } else {
-          router.push({
-            path: "/studentAccountList",
-            state: {
-              data: JSON.stringify(res),
-            },
-          });
+
+        async function executeTasks() {
+          try {
+            // 先执行 missTask
+            // isLoading.value = true;
+            const res_miss = await missTask();
+            if (res_miss.message != "无") {
+              missyouFlag.value = true;
+              missDays.value = res_miss.message;
+              console.log("missDays.value: ", missDays.value);
+            }
+
+            // 然后执行后续逻辑
+            if (userAccount.value == "user" || userAccount.value == "teacher") {
+              await userTestUpdate();
+              router.push({
+                path: "/studentAccountList",
+                state: {
+                  data: JSON.stringify(res),
+                  missyouflag: missyouFlag.value,
+                  missDays: missDays.value,
+                },
+              });
+            } else {
+              const userData = {
+                username: userAccount.value.trim(),
+                password: passwordAccount.value.trim(),
+              };
+              const now = new Date();
+              const expirationDate = new Date(
+                now.getTime() + 7 * 24 * 60 * 60 * 1000
+              );
+              localStorage.setItem("userData", JSON.stringify(userData));
+              localStorage.setItem(
+                "expirationDate",
+                expirationDate.toISOString()
+              );
+              isLoading.value = false;
+              router.push({
+                path: "/studentAccountList",
+                state: {
+                  data: JSON.stringify(res),
+                  missyouflag: missyouFlag.value,
+                  missDays: missDays.value,
+                },
+              });
+            }
+          } catch (error) {
+            console.error("Error executing tasks:", error);
+          }
         }
+        executeTasks();
       }
     });
   } else {
@@ -446,7 +497,38 @@ const wordList = [
   "高考英语",
 ];
 onMounted(async () => {
-  // await nextTick();
+  const expirationDate = localStorage.getItem("expirationDate");
+  console.log("expirationDate: ", expirationDate);
+  if (expirationDate) {
+    const now = new Date();
+    const expiration = new Date(expirationDate);
+    if (now >= expiration) {
+      localStorage.removeItem("userData");
+      localStorage.removeItem("expirationDate");
+    } else {
+      let res = new Promise((resolve, reject) => {
+        const userData = JSON.parse(localStorage.getItem("userData"));
+        console.log("userData: ", userData);
+        userAccount.value = userData["username"];
+        passwordAccount.value = userData["password"];
+        resolve("ok");
+      });
+      res.then(() => {
+        submitAccountData().then((res) => {
+          console.log("res: ", res);
+          router.push({
+            path: "/studentAccountList",
+            state: {
+              data: JSON.stringify(res),
+            },
+          });
+        });
+      });
+    }
+  } else {
+    userAccount.value = "";
+    passwordAccount.value = "";
+  }
   // const options = {
   //   strings: ["每天10分钟", "扫码背单词"],
   //   typeSpeed: 140,
@@ -519,7 +601,7 @@ onMounted(async () => {
         entry.中文 = entry.中文.split("；");
       });
       showGetWords.value = false;
-      console.log(ret.data);
+      // console.log(ret.data);
       return ret.data;
     });
   }
@@ -571,6 +653,14 @@ onUnmounted(() => {
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
     >
       
+      <div
+        style="
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
         <!-- 滚动动画 -->
         <!-- <QuickSwitchingText 
           class="content" 
@@ -583,21 +673,12 @@ onUnmounted(() => {
           "
           finalText="扫码背单词" :textList="wordList" :duration="1900" ref="quickSwitchingTextRef" /> -->
         <!-- 打字动画 -->
-        <div
-          ref="pRef"
-          style="
-            font-size: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 40%;
-          "
-        ></div>
+        <div ref="pRef" class="content"></div>
 
         <!-- <div>
           <div style="font-size: 40px; margin-top: 40%">
             <!-- 打字动画 -->
-            <!-- <div
+        <!-- <div
               v-if="!showSwitchingText"
               ref="typedContainer"
               style="
@@ -606,8 +687,8 @@ onUnmounted(() => {
                 justify-content: center;
               "
             ></div> -->
-            <!-- 多词切换动画 -->
-            <!-- <QuickSwitchingText
+        <!-- 多词切换动画 -->
+        <!-- <QuickSwitchingText
               v-else
               ref="quickSwitchingTextRef"
               class="content"
@@ -620,69 +701,68 @@ onUnmounted(() => {
                 justify-content: center;
               "
             /> -->
-          
-        
-      
 
         <!-- designed by xie -->
         <div
           class="logo"
           data-text="♠ Designed by xie ♠"
-          style="margin-top: 60%"
+          style="margin-top: 100%"
         >
           ♠ Designed by xie ♠
         </div>
+      </div>
 
-        <div style="position: fixed; bottom: 0; width: 100%">
-          <van-cell-group inset style="margin-top: 80px">
-            <div style="font-weight: 700; font-size: 20; margin: 20px">
-              请输入账户名和密码
-            </div>
-            <van-field
-              v-model="userAccount"
-              label="用户"
-              placeholder="请输入用户名"
-            />
-            <van-field
-              v-model="passwordAccount"
-              type="password"
-              label="密码"
-              placeholder="请输入密码"
-            />
-          </van-cell-group>
-          <div style="margin: 10px">
-            <van-button type="success" plain block @click="submitAccount"
-              >提交</van-button
-            >
-            <van-button
-              type="primary"
-              plain
-              block
-              @click="showAccountPop == false"
-              >关闭</van-button
-            >
+      <div style="position: fixed; bottom: 0; width: 100%">
+        <van-cell-group inset style="margin-top: 80px">
+          <div style="font-weight: 700; font-size: 20; margin: 20px">
+            请输入账户名和密码
           </div>
-          <div
-            style="
-              display: flex;
-              justify-content: flex-end;
-              width: 96%;
-              margin-top: 5%;
-              margin-bottom: 5%;
-            "
+          <van-field
+            v-model="userAccount"
+            label="用户"
+            placeholder="请输入用户名"
+          />
+          <van-field
+            v-model="passwordAccount"
+            type="password"
+            label="密码"
+            placeholder="请输入密码"
+          />
+        </van-cell-group>
+        <div style="margin: 10px">
+          <van-button type="success" plain block @click="submitAccount"
+            >提交</van-button
           >
-            <div>
-              <van-button
-                type="warning"
-                plain
-                @click="pushUserTest"
-                size="normal"
-                style="margin-top: 5%; margin-bottom: 5%"
-                >点击体验</van-button
-              >
-            </div>
+          <van-button
+            type="primary"
+            plain
+            block
+            @click="showAccountPop == false"
+            >关闭</van-button
+          >
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: flex-end;
+            width: 96%;
+            margin-top: 5%;
+            margin-bottom: 5%;
+          "
+        >
+          <div>
+            <van-button
+              type="warning"
+              plain
+              @click="pushUserTest"
+              size="normal"
+              style="margin-top: 5%; margin-bottom: 5%"
+              >点击体验</van-button
+            >
           </div>
         </div>
+      </div>
+      
     </van-popup>
 
     <!-- 加载数据遮罩层 -->
@@ -795,6 +875,8 @@ onUnmounted(() => {
         </div>
       </van-cell-group>
     </van-checkbox-group>
+
+    <loading v-if="isLoading" />
   </div>
 </template>
 
@@ -802,6 +884,27 @@ onUnmounted(() => {
 
 
 <style>
+
+.content {
+  font-size: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 40%;
+}
+@media (min-width: 431px)  and (max-width: 767px){
+  .content {
+    margin-top: 30%;
+  }
+
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .content {
+    margin-top: 15%;
+  }
+
+}
 .logo {
   font-size: 20px;
   font-family: "SourceHanSansCN-Bold" !important;
@@ -811,7 +914,7 @@ onUnmounted(() => {
   bottom: 60%;
   width: 100%;
   text-align: center; /* 水平居中文本 */
-  /* display: flex; */
+  display: flex;
   justify-content: center; /* Flexbox 水平居中所有内容 */
   overflow: hidden; /* 防止超出内容影响布局 */
 }

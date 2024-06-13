@@ -6,12 +6,17 @@ import {
   getCurrentInstance,
   onBeforeUpdate,
   computed,
+  nextTick,
+  onBeforeMount,
 } from "vue";
 import "vant/lib/index.css"; // 确保引入样式
 import cover3500Image from "../assets/3500_cover.png";
-import itemList from "../assets/item_list.png";
-
+import angryWolf from "./angryWolf.vue";
+import missyou from "./missyou.vue";
+import startOut from "./startOut.vue";
+import threeStar from "./threeStar.vue";
 import { useRouter } from "vue-router";
+import loading from "./loading.vue";
 import {
   showFailToast,
   showToast,
@@ -22,11 +27,14 @@ import {
   Toast,
   closeToast,
 } from "vant";
+const isLoading = ref(false);
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
 // 返回首页
 const gobackHomepage = () => {
+  localStorage.removeItem("userData");
+  localStorage.removeItem("expirationDate");
   router.push({
     path: "/homepage",
   });
@@ -37,7 +45,15 @@ const showAnswerSheet = ref(false);
 const answerSheetList = ref([]);
 
 // 点击跳转明细
-const goToNextPage = (index, data) => {
+function showAnimationShineStartout() {
+  if (startOutRef.value.visible) {
+    startOutRef.value.hide();
+  } else {
+    startOutRef.value.show();
+  }
+  animationVisible.value = !animationVisible.value;
+}
+const goToNextPage = (index, data, mode) => {
   function shuffle(array) {
     for (let i = array.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -101,23 +117,53 @@ const goToNextPage = (index, data) => {
     return data;
   }
 
-  console.log(processData(data));
-  router.push({
-    path: "/studentAccountItem",
-    state: {
-      data: JSON.stringify(data),
-      nid: originalData.value[index].nid,
-      title: data["title"],
-      username: data["username"],
-    },
-  });
+  processData(data);
+
+  const newTabsName = ["全部", ...tabsName.value];
+  if (mode == 0) {
+    router.push({
+      path: "/studentAccountItem",
+      // path: "/studentAccountSwipe",
+      state: {
+        data: JSON.stringify(data),
+        nid: originalData.value[index].nid,
+        title: data["title"],
+        username: data["username"],
+      },
+    });
+  }
+  if (mode == 1) {
+    router.push({
+      // path: "/studentAccountItem",
+      path: "/studentAccountSwipe",
+      state: {
+        data: JSON.stringify(data),
+        nid: originalData.value[index].nid,
+        title: data["title"],
+        username: data["username"],
+      },
+    });
+  }
+};
+
+// 跳转下一面
+const showChooseMode = ref(false);
+const gotoIndex = ref("");
+const gotoData = ref("");
+const handleRegularMode = () => {
+  goToNextPage(gotoIndex.value, gotoData.value, 0);
+};
+const handleSwipeMode = () => {
+  goToNextPage(gotoIndex.value, gotoData.value, 1);
 };
 const gotoItem = (index) => {
-  console.log(originalData.value[index]);
-  const data = originalData.value[index];
+  // console.log(originalData.value[index]);
+  gotoIndex.value = index;
+  gotoData.value = originalData.value[index];
   if (
     originalData.value[index]["rate"] == 0 &&
     originalData.value[index]["attempt"] == 0
+    // true
   ) {
     showConfirmDialog({
       title: "是否需要复习答案？",
@@ -125,6 +171,7 @@ const gotoItem = (index) => {
       confirmButtonText: "查看答案",
       cancelButtonText: "开启挑战",
       cancelButtonColor: "red",
+      className: "custom-dark-dialog", // 添加自定义类名
     })
       .then(() => {
         // 查看答案
@@ -133,10 +180,145 @@ const gotoItem = (index) => {
       })
       .catch(() => {
         // 跳转页面
-        goToNextPage(index, data);
+        showChooseMode.value = true;
+        // 先执行动画
+        // showAnimationShineStartout();
+        // 1秒后跳转页面
+        // setTimeout(() => {
+        //   goToNextPage(index, data, mode);
+        // }, 1200);
       });
   } else {
-    goToNextPage(index, data);
+    showChooseMode.value = true;
+    // 先执行动画
+    // showAnimationShineStartout();
+    // 1秒后跳转页面
+    // setTimeout(() => {
+    //   goToNextPage(index, data, mode);
+    // }, 1200);
+  }
+};
+
+// 提前查看答案
+const viewAnswer = (item, index) => {
+  console.log("item: ", item);
+  console.log("index: ", index);
+  if (item.attempt == 0) {
+    gotoItem(index);
+  } else {
+    function parseChineseDate(chineseDateStr) {
+      // 替换中文日期字符串中的年、月、日为标准格式
+      const standardDateStr = chineseDateStr
+        .replace("年", "-")
+        .replace("月", "-")
+        .replace("日", "");
+
+      // 返回新格式的日期字符串
+      return new Date(standardDateStr);
+    }
+    function getLatestTime(view_time, create_time) {
+      // 检查 view_time 是否为 null
+      if (view_time === null) {
+        return create_time;
+      }
+
+      // 将时间字符串转换为 Date 对象
+      const viewTimeDate = parseChineseDate(view_time);
+      const createTimeDate = parseChineseDate(create_time);
+      // 比较两个时间并返回更靠后的时间
+      if (viewTimeDate > createTimeDate) {
+        return view_time;
+      } else {
+        return create_time;
+      }
+    }
+    const timeString = getLatestTime(item.view_time, item.create_time);
+
+    // console.log("timeString: ", timeString);
+
+    // 解析时间字符串为 Date 对象
+    function parseTimeString(timeString) {
+      const dateTimeParts = timeString.match(
+        /(\d{4})年(\d{1,2})月(\d{1,2})日 (\d{1,2}):(\d{2})/
+      );
+      if (!dateTimeParts) {
+        throw new Error("Invalid time format");
+      }
+      const [_, year, month, day, hour, minute] = dateTimeParts.map(Number);
+      return new Date(year, month - 1, day, hour, minute);
+    }
+    // 计算时间差并返回分钟和秒
+    function getTimeDifference(timeString) {
+      const parsedTime = parseTimeString(timeString);
+      const currentTime = new Date();
+      const differenceInMillis = currentTime - parsedTime;
+      const differenceInSeconds = Math.floor(differenceInMillis / 1000);
+      const minutes = Math.floor(differenceInSeconds / 60);
+      const seconds = differenceInSeconds % 60;
+      return { minutes, seconds };
+    }
+    // 检查时间差是否超过20分钟并输出结果
+    function checkTimeDifference(timeString) {
+      const { minutes, seconds } = getTimeDifference(timeString);
+      const totalDifferenceInSeconds = minutes * 60 + seconds;
+      const differenceFrom20MinutesInSeconds =
+        20 * 60 - totalDifferenceInSeconds;
+
+      if (differenceFrom20MinutesInSeconds > 0) {
+        const absMinutes = Math.floor(differenceFrom20MinutesInSeconds / 60);
+        const absSeconds = differenceFrom20MinutesInSeconds % 60;
+        return { minutes: absMinutes, seconds: absSeconds };
+      } else {
+        return null;
+      }
+    }
+
+    // 调用函数并输出结果
+    const timeGap = checkTimeDifference(timeString);
+    // console.log("timeGap: ", timeGap);
+    if (timeGap) {
+      showDialog({
+        title: "暂时不能查看",
+        message: `需要等待${timeGap.minutes}分${timeGap.seconds}分后，才可以查看答案`,
+        theme: "round-button",
+      });
+    } else {
+      showAnimationShine();
+      showConfirmDialog({
+        title: "😈 恶魔之眼 😈",
+        message: "每20分钟才能查看一次\n您的行为会被记录",
+        confirmButtonText: "查看答案",
+        cancelButtonText: "取消，不看了",
+        cancelButtonColor: "red",
+        confirmButtonColor: "gray",
+        className: "custom-dark-dialog", // 添加自定义类名
+      })
+        .then(() => {
+          showAnimationShine();
+          showAnswerSheet.value = true;
+          answerSheetList.value = item["answers"];
+          async function updateView() {
+            // 更新view + 1
+            let params = new URLSearchParams();
+            params.append("method", "updateView");
+            params.append("nid", item["nid"]);
+            return await axios.post("words/", params).then((ret) => {
+              return ret.data;
+            });
+          }
+          updateView().then((res) => {
+            originalData.value = [];
+            pageIndexOriginalData.value = 0;
+            finishedOriginalData.value = false;
+            loadingOriginalData.value = false; // 重新触发加载
+            onLoadOriginalData(); // 手动调用onLoad以重新开始加载过程
+            activeTabs.value = 0;
+          });
+        })
+        .catch(() => {
+          showAnimationShine();
+        });
+    }
   }
 };
 
@@ -147,24 +329,34 @@ const showRatePlus = computed(() => {
 
 // 总进度环形circle
 const currentRate = ref(0);
+const nameCircle = ref("全部");
 const textCircle = computed(() => currentRate.value.toFixed(0) + "%");
-const gradientColor = {
-  "0%": "#3fecff",
-  "100%": "#6149f6",
+const gradientColor = ref({
+  "0%": "#ff0000",
+  "100%": "#ffff00",
+});
+
+const getGradientColor = (index) => {
+  const colors = [
+    { "0%": "#ff0000", "100%": "#ffff00" }, // 红到黄
+    { "0%": "#ffff00", "100%": "#00ff00" }, // 黄到绿
+    { "0%": "#00ff00", "100%": "#ff00ff" }, // 绿到粉
+    { "0%": "#3fecff", "100%": "#6149f6" },
+  ];
+  // 循环使用颜色
+  gradientColor.value = colors[index % colors.length];
+  // return colors[index % colors.length];
 };
-const rateCircle = computed(() => {
-  const rates = originalData.value.map((item) => item.rate / 3);
-  const averageRate =
-    rates.reduce((sum, current) => sum + current, 0) / rates.length;
-  return averageRate * 100;
-});
+
+const rateCircle = ref(0);
+const rateCircleList = ref([]);
+
 const starRate = ref(1); // 总星星数
-const starRateNumber = computed(() => {
-  return originalData.value.reduce((sum, item) => sum + item.rate, 0);
-});
-const completeNumber = computed(() => {
-  return originalData.value.filter((item) => item.rate >= 3).length;
-});
+
+const starRateNumber = ref(0);
+const starRateNumberList = ref([]);
+const completeNumber = ref(0);
+const completeNumberList = ref([]);
 
 // textbook单词表
 const textbookData = ref([]);
@@ -222,7 +414,7 @@ const getVocabularyMeaning = (index) => {
   });
   getWordMeaning()
     .then((res) => {
-      console.log("res", res);
+      // console.log("res", res);
       const sortOrder = [
         "七上",
         "七下",
@@ -266,115 +458,225 @@ const getVocabularyMeaning = (index) => {
     });
 };
 
-// 终局之战
-const rollingShow = ref(false);
-const rollingList = ref([]);
-const intervalId = ref(null);
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
-const startRollingGame = () => {
-  rollingShow.value = true;
-  rollingList.value = textbookData.value.map((item) => {
-    return item.英文;
-  });
-  const originalArray = [...rollingList.value];
-  // const originalArray = rollingList.value;
-  let lastElement = null;
-  let counter = 0;
-  const lastElementHistory = new Set();
-  rollingList.value = setInterval(() => {
-    let newArray;
-    do {
-      newArray = [...originalArray];
-      shuffleArray(newArray);
-    } while (lastElement === newArray[newArray.length - 1]);
-
-    lastElement = newArray[newArray.length - 1];
-    rollingList.value = [...newArray];
-    lastElementHistory.add(lastElement);
-    console.log(newArray); // 打印乱序后的数组
-
-    counter++;
-    if (
-      lastElementHistory.size === originalArray.length ||
-      counter >= rollingList.value.length
-    ) {
-      clearInterval(rollingList.value);
-      console.log(
-        "All elements have been the last item at least once or 10 shuffles reached."
-      );
-    }
-  }, 2000);
-
-  console.log("rollingList: ", rollingList.value);
-};
+// 导航分类
+const activeTabs = ref("0");
+const tabsName = ref([]);
 
 // 加载数据
 const originalData = ref([]);
 const showStars = ref(false);
+const loadingOriginalData = ref(false);
+const finishedOriginalData = ref(false);
+const pageIndexOriginalData = ref(0);
 const username = ref("");
-function formatDateString(dateString) {
-  const date = new Date(dateString);
+const formattedRate = (rate) => {
+  // 检查是否为整数
+  if (Number.isInteger(rate)) {
+    return rate - 3;
+  } else {
+    // 保留一位小数
+    return (rate - 3).toFixed(1);
+  }
+};
 
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1; // getMonth() 返回的月份是从0开始的
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
+// 分页加载
+const onLoadOriginalData = async (title = "全部") => {
+  // console.log("title: ", title);
+  // console.log('finishedOriginalData.value: ', finishedOriginalData.value);
+  // console.log('loadingOriginalData.value: ', loadingOriginalData.value);
+  if (loadingOriginalData.value || finishedOriginalData.value) {
+    return;
+  }
+  loadingOriginalData.value = true;
+  isLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    params.append("method", "getUserDataPage");
+    params.append("alias", title);
+    params.append("user", username.value);
+    params.append("page", pageIndexOriginalData.value + 1); // 请求下一页的数据
+    params.append("page_size", 20); // 每页数据大小
 
-  // 使用模板字符串来格式化日期，确保月份和日期总是显示为两位数
-  return `${year}年${month.toString().padStart(2, "0")}月${day
-    .toString()
-    .padStart(2, "0")}日${hours}时${minutes}分`;
+    const response = await axios.post("words/", params);
+    const moreData = response.data.data;
+    console.log("moreData: ", moreData);
+    if (moreData.length) {
+      moreData.sort(
+        (a, b) => new Date(b.create_time) - new Date(a.create_time)
+      );
+      moreData.forEach((item) => {
+        const answers = JSON.parse(item.answers);
+        const synonyms = JSON.parse(item.synonyms);
+        // 解析日期并格式化
+        const date = new Date(item.create_time);
+        const viewDate = new Date(item.view_time);
+        const formatter = new Intl.DateTimeFormat("zh-CN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false,
+        });
+        const formattedCreateTime = formatter.format(date);
+        const formattedViewTime = formatter.format(viewDate);
+        const newItem = {
+          ...item,
+          answers: answers,
+          synonyms: synonyms,
+          create_time: formattedCreateTime,
+          view_time: formattedViewTime,
+        };
+        originalData.value.push(newItem);
+      });
+      pageIndexOriginalData.value++;
+    }
+    finishedOriginalData.value = !response.data.has_more;
+  } catch (error) {
+    console.error("Failed to fetch data:", error);
+  }
+  loadingOriginalData.value = false;
+  isLoading.value = false;
+
+  if (missyouFlag.value) {
+    showAnimationShineMissYou();
+    missyouFlag.value = false;
+  }
+  return originalData.value;
+};
+// 点击tab
+const onClickTab = ({ title }) => {
+  // console.log('title: ', title);
+  originalData.value = [];
+  loadingOriginalData.value = false;
+  finishedOriginalData.value = false;
+  pageIndexOriginalData.value = 0;
+  nameCircle.value = title;
+  const listTabs = ["全部", ...tabsName.value];
+  const indexClickTab = listTabs.lastIndexOf(nameCircle.value);
+
+  rateCircle.value = 0;
+  setTimeout(() => {
+    rateCircle.value = rateCircleList.value[indexClickTab];
+  }, 0);
+  currentRate.value = rateCircle.value;
+
+  // console.log("rateCircle: ", rateCircle.value);
+  starRateNumber.value = starRateNumberList.value[indexClickTab];
+  completeNumber.value = completeNumberList.value[indexClickTab];
+  getGradientColor(indexClickTab);
+  onLoadOriginalData(title);
+};
+
+// 模式选择
+const checkedMode = ref("1");
+
+// 获取rateCircle
+async function getRateCircle() {
+  let params = new URLSearchParams();
+  params.append("method", "getRateCircle");
+  params.append("username", username.value);
+  params.append("listlAias", JSON.stringify(tabsName.value));
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
 }
+// 生气动画
+const wolfBackRef = ref(null);
+
+const startOutRef = ref(null);
+const threeStarRef = ref(null);
+const animationVisible = ref(false);
+
+function showAnimationShine() {
+  if (wolfBackRef.value.visible) {
+    wolfBackRef.value.hide();
+  } else {
+    wolfBackRef.value.show();
+  }
+  animationVisible.value = !animationVisible.value;
+}
+
+function showAnimationShineThreeStar() {
+  if (threeStarRef.value.visible) {
+    threeStarRef.value.hide();
+  } else {
+    threeStarRef.value.show();
+  }
+  animationVisible.value = !animationVisible.value;
+}
+
+// miss动画
+const missyouRef = ref(null);
+const missyouFlag = ref(false);
+const missDays = ref(2);
+function showAnimationShineMissYou() {
+  missyouRef.value.show();
+
+  setTimeout(() => {
+    missyouRef.value.hide();
+  }, 8000);
+}
+
+const processedTitle = (title) => {
+  return title.split(".")[0]; // 获取第一个句点（.）之前的部分
+};
+// swipe徽章
+const flagSwipe = ref(1);
 onMounted(async () => {
   // 弹出庆祝
-  const flagRate = history.state?.flagRate;
-  // console.log("flagRate", flagRate);
-  // let flagRate = 3;
-  if (flagRate !== undefined && flagRate >= 3) {
-    showStars.value = true;
-    // 设置定时器以在动画完成后隐藏星星
-    setTimeout(() => {
-      showStars.value = false;
-    }, 3000); // 假设动画时长为2秒
+  let flagRate = history.state?.flagRate;
+  missyouFlag.value = history.state?.missyouflag;
+  missDays.value = history.state?.missDays;
+  await nextTick(); // 等待页面完全渲染
+  // console.log("flagRate: ", flagRate);
+  if (flagRate !== undefined) {
+    if (flagRate > 2.8) {
+      flagRate = 3;
+    }
+    if (flagRate === 3) {
+      showAnimationShineThreeStar();
+    }
   }
+
   // 加载数据
   originalData.value = [];
   let res = new Promise((resolve, reject) => {
     let res = JSON.parse(history.state.data);
-    res.sort((a, b) => {
-      // 将 create_time 字符串转换为 Date 对象，并比较
-      return new Date(b.create_time) - new Date(a.create_time);
-    });
+    let aliases = new Set();
+    res.sort((a, b) => a.nid - b.nid);
     for (let i = 0; i < res.length; i++) {
-      originalData.value.push({
-        answers: JSON.parse(res[i].answers),
-        synonyms: JSON.parse(res[i].synonyms),
-        nid: res[i].nid,
-        title: res[i].title.replace(".xlsm", ""),
-        username: res[i].username,
-        complete_status: res[i].complete_status,
-        alias: res[i].alias,
-        create_time: formatDateString(res[i].create_time),
-        attempt: res[i].attempt,
-        rate: res[i].rate,
-      });
+      aliases.add(res[i].alias);
     }
-    username.value = originalData.value[0].username;
-    console.log("originalData", originalData.value);
-    resolve(originalData.value);
+    tabsName.value = Array.from(aliases);
+    username.value = res[0].username;
+    resolve("ok");
+  });
+  res.then(() => {
+    getRateCircle().then((res) => {
+      rateCircleList.value = res.map((item) => item.rate * 100);
+      // starRateNumberList.value = res.map((item) => item.starRateNumber);
+      starRateNumberList.value = res.map((item) => {
+        if (Number.isInteger(item.starRateNumber)) {
+          return item.starRateNumber;
+        } else {
+          return parseFloat(item.starRateNumber.toFixed(1));
+        }
+      });
+      completeNumberList.value = res.map((item) => item.completeNumber);
+
+      rateCircle.value = rateCircleList.value[0];
+      starRateNumber.value = starRateNumberList.value[0];
+      completeNumber.value = completeNumberList.value[0];
+    });
+
+    return "ok";
   });
 });
 </script>
 
 <template>
-  <div>
+  <div class="container">
     <div class="nav-bar-container">
       <van-nav-bar
         :right-text="username"
@@ -386,40 +688,30 @@ onMounted(async () => {
         </template>
       </van-nav-bar>
     </div>
-    <div
-      style="
-        display: flex;
-        justify-content: space-between;
-        background-color: #fff; /* 设置背景颜色为白色或其他浅色 */
-        border-radius: 8px; /* 轻微圆角效果 */
-        box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* 应用阴影效果 */
-        margin: 10px; /* 为了更好的视觉效果和空间感，添加外边距 */
-        padding: 15px 10px; /* 增加内边距，使内容与边框有一定距离 */
-        transition: box-shadow 0.3s ease; /* 平滑过渡效果 */
-        width: 89.5%;
-        font-size: 13px;
-      "
-    >
+    <div class="custom-container">
       <div style="margin-left: 1rem; margin-top: 1rem">
         <!-- 共获得星星 -->
         <div style="display: flex">
-          <div style="margin-top: 0.3rem;">共获得</div>
+          <div style="margin-top: 0.3rem">共获得</div>
           <van-rate
             v-model="starRate"
             color="#ffd21e"
             icon="like"
             :count="1"
             readonly
+            allow-half
             size="28"
             style=""
           >
           </van-rate>
-          <div style="margin-top: 0.3rem;">&nbsp;&nbsp;✖️ {{ starRateNumber }}</div>
+          <div style="margin-top: 0.3rem">
+            &nbsp;&nbsp;✖️ {{ starRateNumber }}
+          </div>
         </div>
 
         <!-- 共完成任务 -->
         <div style="display: flex; margin-top: 2rem">
-          <div style="margin-top: 0.2rem;">共完成</div>
+          <div style="margin-top: 0.2rem">共完成</div>
           <img
             src="../assets/item_list_complete.png"
             style="
@@ -430,16 +722,20 @@ onMounted(async () => {
               margin-top: -0.1rem;
             "
           />
-          <div style="margin-top: 0.2rem;">&nbsp;&nbsp;✖️ {{ completeNumber }}</div>
+          <div style="margin-top: 0.2rem">
+            &nbsp;&nbsp;✖️ {{ completeNumber }}
+          </div>
         </div>
       </div>
 
       <div style="margin-right: 2rem">
-        <div style="margin-bottom: 0.5rem; text-align: center">总进度：</div>
+        <div style="margin-bottom: 0.5rem; text-align: center">
+          {{ nameCircle }}：
+        </div>
         <van-circle
           v-model:current-rate="currentRate"
           :rate="rateCircle"
-          :speed="100"
+          :speed="80"
           :text="textCircle"
           :color="gradientColor"
           size="90px"
@@ -447,96 +743,316 @@ onMounted(async () => {
         />
       </div>
     </div>
-    <!-- 任务列表 -->
-    <van-cell-group v-model="originalData">
-      <div v-for="(item, index) in originalData" :key="index">
-        <van-cell
-          is-link
-          center
-          clickable
-          @click="gotoItem(index)"
-          style="
-            background-color: #fff; /* 设置背景颜色为白色或其他浅色 */
-            border-radius: 8px; /* 轻微圆角效果 */
-            box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* 应用阴影效果 */
-            margin: 10px; /* 为了更好的视觉效果和空间感，添加外边距 */
-            padding: 15px 10px; /* 增加内边距，使内容与边框有一定距离 */
-            transition: box-shadow 0.3s ease; /* 平滑过渡效果 */
-            width: 94.5%;
-            font-size: 13px;
-          "
+
+    <van-tabs
+      v-model:active="activeTabs"
+      @click-tab="onClickTab"
+      shrink
+      swipeable
+      sticky
+    >
+      <van-tab title="全部">
+        <van-list
+          v-model="loadingOriginalData"
+          :finished="finishedOriginalData"
+          finished-text="没有更多了"
+          @load="onLoadOriginalData"
         >
-          <template #icon>
-            <img
-              v-if="item.rate < 3"
-              src="../assets/item_list.png"
-              style="width: 27px; height: auto; margin-right: 0.5rem"
-              alt="Item List"
-            />
-            <img
-              v-else
-              src="../assets/item_list_complete.png"
-              style="width: 27px; height: auto; margin-right: 0.5rem"
-              alt="Item List Complete"
-            />
-          </template>
-          <template #title>
-            <!-- <img :src="itemList" style="width: 30px; height: auto"/> -->
-            <div style="width: 160%; margin-bottom: 7px; font-weight: 700">
-              {{ item.title }}
-            </div>
-          </template>
-
-          <template #value>
-            <div style="font-size: 12px">
-              <div>
-                <div style="display: flex; justify-content: flex-end">
-                  尝试了
-                  <div style="font-weight: 700; color: red">
-                    {{ item.attempt }}
-                  </div>
-                  次
-                </div>
-                <div style="margin-top: 0.5rem">
-                  {{ item.answers.length }}词
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template #label>
-            <div style="display: flex">
-              <van-rate
-                v-model="item.rate"
-                :size="20"
-                color="#ffd21e"
-                void-icon="like"
-                icon="like"
-                void-color="#eee"
-                :count="3"
-                readonly
-              />
-              <div
-                style="margin-top: 3%; margin-left: 0.2rem"
-                v-if="showRatePlus[index]"
-              >
-                + {{ item.rate - 3 }}
-              </div>
-            </div>
-            <div
-              style="
-                margin-left: 4px;
-                margin-top: 7px;
-                width: 140%;
-                font-size: 12px;
-              "
+          <div v-for="(item, index) in originalData" :key="index">
+            <van-cell
+              is-link
+              center
+              clickable
+              @click="gotoItem(index)"
+              class="custom-cell"
             >
-              {{ item.create_time }}
+              <template #icon>
+                <img
+                  v-if="item.rate < 3"
+                  src="../assets/item_list.png"
+                  style="width: 27px; height: auto; margin-right: 0.5rem"
+                  alt="Item List"
+                />
+                <img
+                  v-else
+                  src="../assets/item_list_complete.png"
+                  style="width: 27px; height: auto; margin-right: 0.5rem"
+                  alt="Item List Complete"
+                />
+              </template>
+              <template #title>
+                <div
+                  v-if="item.swipe == 0"
+                  style="display: flex; align-items: flex-start; width: 160%"
+                >
+                  <div style="margin-bottom: 7px; font-weight: 700">
+                    {{ processedTitle(item.title) }}
+                  </div>
+                  <van-badge
+                    content="Game"
+                    color="lightgray"
+                    style="margin-left: -20px"
+                  />
+                </div>
+
+                <div
+                  v-else
+                  style="display: flex; align-items: flex-start; width: 160%"
+                >
+                  <div style="margin-bottom: 7px; font-weight: 700">
+                    {{ processedTitle(item.title) }}
+                  </div>
+                  <van-badge content="Game" style="margin-left: -20px" />
+                </div>
+              </template>
+
+              <template #value>
+                <div style="font-size: 12px">
+                  <div>
+                    <div style="display: flex; justify-content: flex-end">
+                      尝试了
+                      <div style="font-weight: 700; color: red">
+                        {{ item.attempt }}
+                      </div>
+                      次
+                    </div>
+                    <div style="margin-top: 0.5rem">
+                      {{ item.answers.length }}词
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="item.view == 0">
+                  <van-button
+                    style="default;color:gray;border:none"
+                    size="mini"
+                    @click.stop="viewAnswer(item, index)"
+                    class="button-container"
+                  >
+                    <span class="button-content">
+                      <img
+                        src="../assets/close_eye.png"
+                        alt="Icon"
+                        class="button-icon"
+                      />
+                    </span>
+                  </van-button>
+                </div>
+
+                <div v-else>
+                  <van-button
+                    style="default;color:red;font-weight:700;border:none"
+                    size="small"
+                    @click.stop="viewAnswer(item, index)"
+                    class="button-container"
+                  >
+                    <span class="button-content">
+                      <img
+                        src="../assets/eye.png"
+                        alt="Icon"
+                        class="button-icon"
+                        style="margin-right: 0.1rem"
+                      />
+                      * {{ item.view }}
+                    </span>
+                  </van-button>
+                </div>
+              </template>
+
+              <template #label>
+                <div style="display: flex">
+                  <van-rate
+                    v-model="item.rate"
+                    :size="20"
+                    color="#ffd21e"
+                    void-icon="like"
+                    icon="like"
+                    void-color="#eee"
+                    :count="3"
+                    readonly
+                    allow-half
+                  />
+                  <div
+                    style="margin-top: 3%; margin-left: 0.2rem"
+                    v-if="showRatePlus[index]"
+                  >
+                    + {{ formattedRate(item.rate) }}
+                  </div>
+                </div>
+
+                <div
+                  style="
+                    margin-left: 4px;
+                    margin-top: 7px;
+                    width: 140%;
+                    font-size: 12px;
+                  "
+                >
+                  {{ item.create_time }}
+                </div>
+              </template>
+            </van-cell>
+          </div>
+        </van-list>
+      </van-tab>
+
+      <div v-for="(item, index) in tabsName" :key="index">
+        <van-tab :title="item">
+          <van-list
+            v-model="loadingOriginalData"
+            :finished="finishedOriginalData"
+            finished-text="没有更多了"
+            @load="onLoadOriginalData"
+          >
+            <div v-for="(item, index) in originalData" :key="index">
+              <van-cell
+                is-link
+                center
+                clickable
+                @click="gotoItem(index)"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  background-color: #fff; /* 设置背景颜色为白色或其他浅色 */
+                  border-radius: 8px; /* 轻微圆角效果 */
+                  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* 应用阴影效果 */
+                  margin: 10px auto; /* 为了更好的视觉效果和空间感，添加外边距 */
+                  padding: 15px 10px; /* 增加内边距，使内容与边框有一定距离 */
+                  transition: box-shadow 0.3s ease; /* 平滑过渡效果 */
+                  width: 100%;
+                  font-size: 13px;
+                "
+              >
+                <template #icon>
+                  <img
+                    v-if="item.rate < 3"
+                    src="../assets/item_list.png"
+                    style="width: 27px; height: auto; margin-right: 0.5rem"
+                    alt="Item List"
+                  />
+                  <img
+                    v-else
+                    src="../assets/item_list_complete.png"
+                    style="width: 27px; height: auto; margin-right: 0.5rem"
+                    alt="Item List Complete"
+                  />
+                </template>
+                <template #title>
+                  <div
+                  v-if="item.swipe == 0"
+                  style="display: flex; align-items: flex-start; width: 160%"
+                >
+                  <div style="margin-bottom: 7px; font-weight: 700">
+                    {{ processedTitle(item.title) }}
+                  </div>
+                  <van-badge
+                    content="Game"
+                    color="lightgray"
+                    style="margin-left: -20px"
+                  />
+                </div>
+
+                <div
+                  v-else
+                  style="display: flex; align-items: flex-start; width: 160%"
+                >
+                  <div style="margin-bottom: 7px; font-weight: 700">
+                    {{ processedTitle(item.title) }}
+                  </div>
+                  <van-badge content="Game" style="margin-left: -20px" />
+                </div>
+                </template>
+
+                <template #value>
+                  <div style="font-size: 12px">
+                    <div>
+                      <div style="display: flex; justify-content: flex-end">
+                        尝试了
+                        <div style="font-weight: 700; color: red">
+                          {{ item.attempt }}
+                        </div>
+                        次
+                      </div>
+                      <div style="margin-top: 0.5rem">
+                        {{ item.answers.length }}词
+                      </div>
+                    </div>
+                  </div>
+
+                  <div v-if="item.view == 0">
+                    <van-button
+                      style="default;color:gray;border:none"
+                      size="mini"
+                      @click.stop="viewAnswer(item, index)"
+                      class="button-container"
+                    >
+                      <span class="button-content">
+                        <img
+                          src="../assets/close_eye.png"
+                          alt="Icon"
+                          class="button-icon"
+                        />
+                      </span>
+                    </van-button>
+                  </div>
+
+                  <div v-else>
+                    <van-button
+                      style="default;color:red;font-weight:700;border:none"
+                      size="small"
+                      @click.stop="viewAnswer(item, index)"
+                      class="button-container"
+                    >
+                      <span class="button-content">
+                        <img
+                          src="../assets/eye.png"
+                          alt="Icon"
+                          class="button-icon"
+                          style="margin-right: 0.1rem"
+                        />
+                        * {{ item.view }}
+                      </span>
+                    </van-button>
+                  </div>
+                </template>
+
+                <template #label>
+                  <div style="display: flex">
+                    <van-rate
+                      v-model="item.rate"
+                      :size="20"
+                      color="#ffd21e"
+                      void-icon="like"
+                      icon="like"
+                      void-color="#eee"
+                      :count="3"
+                      readonly
+                      allow-half
+                    />
+                    <div
+                      style="margin-top: 3%; margin-left: 0.2rem"
+                      v-if="showRatePlus[index]"
+                    >
+                      + {{ formattedRate(item.rate) }}
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      margin-left: 4px;
+                      margin-top: 7px;
+                      width: 140%;
+                      font-size: 12px;
+                    "
+                  >
+                    {{ item.create_time }}
+                  </div>
+                </template>
+              </van-cell>
             </div>
-          </template>
-        </van-cell>
+          </van-list>
+        </van-tab>
       </div>
-    </van-cell-group>
+    </van-tabs>
 
     <!-- 显示答案 -->
     <van-popup
@@ -556,11 +1072,6 @@ onMounted(async () => {
           font-weight: 700;
         "
       >
-        <div
-          style="font-size: 14px; font-weight: 600; margin: 1rem; color: red"
-        >
-          注意：只能在挑战前复习！
-        </div>
         <div style="font-size: 13px; margin: 1rem">
           {{ answerSheetList.length }}词
         </div>
@@ -666,16 +1177,32 @@ onMounted(async () => {
       </div>
     </van-popup>
 
-    <!-- 终局之战翻转 -->
-    <van-popup
-      position="bottom"
-      :style="{ height: '60%' }"
-      v-model:show="rollingShow"
-      style="padding: 1rem"
-      closeable
+    <!-- 模式选择 -->
+    <van-dialog
+      v-model:show="showChooseMode"
+      title="模式选择"
+      confirmButtonText="普通模式"
+      cancelButtonText="游戏模式"
+      cancelButtonColor="#ee0a24"
+      show-cancel-button
+      @confirm="handleRegularMode"
+      @cancel="handleSwipeMode"
     >
-      <van-rolling-text :text-list="rollingList" :duration="1" />
-    </van-popup>
+      <template #title>
+        <div>
+          模式选择
+          <van-icon
+            name="cross"
+            @click="showChooseMode = false"
+            style="position: absolute; top: 10px; right: 10px"
+          />
+        </div>
+      </template>
+      <img
+        src="../assets/choose.webp"
+        style="max-width: 100%; max-height: 100%; height: auto; display: block"
+      />
+    </van-dialog>
 
     <!-- 庆祝三星 -->
     <div v-if="showStars" class="stars">
@@ -683,6 +1210,12 @@ onMounted(async () => {
       <div class="star" style="animation-delay: 0.5s">🐻</div>
       <div class="star" style="animation-delay: 1s">🐻</div>
     </div>
+
+    <angryWolf ref="wolfBackRef" />
+    <missyou ref="missyouRef" :days="missDays" />
+    <startOut ref="startOutRef" />
+    <threeStar ref="threeStarRef" />
+    <loading v-if="isLoading" />
   </div>
 </template>
 
@@ -690,6 +1223,24 @@ onMounted(async () => {
 
 
 <style>
+.container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+}
+/* @media (min-width: 431px)  and (max-width: 767px){
+  .container {
+    margin-top: 30%;
+  }
+} */
+/* @media (min-width: 768px) and (orientation: lanscape) {
+  .container {
+    width: 60%;
+    margin: 0 auto;
+    padding: 0;
+    }
+} */
+
 .nav-bar-container {
   position: sticky;
   top: 0;
@@ -723,4 +1274,85 @@ onMounted(async () => {
     opacity: 1;
   }
 }
+.button-container {
+  position: relative;
+  margin-top: 0.3rem;
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+}
+
+.button-icon {
+  width: 16px;
+  height: auto;
+}
+
+.custom-dark-dialog .van-dialog__message {
+  color: red; /* 设置内容颜色 */
+  font-weight: 700;
+}
+.custom-dark-dialog .van-dialog__header {
+  background-color: white; /* 设置暗黑色背景 */
+}
+
+.custom-dark-dialog .van-dialog__footer {
+  border-top-color: #444; /* 设置底部边框颜色为暗色 */
+  background-color: gray; /* 设置暗黑色背景 */
+}
+.custom-container {
+  display: flex;
+  justify-content: space-between;
+  background-color: #fff; /* 设置背景颜色为白色或其他浅色 */
+  border-radius: 8px; /* 轻微圆角效果 */
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* 应用阴影效果 */
+  margin: 10px auto; /* 为了更好的视觉效果和空间感，添加外边距，并居中对齐 */
+  padding: 15px 10px; /* 增加内边距，使内容与边框有一定距离 */
+  transition: box-shadow 0.3s ease; /* 平滑过渡效果 */
+  width: 93.5%; /* 设置宽度为屏幕的94% */
+
+  font-size: 13px;
+}
+
+.custom-cell {
+  display: flex;
+  justify-content: space-between;
+  background-color: #fff; /* 设置背景颜色为白色或其他浅色 */
+  border-radius: 8px; /* 轻微圆角效果 */
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.2); /* 应用阴影效果 */
+  margin: 10px auto; /* 为了更好的视觉效果和空间感，添加外边距，并居中对齐 */
+  padding: 15px 10px; /* 增加内边距，使内容与边框有一定距离 */
+  transition: box-shadow 0.3s ease; /* 平滑过渡效果 */
+  width: 95%; /* 设置宽度为屏幕的95% */
+  /* max-width: 1200px; */
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .custom-container {
+    width: 92.5%;
+  }
+  .custom-cell {
+    width: 95%;
+  }
+}
+
+@media (max-width: 430px) {
+  .custom-container {
+    width: 90.5%;
+  }
+  .custom-cell {
+    width: 95%;
+  }
+}
+
+/* @media (min-width: 1200px) and (orientation: landscape){
+  .custom-container {
+    width: 95%;
+  }
+  .custom-cell {
+    width: 95%;
+  }
+} */
 </style>

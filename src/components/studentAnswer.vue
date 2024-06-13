@@ -9,8 +9,10 @@ import {
 } from "vue";
 import { showDialog, showToast } from "vant";
 import { useRouter } from "vue-router";
+import WolfBack from "./wolfBack.vue";
 const router = useRouter();
 const compareResult = ref([]);
+
 const userSelected = ref([]);
 const user = ref();
 const trueCount = computed(() => {
@@ -84,17 +86,12 @@ const scrollToItem = (index) => {
 
 // 弹出欢迎
 const showWelcome = ref(false);
-const keywordsHighlight = "左上角👀";
-const textHighlight = "点击左上角👀，查看错题";
-const keywordsHighlight2 = "下拉导航";
-const textHighlight2 = "底部下拉导航快速定位";
 onMounted(async () => {
   // showWelcome.value = true;
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
     user.value = history.state.user;
     userSelected.value = JSON.parse(history.state.userSelected);
-
     resolve(compareResult.value);
   });
   res.then((res) => {
@@ -107,6 +104,7 @@ onMounted(async () => {
 <template>
   <div>
     <!-- 弹出提示 -->
+    <WolfBack ref="wolfBackRef" />
     <van-dialog
       v-model:show="showWelcome"
       title="完成试题"
@@ -121,20 +119,7 @@ onMounted(async () => {
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
         </div>
-        <div class="custom-content">
-          <van-highlight
-            :keywords="keywordsHighlight"
-            :source-string="textHighlight"
-            highlight-class="custom-class"
-          />
-        </div>
-        <div class="custom-content">
-          <van-highlight
-            :keywords="keywordsHighlight2"
-            :source-string="textHighlight2"
-            highlight-class="custom-class"
-          />
-        </div>
+
       </template>
     </van-dialog>
 

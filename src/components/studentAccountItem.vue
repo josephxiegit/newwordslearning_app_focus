@@ -12,13 +12,19 @@ import {
   showDialog,
   showConfirmDialog,
   showLoadingToast,
+  showToast,
 } from "vant";
 
 import { useRouter } from "vue-router";
+import encouragement from "./encouragement.vue";
+import helpforgood from "./helpforgood.vue";
+import helpforbad from "./helpforbad.vue";
+import submitloading from "./submitloading.vue";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const title = ref("");
+const isLoading = ref(false);
 
 const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
@@ -112,6 +118,7 @@ const clickSubmitUser = (action, done) => {
   // 输入用户名后，确认提交
   if (action === "confirm") {
     // 合并答案和选项
+    showDialogSubmit.value = false;
     mergedData.value = mergeAnswerAndSynonym();
 
     // 将用户选择转化为中文
@@ -132,7 +139,7 @@ const clickSubmitUser = (action, done) => {
       item.用户选择.includes("无")
     );
     // containsUnselected = false;
-    console.log("containsUnselected", containsUnselected);
+    // console.log("containsUnselected", containsUnselected);
 
     if (containsUnselected) {
       function notifyDataEmpty() {
@@ -142,26 +149,49 @@ const clickSubmitUser = (action, done) => {
         }, 1500);
       }
       notifyDataEmpty();
-      showDialogSubmit.value = false;
+      // showDialogSubmit.value = false;
       clickScroll();
     } else {
-      const trueCount = compareResult.filter(
-        (item) => item.flag === "true"
-      ).length;
-      const rate = trueCount === compareResult.length ? 1 : 0;
+      // console.log("compareResult: ", compareResult);
+      function checkFlags(compareResult) {
+        let halfCount = 0;
+        let trueCount = 0;
+
+        for (const item of compareResult) {
+          if (item.flag !== "true" && item.flag !== "half") {
+            return 0;
+          }
+          if (item.flag === "true") {
+            trueCount++;
+          } else if (item.flag === "half") {
+            halfCount++;
+            if (halfCount > 2) {
+              return 0;
+            }
+          }
+        }
+
+        if (trueCount === compareResult.length) {
+          return 1;
+        }
+
+        return halfCount <= 2 ? 0.5 : false;
+      }
+      const rate = checkFlags(compareResult);
+
+      console.log("rate: ", rate);
+
       async function updateAccountData() {
         // 更新attempt和rate
         let params = new URLSearchParams();
         params.append("method", "updateUserData");
         params.append("nid", nid.value);
         params.append("rate", rate);
+        params.append("swipe", 0);
         return await axios.post("words/", params).then((ret) => {
           return ret.data;
         });
       }
-
-      // console.log('compareResult: ', compareResult);
-      // console.log('synonymsSelected: ', synonymsSelected.value);
 
       async function updateAccountlog() {
         // 结果存储到日志
@@ -170,31 +200,84 @@ const clickSubmitUser = (action, done) => {
         params.append("log", JSON.stringify(compareResult));
         params.append("title", titleData.value);
         params.append("username", username.value);
+        params.append("alias", alias.value);
+        params.append("mode", "普通");
         return await axios.post("words/", params).then((ret) => {
           return ret.data;
         });
       }
-      Promise.all([updateAccountData(), updateAccountlog()])
-        .then((results) => {
-          const accountDataResult = results[0]; // updateAccountData 的结果
-          const accountLogResult = results[1]; // updateAccountlog 的结果
-          console.log(accountDataResult);
-          console.log(accountLogResult);
+      isLoading.value = true;
+      if (compareResult.length == 0) {
+        showFailToast("提交数据不能为空");
+        return;
+      } else {
+        function timeoutPromise(ms, promise) {
+          return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+              reject(new Error("Request timed out"));
+            }, ms);
 
-          // 执行页面跳转
-          router.push({
-            path: "/studentAccountAnswer",
-            state: {
-              compareResult: JSON.stringify(compareResult),
-              userSelected: JSON.stringify(synonymsSelected.value),
-              nid: nid.value,
-              rate: accountDataResult.rate,
-            },
+            promise
+              .then((value) => {
+                clearTimeout(timer);
+                resolve(value);
+              })
+              .catch((error) => {
+                clearTimeout(timer);
+                reject(error);
+              });
           });
-        })
-        .catch((error) => {
-          console.error("An error occurred:", error);
-        });
+        }
+
+        Promise.race([
+          timeoutPromise(
+            15000,
+            Promise.all([updateAccountData(), updateAccountlog()])
+          ),
+        ])
+          .then((results) => {
+            const accountDataResult = results[0]; // updateAccountData 的结果
+            const accountLogResult = results[1]; // updateAccountlog 的结果
+            console.log(accountDataResult);
+            console.log(accountLogResult);
+            // showLoadingToast.close;
+            isLoading.value = false;
+            return accountDataResult;
+          })
+          .then((accountDataResult) => {
+            // 执行页面跳转
+            router.push({
+              path: "/studentAccountAnswer",
+              state: {
+                compareResult: JSON.stringify(compareResult),
+                userSelected: JSON.stringify(synonymsSelected.value),
+                nid: nid.value,
+                rate: accountDataResult.rate,
+                halfTrue: rate,
+              },
+            });
+          })
+          .catch((error) => {
+            console.error("An error occurred:", error);
+            if (error.message === "Request timed out") {
+              // 处理超时情况
+              // 通知后端取消操作
+              fetch("/cancelOperation", {
+                method: "POST",
+                body: JSON.stringify({ operation: "updateUserlog" }),
+                headers: {
+                  "Content-Type": "application/json",
+                },
+              });
+              isLoading.value = false;
+              showFailToast("网络超时");
+            } else {
+              // 处理其他错误
+              isLoading.value = false;
+              // showFailToast("提交失败");
+            }
+          });
+      }
     }
   } else {
     // 如果用户点击取消或遮罩层，直接关闭对话框
@@ -305,6 +388,14 @@ const toggleCheckChinese = (index, index2) => {
     }
     return count;
   }, 0);
+  // console.log("completeCount: ", completeCount.value);
+
+  // 判断是否超过一半的选项被选中
+  const halfOptions = synonymsOptions.value.length / 2;
+  // console.log("halfOptions: ", halfOptions);
+  if (completeCount.value == halfOptions) {
+    showAnimationShineEncouragement(); // 调用动画显示方法
+  }
 };
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
@@ -357,16 +448,21 @@ const helpOutside = () => {
         );
         // console.log(countFlags);
         if (countFlags.falseCount == 0 && countFlags.halfCount == 0) {
-          showDialog({
-            title: "恭喜，全对了",
-            theme: "round-button",
-            message: "可以提交答案了！",
-          });
+          // showDialog({
+          //   title: "恭喜，全对了",
+          //   theme: "round-button",
+          //   message: "可以提交答案了！",
+          // });
+          showAnimationShineHelpForGood();
         } else {
+          // showAnimationShineHelpForBad();
+          helpforbadRef.value.show();
           showDialog({
             title: "再加油",
             theme: "round-button",
             message: `错误: ${countFlags.falseCount}\n半对：${countFlags.halfCount}`,
+          }).then(() => {
+            helpforbadRef.value.hide();
           });
         }
         flagHelp.value = false;
@@ -379,10 +475,41 @@ const helpOutside = () => {
   }
 };
 
+// 动画鼓励
+const encouragementRef = ref(null);
+const animationVisible = ref(false);
+
+const helpforgoodRef = ref(null);
+const animationVisible_help = ref(false);
+
+const helpforbadRef = ref(null);
+const animationVisible_help2 = ref(false);
+
+function showAnimationShineEncouragement() {
+  if (encouragementRef.value.visible) {
+    encouragementRef.value.hide();
+  } else {
+    encouragementRef.value.show();
+  }
+  animationVisible.value = !animationVisible.value;
+}
+
+function showAnimationShineHelpForGood() {
+  if (helpforgoodRef.value.visible) {
+    helpforgoodRef.value.hide();
+  } else {
+    helpforgoodRef.value.show();
+  }
+  animationVisible_help.value = !animationVisible_help.value;
+}
+
 const titleData = ref("");
 const username = ref("");
+const alias = ref("");
 onMounted(async () => {
   const data = JSON.parse(history.state.data);
+  // console.log('data: ', data);
+  alias.value = data.alias;
   nid.value = history.state.nid;
   synonymsOptions.value = data.synonyms;
   answers.value = data.answers;
@@ -390,7 +517,7 @@ onMounted(async () => {
   username.value = data.username;
   console.log("username: ", username.value);
 
-  console.log(synonymsOptions);
+  console.log(synonymsOptions.value);
 });
 </script>
 
@@ -399,11 +526,14 @@ onMounted(async () => {
     <div class="nav-bar-container">
       <van-nav-bar
         title="学生题目"
-        right-text="提交"
-        :left-text="`场外支援：${completeCount}/${synonymsOptions.length}`"
-        @click-right="submitSelection()"
-        @click-left="helpOutside()"
+        :left-text="`${completeCount}/${synonymsOptions.length}`"
       >
+        <template #right>
+          <div class="nav-bar-right">
+            <span class="nav-button" @click="helpOutside"> 场外支援 </span>
+            <span class="nav-button" @click="submitSelection"> 提交 </span>
+          </div>
+        </template>
       </van-nav-bar>
     </div>
 
@@ -464,7 +594,7 @@ onMounted(async () => {
     </van-floating-panel>
 
     <!-- 显示列表单词 -->
-    <van-checkbox-group v-model="synonymsSelected" style="margin-bottom: 80px">
+    <van-checkbox-group class="checkbox-container" v-model="synonymsSelected">
       <van-cell-group>
         <div
           v-for="(item, index) in synonymsOptions"
@@ -504,6 +634,11 @@ onMounted(async () => {
         </div>
       </van-cell-group>
     </van-checkbox-group>
+    <div class="bottom-placeholder"></div>
+    <encouragement ref="encouragementRef" />
+    <helpforgood ref="helpforgoodRef" />
+    <helpforbad ref="helpforbadRef" />
+    <submitloading v-if="isLoading" />
   </div>
 </template>
 
@@ -511,6 +646,21 @@ onMounted(async () => {
 
 
 <style>
+.checkbox-container {
+  width: 100%;
+  margin: 0 auto;
+}
+@media (min-width: 431px) {
+  .checkbox-container {
+    width: 90%;
+    box-shadow: -5px 0 8px rgba(0, 0, 0, 0.2), 5px 0 8px rgba(0, 0, 0, 0.2);
+    padding: 10px;
+  }
+}
+.bottom-placeholder {
+  height: 80px;
+}
+
 .selected-cell {
   font-weight: bold;
   color: #1a89fa !important;
@@ -560,5 +710,17 @@ onMounted(async () => {
   position: sticky;
   top: 0;
   z-index: 100;
+}
+.nav-bar-right {
+  display: flex;
+  align-items: center;
+}
+.nav-button {
+  margin-left: 10px;
+  padding: 5px 5px;
+  margin-top: 4px;
+  color: #208BFA;
+  cursor: pointer;
+  user-select: none;
 }
 </style>

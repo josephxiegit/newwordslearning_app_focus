@@ -9,12 +9,12 @@ import TeacherList from './components/teacherList.vue';
 import StudentAnswer from './components/studentAnswer.vue';
 import StudentAccountList from './components/studentAccountList.vue';
 import StudentAccountItem from './components/studentAccountItem.vue';
+import StudentAccountSwipe from './components/studentAccountSwipe.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
 import TextbookList from './components/textbookList.vue';
-import Typed1 from './components/typed1.vue';
 import 'vant/lib/index.css';
 
 // 定义你的路由配置
@@ -32,16 +32,15 @@ const routes = [
             preventBack: true
         }
     },
-    
-    // {
-    //     path: '/',
-    //     redirect: '/Typed1'
-    // },
-    // {
-    //     path: '/homepage',
-    //     name: 'typed1',
-    //     component: Typed1,
-    // },
+    {
+        path: '/studentAccountSwipe',
+        name: 'studentAccountSwipe',
+        component: StudentAccountSwipe,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
 
     {
         path: '/teacher',
@@ -182,10 +181,10 @@ const globalState = reactive({
 
 
 import {
-    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay,
-    Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle,
-    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search
+    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem,
+    Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row,
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText,RadioGroup, Radio, Space,
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -197,6 +196,18 @@ app.provide('globalState', globalState);
 // 使用Vant组件
 app.use(Button)
     .use(Checkbox)
+    .use(Space)
+    .use(Col)
+    .use(Row)
+    .use(Swipe)
+    .use(SwipeItem)
+    .use(Grid)
+    .use(GridItem)
+    .use(List)
+    .use(RadioGroup)
+    .use(Radio)
+    .use(Tab)
+    .use(Tabs)
     .use(Circle)
     .use(CheckboxGroup)
     .use(NavBar)
@@ -225,7 +236,8 @@ app.use(Button)
     .use(Tag)
     .use(Badge)
     .use(RollingText)
-    .use(CollapseItem);
+    .use(CollapseItem)
+    .use(Calendar);
 // 使用vue-router
 app.use(router);
 app.use(axiosPlugin);
