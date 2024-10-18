@@ -2,7 +2,7 @@
   <div v-if="visible" class="miss-you-overlay">
     <div class="miss-you">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <img src="../assets/missyou.gif" alt="miss you">
+      <img :src="srcTheme" alt="miss you">
       <!-- 添加艺术字体的文字 -->
       <div class="miss-text">已经 {{ days }} 天没学习了？好想你啊！</div>
       <!-- 关闭按钮 -->
@@ -12,7 +12,13 @@
 </template>
 
 <script setup>
-import { ref, defineProps, defineExpose } from 'vue';
+import { ref, defineProps, defineExpose, inject, onMounted } from 'vue';
+// 主题路径
+import missyouSrcGoatAndWolf from '../assets/missyou.gif';
+import missyouSrcBears from '../assets/Boonie Bears/missyou.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
+
 
 const props = defineProps({
   days: {
@@ -32,7 +38,14 @@ function hide() {
 }
 
 const methods = { show, hide };
-
+onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = missyouSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = missyouSrcBears;
+  }
+});
 defineExpose(methods);
 </script>
 
@@ -46,7 +59,8 @@ defineExpose(methods);
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.3);
+  /* background-color: rgba(0, 0, 0, 0.3); */
+  background: transparent;
   display: flex;
   justify-content: center;
   align-items: center;

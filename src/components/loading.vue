@@ -1,31 +1,48 @@
 <template>
   <div class="loading-overlay">
     <div class="loading">
-      <img src="../assets/loading.gif" alt="Loading" class="loading-icon" />
+      <img :src="srcTheme" alt="Loading" class="loading-icon" />
       <span class="loading-text">{{ loadingText }}</span>
     </div>
   </div>
 </template>
-  
-  <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+
+<script setup>
+import {
+  ref,
+  computed,
+  onMounted,
+  onUnmounted,
+  defineProps,
+  inject,
+} from "vue";
+import loadingSrcGoatAndWolf from '../assets/loading.gif';
+import loadingSrcBears from '../assets/Boonie Bears/loading.gif';
+
+
 
 const dotCount = ref(1);
-
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 const loadingText = computed(() => `加载中${".".repeat(dotCount.value)}`);
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = loadingSrcGoatAndWolf
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = loadingSrcBears;
+  }
+});
+onUnmounted(() => {
   const interval = setInterval(() => {
     dotCount.value = (dotCount.value % 3) + 1;
-  }, 500); // 每 500 毫秒更新一次
-
-  onUnmounted(() => {
-    clearInterval(interval);
-  });
+  }, 500);
+  clearInterval(interval);
 });
 </script>
-  
-  <style scoped>
+
+<style scoped>
 .loading-overlay {
   position: fixed;
   top: 0;
@@ -36,7 +53,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999; /* 确保这个值大于 Popup 组件的 z-index */
+  z-index: 9999;
 }
 .loading {
   display: flex;
@@ -46,7 +63,7 @@ onMounted(() => {
 }
 
 .loading-icon {
-  width: 60px; /* 你可以根据需要调整图片大小 */
+  width: 60px;
   height: 60px;
   margin-bottom: 10px;
 }
@@ -55,4 +72,3 @@ onMounted(() => {
   font-size: 13px;
 }
 </style>
-  

@@ -2,15 +2,22 @@
   <div v-if="visible" :class="['encouragement-overlay', { 'exit': isExiting, 'enter': isEntering }]">
     <div class="encouragement">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <img src="../assets/encouragement.gif" alt="encouragement">
+      <img :src="srcTheme" alt="encouragement">
       <!-- 添加艺术字体的文字 -->
       <div class="encouragement-text">完成一半了哦！</div>
+      <!-- 关闭按钮 -->
+      <button class="close-button" @click="hide">关闭</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import { ref, onMounted, defineExpose, inject } from 'vue';
+// 主题路径
+import encouragementSrcGoatAndWolf from '../assets/encouragement.gif';
+import encouragementSrcBears from '../assets/Boonie Bears/encouragement.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 
 const visible = ref(false);
 const isEntering = ref(false);
@@ -43,6 +50,12 @@ const methods = { show, hide };
 defineExpose({ ...methods, visible });
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = encouragementSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = encouragementSrcBears;
+  }
   isEntering.value = false;
 });
 </script>
@@ -94,6 +107,8 @@ onMounted(() => {
 .encouragement {
   display: flex;
   align-items: center;
+  position: relative; /* 添加相对定位 */
+  flex-direction: column; /* 让内容垂直排列 */
 }
 
 .encouragement img {
@@ -101,14 +116,33 @@ onMounted(() => {
   height: auto; /* 让高度自动调整，保持宽高比 */
   max-width: 100%; /* 确保图片不会超过容器宽度 */
   max-height: 100%; /* 确保图片不会超过容器高度 */
-  margin-right: 20px; /* 调整图片与文字之间的间距 */
+  margin-bottom: 20px; /* 调整图片与文字之间的间距 */
 }
 
 .encouragement-text {
-  writing-mode: vertical-rl; /* 竖排文字 */
-  text-orientation: upright; /* 文字直立方向 */
   font-family: 'Zhi Mang Xing', cursive;
   font-size: 20px; /* 调整文字大小 */
   color: black; /* 设置文字颜色 */
+  margin-bottom: 20px; /* 调整文字与按钮之间的间距 */
+}
+
+/* 新增的关闭按钮样式 */
+.close-button {
+  background-color: white;
+  border: 2px solid red; /* 修改边框为红色 */
+  color: red;
+  padding: 5px 10px; /* 缩小按钮的尺寸 */
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px; /* 调整字体大小 */
+  margin-top: 10px;
+  cursor: pointer;
+  border-radius: 12px; /* 圆角 */
+}
+
+.close-button:hover {
+  background-color: darkred; /* 鼠标悬停时的颜色 */
+  color: white; /* 鼠标悬停时的字体颜色 */
 }
 </style>

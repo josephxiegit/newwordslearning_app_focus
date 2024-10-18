@@ -1,18 +1,44 @@
 <template>
-  <div v-if="visible" :class="['wolf-back-overlay', { 'exit': isExiting, 'enter': isEntering }]">
+  <div
+    v-if="visible"
+    :class="['wolf-back-overlay', { exit: isExiting, enter: isEntering }]"
+    :style="positionStyle"
+  >
     <div class="wolf-back">
       <!-- 添加艺术字体的文字 -->
-      <div class="wolf-text">不能看答案</div>
+      <div :class="wolfTextClass" style="">不能看答案</div>
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <img src="../assets/angry_wolf.gif" alt="Wolf Back">
-      
+      <img :src="srcTheme" alt="Wolf Back" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import {
+  ref,
+  onMounted,
+  defineExpose,
+  inject,
+  computed,
+  defineProps,
+  watch,
+} from "vue";
+// 主题路径
+import angryWolfGoatAndWolf from "../assets/angry_wolf.gif";
+import angryWolfSrcBears from '../assets/Boonie Bears/angryWolf.gif';
 
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
+const wolfTextClass = computed(() => {
+  return flagTheme.value === 0 ? "wolf-text-wolf" : "wolf-text-bear";
+});
+
+const props = defineProps({
+  dialogPosition: {
+    type: Object,
+    required: true,
+  },
+});
 const visible = ref(false);
 const isEntering = ref(false);
 const isExiting = ref(false);
@@ -37,14 +63,40 @@ function hide() {
 const methods = { show, hide };
 
 defineExpose({ ...methods, visible });
-
+const positionStyle = computed(() => {
+  if (
+    props.dialogPosition &&
+    props.dialogPosition.x !== undefined &&
+    props.dialogPosition.y !== undefined
+  ) {
+    return {
+      position: "absolute",
+      top: `${props.dialogPosition.y}px`, // 根据父组件传递的坐标设置 top
+      left: `${props.dialogPosition.x}px`, // 根据父组件传递的坐标设置 left
+    };
+  }
+  return {};
+});
+// 监听 dialogPosition 的变化
+// watch(
+//   () => props.dialogPosition,
+//   (newValue, oldValue) => {
+//     console.log("Dialog position changed:", newValue);
+//   }
+// );
 onMounted(() => {
   isEntering.value = false;
+  if (flagTheme.value == 1) {
+    srcTheme.value = angryWolfGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = angryWolfSrcBears;
+  }
 });
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap'); /* 引入艺术字体 */
+@import url("https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap"); /* 引入艺术字体 */
 
 .wolf-back-overlay {
   position: fixed;
@@ -100,11 +152,25 @@ onMounted(() => {
   max-height: 100%; /* 确保图片不会超过容器高度 */
 }
 
-.wolf-text {
-  margin-top: 20px; /* 调整文字与图片的间距 */
-  font-family: 'Zhi Mang Xing', cursive; /* 使用艺术字体 */
-  font-size: 30px; /* 调整文字大小 */
-  color: white; /* 设置文字颜色 */
-  transform: translateX(-20px); /* 向左移动 20px */
+.wolf-text-wolf {
+  margin-top: 20px;
+  font-family: "Zhi Mang Xing", cursive;
+  font-size: 30px;
+  color: white;
+  transform: translateX(-20px);
+}
+
+.wolf-text-bear {
+  margin-top: 20px;
+  margin-left: 50px;
+  font-family: "Zhi Mang Xing", cursive;
+  font-size: 30px;
+  color: white;
+  transform: translateX(-20px);
+  @media (min-width: 765px) {
+    .parent-version {
+      top: 35%;
+    }
+  }
 }
 </style>

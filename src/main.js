@@ -1,4 +1,4 @@
-import { createApp, reactive, provide } from 'vue'
+import { createApp, reactive, provide, ref } from 'vue'
 // import './style.css'
 import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router';
@@ -10,12 +10,19 @@ import StudentAnswer from './components/studentAnswer.vue';
 import StudentAccountList from './components/studentAccountList.vue';
 import StudentAccountItem from './components/studentAccountItem.vue';
 import StudentAccountSwipe from './components/studentAccountSwipe.vue';
+import StudentAccountTest from './components/studentAccountTest.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
 import TextbookList from './components/textbookList.vue';
+import UserInformation from './components/userInformation.vue';
+import PurchaseLog from './components/purchaseLog.vue';
+import Viewers from './components/viewers.vue';
+import ViewersHomepage from './components/viewersHomepage.vue';
 import 'vant/lib/index.css';
+import Global from "./components/Global.vue";
+
 
 // 定义你的路由配置
 const routes = [
@@ -41,7 +48,24 @@ const routes = [
             preventBack: true
         }
     },
-
+    {
+        path: '/purchaseLog',
+        name: 'purchaseLog',
+        component: PurchaseLog,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/studentAccountTest',
+        name: 'studentAccountTest',
+        component: StudentAccountTest,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
     {
         path: '/teacher',
         name: 'teacher',
@@ -70,6 +94,15 @@ const routes = [
         path: '/studentAccountList',
         name: 'studentAccountList',
         component: StudentAccountList,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/userinformation',
+        name: 'userinformation',
+        component: UserInformation,
         meta: {
             index: 1,
             preventBack: true
@@ -127,6 +160,24 @@ const routes = [
             preventBack: true
         }
     },
+    {
+        path: '/viewers',
+        name: 'viewers',
+        component: Viewers,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
+    {
+        path: '/viewersHomepage',
+        name: 'viewersHomepage',
+        component: ViewersHomepage,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
 ];
 // 创建router实例
 const router = createRouter({
@@ -139,8 +190,6 @@ router.beforeEach((to, from, next) => {
     let localTeacherPassword = window.localStorage.getItem('teacherPassword');
     localTeacherPassword = atob(localTeacherPassword);
     // console.log('localTeacherPassword: ', localTeacherPassword);
-    
-
     if (localTeacherPassword == "ss27834894") {
         next();
     } else {
@@ -153,10 +202,16 @@ router.beforeEach((to, from, next) => {
         if ((from.path === '/studentAnswer' && to.meta.preventBack) ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') ||
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
+            (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
+            (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
+            (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
+            (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
             (from.path === '/studentAccountItem' && to.meta.preventBack)) {
             // 如果满足以上任何条件，阻止导航
             next(false);
-        } else {
+        }
+
+        else {
             // 其他情况，正常进行路由导航
             next();
         }
@@ -178,13 +233,13 @@ const globalState = reactive({
     user: '',
     password: ''
 });
-
+const flagTheme = ref(1);
 
 import {
-    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem,
-    Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row,
-    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText,RadioGroup, Radio, Space,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar
+    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps,Divider, ActionSheet,
+    Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row, ConfigProvider, BackTop, DropdownMenu, DropdownItem,
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem,
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -193,9 +248,28 @@ import 'vant/lib/index.css';
 // 创建Vue应用实例
 const app = createApp(App);
 app.provide('globalState', globalState);
+app.provide('flagTheme', flagTheme);
+// 主题路径
+app.config.globalProperties.$bonnieBearsSrc = Global.BONNIE_BEARS_SRC;
+
 // 使用Vant组件
 app.use(Button)
     .use(Checkbox)
+    .use(ActionSheet)
+    .use(DropdownMenu)
+    .use(DropdownItem)
+    .use(BackTop)
+    .use(Divider)
+    .use(Sidebar)
+    .use(SidebarItem)
+    .use(Step)
+    .use(Steps)
+    .use(Stepper)
+    .use(CountDown)
+    .use(Switch)
+    .use(ConfigProvider)
+    .use(Progress)
+    .use(Card)
     .use(Space)
     .use(Col)
     .use(Row)

@@ -20,6 +20,7 @@ import { useIntervalFn } from "@vueuse/core";
 import { useRouter } from "vue-router";
 import swipeHelp from "./swipeHelp.vue";
 import submitloading from "./submitloading.vue";
+import TestAnimation from "./test.vue";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -133,13 +134,12 @@ const compareAndAddFlag = (dictArray) => {
         .split(",")
         .map((s) => s.trim());
 
-    // 定义原来的处理逻辑
     const answerArray = normalize(答案).sort();
     const correctAnswerArray = 正确答案 ? normalize(正确答案).sort() : [];
     const userSelectionArray = normalize(用户选择.join(",")).sort();
 
+    // 计算匹配情况
     let flag = "false"; // 默认为没有匹配
-
     if (is_spell) {
       // 当 is_spell 为 true 时，使用新的逻辑
       const userSelectionString = 用户选择.join("").replace(/\s/g, "");
@@ -151,7 +151,6 @@ const compareAndAddFlag = (dictArray) => {
         flag = "false";
       }
     } else {
-      // 原有的逻辑
       // 完全匹配：用户选择和答案（或正确答案）完全一致
       if (
         userSelectionArray.join(",") === answerArray.join(",") ||
@@ -173,7 +172,6 @@ const compareAndAddFlag = (dictArray) => {
         flag = "half";
       }
     }
-
     // 返回结果
     return {
       ...item,
@@ -185,278 +183,300 @@ const compareAndAddFlag = (dictArray) => {
 const swipeFlag = ref(0);
 const totalCoins = ref(0);
 const clickSubmitUser = async (action, done) => {
-  // 直接提交
-  showDialogSubmit.value = false;
-  mergedData.value = mergeAnswerAndSynonym();
+  // totalTimeInterval.value = 180;
+  if (totalTimeInterval.value > standardTimeInterval.value + 5) {
+    showDialog({
+      title: "抱歉",
+      message: "检测到可能的作弊行为，请重新登陆",
+      theme: "round-button",
+    }).then(() => {
+      router.push({
+        path: "/homepage",
+      });
+      return;
+    });
+  } else {
+    // 直接提交
+    showDialogSubmit.value = false;
+    mergedData.value = mergeAnswerAndSynonym();
 
-  // 将用户选择转化为中文
-  const synonymsSelectedChinese = convertSelections(
-    synonymsSelected.value,
-    synonymsOptions.value
-  );
-
-  // 将中文用户选择和选项答案合并
-  const synonymAndSelections = mergeSynonymAndSelections(
-    synonymsSelectedChinese
-  );
-
-  // 比对结果给出flag
-  const compareResult = compareAndAddFlag(synonymAndSelections);
-  // console.log("compareResult: ", compareResult);
-
-  // 处理迟疑库
-  function handleUncertain(uncertainVocabulary, compareResult) {
-    // 转换 uncertainVocabulary 为可以快速查找的 Map 结构
-    let uncertainVocabularyMap = new Map(
-      [...uncertainVocabulary].map((item) => [item.英文, item])
+    // 将用户选择转化为中文
+    const synonymsSelectedChinese = convertSelections(
+      synonymsSelected.value,
+      synonymsOptions.value
     );
 
-    // 遍历 compareResult，检查条件并移除符合条件的 uncertainVocabulary 项
-    compareResult.forEach((result) => {
-      if (result.flag !== "true") {
-        if (uncertainVocabularyMap.has(result.英文)) {
-          uncertainVocabularyMap.delete(result.英文);
-        }
-      }
-    });
+    // 将中文用户选择和选项答案合并
+    const synonymAndSelections = mergeSynonymAndSelections(
+      synonymsSelectedChinese
+    );
 
-    // 对于未移除的项，添加 "答案" 和 "正确答案"
-    let updatedUncertainVocabulary = new Set();
-    uncertainVocabularyMap.forEach((item, key) => {
-      let correspondingResult = compareResult.find(
-        (result) => result.英文 === key
+    // 比对结果给出flag
+    const compareResult = compareAndAddFlag(synonymAndSelections);
+
+    // 处理迟疑库
+    function handleUncertain(uncertainVocabulary, compareResult) {
+      // 转换 uncertainVocabulary 为可以快速查找的 Map 结构
+      let uncertainVocabularyMap = new Map(
+        [...uncertainVocabulary].map((item) => [item.英文, item])
       );
-      if (correspondingResult) {
-        item["答案"] = correspondingResult.答案;
 
-        // 检查是否存在“正确答案”，如果存在则添加到 item 中
-        if (correspondingResult.正确答案 !== undefined) {
-          item["正确答案"] = correspondingResult.正确答案;
-        } else {
-          // 如果没有“正确答案”，可以选择添加一个默认值，或者直接不添加该键
-          item["正确答案"] = "无"; // 或者直接跳过这行代码
-        }
-      }
-      updatedUncertainVocabulary.add(item);
-    });
-
-    // 输出处理后的 uncertainVocabulary 集合
-    return updatedUncertainVocabulary;
-  }
-  uncertainVocabulary.value = handleUncertain(
-    uncertainVocabulary.value,
-    compareResult
-  );
-  // console.log("uncertainVocabulary", uncertainVocabulary.value);
-
-  // 计算拼写库
-  if (!lock_spell.value) {
-    function getSpellVocabulary(compareResult, uncertainVocabulary) {
-      const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
-      const addedEnglishSet = new Set();
-      const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
-
-      function isPhrase(text) {
-          return /\s|,|\/|\.|…/.test(text);
-      }
-
-      compareResult.forEach((item) => {
-        let english = item.英文;
-        let correctAnswer = item.正确答案;
-        let answer = item.答案;
-
-        if (chineseCharacterRegex.test(english)) {
-          if (correctAnswer !== undefined) {
-            [english, correctAnswer] = [correctAnswer, english];
-            answer = correctAnswer;
-          } else {
-            [english, answer] = [answer, english];
-            correctAnswer = answer;
+      // 遍历 compareResult，检查条件并移除符合条件的 uncertainVocabulary 项
+      compareResult.forEach((result) => {
+        if (result.flag !== "true") {
+          if (uncertainVocabularyMap.has(result.英文)) {
+            uncertainVocabularyMap.delete(result.英文);
           }
-        }
-
-        if (
-          item.flag !== "true" &&
-          !addedEnglishSet.has(english) &&
-          !isPhrase(english)
-        ) {
-          spellVocabularyResult.push({
-            英文: english,
-            答案: answer,
-            正确答案: correctAnswer,
-            flag: item.flag,
-          });
-          addedEnglishSet.add(english);
         }
       });
 
-      uncertainVocabulary.forEach((item) => {
-        let english = item.英文;
-        let correctAnswer = item.正确答案;
-        let answer = item.答案;
+      // 对于未移除的项，添加 "答案" 和 "正确答案"
+      let updatedUncertainVocabulary = new Set();
+      uncertainVocabularyMap.forEach((item, key) => {
+        let correspondingResult = compareResult.find(
+          (result) => result.英文 === key
+        );
+        if (correspondingResult) {
+          item["答案"] = correspondingResult.答案;
 
-        if (chineseCharacterRegex.test(english)) {
-          if (correctAnswer !== undefined) {
-            [english, correctAnswer] = [correctAnswer, english];
-            answer = correctAnswer;
+          // 检查是否存在“正确答案”，如果存在则添加到 item 中
+          if (correspondingResult.正确答案 !== undefined) {
+            item["正确答案"] = correspondingResult.正确答案;
           } else {
-            [english, answer] = [answer, english];
-            correctAnswer = answer;
+            // 如果没有“正确答案”，可以选择添加一个默认值，或者直接不添加该键
+            item["正确答案"] = "无"; // 或者直接跳过这行代码
           }
         }
-
-        if (
-          item.type.includes(",") &&
-          item.is_spell === false &&
-          !addedEnglishSet.has(english) &&
-          !isPhrase(english)
-        ) {
-          spellVocabularyResult.push({
-            英文: english,
-            答案: answer,
-            正确答案: correctAnswer,
-            flag: item.type,
-          });
-          addedEnglishSet.add(english);
-        }
+        updatedUncertainVocabulary.add(item);
       });
 
-      return spellVocabularyResult; // 返回局部变量
+      // 输出处理后的 uncertainVocabulary 集合
+      return updatedUncertainVocabulary;
     }
-    spellVocabulary.value = getSpellVocabulary(
-      compareResult,
-      uncertainVocabulary.value
+    uncertainVocabulary.value = handleUncertain(
+      uncertainVocabulary.value,
+      compareResult
     );
-  } else {
-    spellVocabulary.value = spellVocabulary.value;
-  }
+    // console.log("uncertainVocabulary", uncertainVocabulary.value);
 
-  console.log("spellVocabulary", spellVocabulary.value);
+    // 计算拼写库
+    if (!lock_spell.value) {
+      function getSpellVocabulary(compareResult, uncertainVocabulary) {
+        const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
+        const addedEnglishSet = new Set();
+        const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
-  // 计算金币
-  function calculateAccuracy(compareResult) {
-    const total = compareResult.length;
-    const correct = compareResult.filter((item) => item.flag === "true").length;
-    return ((correct / total) * 100).toFixed(2);
-  }
-  if (isRewardEligible.value) {
-    if (calculateAccuracy(compareResult) < 70) {
-      totalCoins.value = 0;
+        function isPhrase(text) {
+          return /\s|,|\/|\./.test(text);
+        }
+
+        compareResult.forEach((item) => {
+          let english = item.英文;
+          let correctAnswer = item.正确答案;
+          let answer = item.答案;
+
+          if (chineseCharacterRegex.test(english)) {
+            if (correctAnswer !== undefined) {
+              [english, correctAnswer] = [correctAnswer, english];
+              answer = correctAnswer;
+            } else {
+              [english, answer] = [answer, english];
+              correctAnswer = answer;
+            }
+          }
+
+          if (
+            item.flag !== "true" &&
+            !addedEnglishSet.has(english) &&
+            !isPhrase(english)
+          ) {
+            spellVocabularyResult.push({
+              英文: english,
+              答案: answer,
+              正确答案: correctAnswer,
+              flag: item.flag,
+            });
+            addedEnglishSet.add(english);
+          }
+        });
+
+        uncertainVocabulary.forEach((item) => {
+          let english = item.英文;
+          let correctAnswer = item.正确答案;
+          let answer = item.答案;
+
+          if (chineseCharacterRegex.test(english)) {
+            if (correctAnswer !== undefined) {
+              [english, correctAnswer] = [correctAnswer, english];
+              answer = correctAnswer;
+            } else {
+              [english, answer] = [answer, english];
+              correctAnswer = answer;
+            }
+          }
+
+          if (
+            item.type.includes(",") &&
+            item.is_spell === false &&
+            !addedEnglishSet.has(english) &&
+            !isPhrase(english)
+          ) {
+            spellVocabularyResult.push({
+              英文: english,
+              答案: answer,
+              正确答案: correctAnswer,
+              flag: item.type,
+            });
+            addedEnglishSet.add(english);
+          }
+        });
+
+        return spellVocabularyResult; // 返回局部变量
+      }
+      spellVocabulary.value = getSpellVocabulary(
+        compareResult,
+        uncertainVocabulary.value
+      );
     } else {
-      totalCoins.value = compareResult.reduce((coins, item) => {
-        return item.flag === "true" ? coins + 10 : coins;
-      }, 0);
+      spellVocabulary.value = spellVocabulary.value;
     }
-  } else {
-    totalCoins.value = 0;
-  }
 
-  function checkFlags(compareResult) {
-    let halfCount = 0;
-    let trueCount = 0;
+    console.log("spellVocabulary", spellVocabulary.value);
 
-    for (const item of compareResult) {
-      if (item.flag !== "true" && item.flag !== "half") {
-        return 0;
-      }
-      if (item.flag === "true") {
-        trueCount++;
-      } else if (item.flag === "half") {
-        halfCount++;
-        if (halfCount > 3) {
-          return 0;
+    // 计算金币
+    if (isRewardEligible) {
+      totalCoins.value = compareResult.reduce((coins, item) => {
+        return item.flag === "true" ? coins + 2 : coins;
+      }, 0);
+    } else {
+      totalCoins.value = 0;
+    }
+
+    function checkFlags(compareResult) {
+      console.log("compareResult", compareResult);
+      let trueCount = 0;
+
+      for (const item of compareResult) {
+        if (item.flag !== "true" && item.flag !== "half") {
+          continue;
+        }
+        if (item.flag === "true") {
+          trueCount++;
         }
       }
+      return parseFloat((trueCount / compareResult.length).toFixed(2));
     }
 
-    if (trueCount === compareResult.length) {
-      return 1.5;
+    const rate = checkFlags(compareResult);
+    console.log("rate: ", rate);
+
+    async function updateAccountData() {
+      // 更新attempt和rate
+      let params = new URLSearchParams();
+      params.append("method", "updateUserData");
+      params.append("submittoken", submittoken.value);
+      params.append("nid", nid.value);
+      params.append("rate", rate);
+      params.append("type", 3);
+      params.append("swipe", 0);
+      params.append("coins", totalCoins.value);
+
+      // 更新Accountlog
+      params.append("log", JSON.stringify(compareResult));
+      params.append("title", titleData.value);
+      params.append("username", username.value);
+      params.append("alias", alias.value);
+      params.append("mode", "考试");
+      params.append("numberprev", clickNumberPrev.value);
+      params.append("numbershowanswer", clickNumberShowAnswer.value);
+      params.append("numbertransparent", clickNumberTransparent.value);
+
+      // 更新spell vocabulary
+      params.append("data_words", JSON.stringify(spellVocabulary.value));
+      params.append("lock_spell", lock_spell.value);
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
     }
-    return halfCount <= 3 ? 0.5 : false;
-  }
-  const rate = checkFlags(compareResult);
-  const type = Number(remainingSeconds.value) == 8 ? 0 : 1;
-  // console.log('type', type);
 
-  async function updateAccountData() {
-    // 更新AccountData
-    let params = new URLSearchParams();
-    params.append("method", "updateUserData");
-    params.append("submittoken", submittoken.value);
-    params.append("nid", nid.value);
-    params.append("rate", rate);
-    params.append("swipe", 1);
-    params.append("type", type);
-    params.append("coins", totalCoins.value);
+    // async function updateAccountlog(account_data_nid) {
+    //   // 结果存储到日志
+    //   let params = new URLSearchParams();
+    //   params.append("method", "updateUserlog");
+    //   params.append("log", JSON.stringify(compareResult));
+    //   params.append("title", titleData.value);
+    //   params.append("username", username.value);
+    //   params.append("alias", alias.value);
+    //   params.append("mode", "考试");
+    //   params.append("numberprev", clickNumberPrev.value);
+    //   params.append("numbershowanswer", clickNumberShowAnswer.value);
+    //   params.append("numbertransparent", clickNumberTransparent.value);
+    //   params.append("coins", totalCoins.value);
+    //   params.append("submittoken", submittoken.value);
+    //   params.append("account_data_nid", account_data_nid);
+    //   return await axios.post("words/", params).then((ret) => {
+    //     return ret.data.accountLogResult;
+    //   });
+    // }
 
-    // 更新Accountlog
-    params.append("log", JSON.stringify(compareResult));
-    params.append("title", titleData.value);
-    params.append("username", username.value);
-    params.append("alias", alias.value);
-    params.append("mode", "游戏");
-    params.append("numberprev", clickNumberPrev.value);
-    params.append("numbershowanswer", clickNumberShowAnswer.value);
-    params.append("numbertransparent", clickNumberTransparent.value);
+    // async function updateUser() {
+    //   // 结果存储到日志
+    //   let params = new URLSearchParams();
+    //   params.append("method", "updateUserCoins");
+    //   params.append("username", username.value);
+    //   params.append("coins", totalCoins.value);
+    //   return await axios.post("words/", params).then((ret) => {
+    //     return ret.data;
+    //   });
+    // }
 
-    // 更新spell vocabulary
-    params.append("data_words", JSON.stringify(spellVocabulary.value));
-    params.append("lock_spell", lock_spell.value);
+    async function updateUncertain(accountLogResult) {
+      // 延迟库
+      let params = new URLSearchParams();
+      params.append("method", "updateUncertain");
+      params.append("username", username.value);
+      params.append("account_data_nid", nid.value);
+      params.append("new_log_nid", accountLogResult);
+      params.append("type", "考试");
+      params.append(
+        "vocabulary",
+        JSON.stringify(Array.from(uncertainVocabulary.value))
+      );
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
+    }
+    // 计算得到多少新coins
+    const newCoins = totalCoins.value;
+    console.log("newCoins: ", newCoins);
 
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-
-  async function updateUncertain(accountLogResult) {
-    // 延迟库
-    let params = new URLSearchParams();
-    params.append("method", "updateUncertain");
-    params.append("username", username.value);
-    params.append("account_data_nid", nid.value);
-    params.append("new_log_nid", accountLogResult);
-    params.append("type", "游戏");
-    params.append(
-      "vocabulary",
-      JSON.stringify(Array.from(uncertainVocabulary.value))
-    );
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  // 计算得到多少新coins
-  const newCoins = totalCoins.value;
-  // console.log("newCoins: ", newCoins);
-
-  isLoading.value = true;
-  function redirect() {
-    router.push({
-      path: "/studentAccountAnswer",
-      state: {
-        uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
-        compareResult: JSON.stringify(compareResult),
-        userSelected: JSON.stringify(synonymsSelected.value),
-        nid: nid.value,
-        rate: accountDataResult.rate,
-        halfTrue: rate,
-        newCoins: newCoins,
-        username: username.value,
-        account_log_id: accountDataResult["new_log_nid"],
-        spellVocabulary: JSON.stringify(spellVocabulary.value),
-        lock_spell: lock_spell.value,
-      },
-    });
-  }
-  let accountDataResult;
-  if (compareResult.length == 0) {
-    showFailToast("提交数据不能为空");
-    isLoading.value = false;
-    return;
-  } else {
+    isLoading.value = true;
+    function redirect() {
+      router.push({
+        path: "/studentAccountAnswer",
+        state: {
+          uncertainResult: JSON.stringify(
+            Array.from(uncertainVocabulary.value)
+          ),
+          compareResult: JSON.stringify(compareResult),
+          userSelected: JSON.stringify(synonymsSelected.value),
+          nid: nid.value,
+          rate: accountDataResult.rate,
+          halfTrue: rate,
+          newCoins: newCoins,
+          username: username.value,
+          account_log_id: accountDataResult["new_log_nid"],
+          spellVocabulary: JSON.stringify(spellVocabulary.value),
+          lock_spell: lock_spell.value,
+        },
+      });
+    }
     // 如果 updateAccountlog 成功，继续执行其他操作
-    accountDataResult = await updateAccountData();
-    // console.log("accountDataResult: ", accountDataResult);
-    if (accountDataResult === "不能提交相同内容") {
+    const accountDataResult = await updateAccountData();
+    if (
+      accountDataResult === "不能提交相同内容" &&
+      sessionStorage.getItem("testFreshFlag") == true
+    ) {
       isLoading.value = false;
       showDialog({
         title: "错误",
@@ -494,110 +514,12 @@ const selectedIndexes = ref({});
 const flagSingleOrMultiChoice = ref("单选");
 const uncertainVocabulary = ref(new Set());
 
-// 加入迟疑库
-function addUncertain(index, content) {
-  const uncertainItem =
-    content === "回溯"
-      ? synonymsOptions.value[index - 1].英文
-      : synonymsOptions.value[index].英文;
-
-  const exists = Array.from(uncertainVocabulary.value).find((vocab) => {
-    return vocab.英文 === uncertainItem;
-  });
-
-  if (exists) {
-    const types = exists.type.split(","); // 将 type 字符串分割为数组
-    let updated = false;
-
-    const updatedTypes = types.map((type) => {
-      if (type.startsWith(content)) {
-        // 如果 type 中已存在该 content，则增加计数
-        const match = type.match(/(.+)\+(\d+)/);
-        if (match) {
-          const [_, baseContent, count] = match;
-          updated = true;
-          return `${baseContent}+${parseInt(count, 10) + 1}`;
-        } else {
-          updated = true;
-          return `${content}+1`; // 初次重复时加上 "+1"
-        }
-      }
-      return type;
-    });
-
-    if (!updated) {
-      // 如果 type 中没有该 content，则添加
-      updatedTypes.push(content);
-    }
-
-    // 合并更新后的类型数组为字符串，不会重复添加相同的 content
-    exists.type = updatedTypes.join(",");
-  } else {
-    // 如果不存在相同的 '英文' 项，则添加新字典
-    uncertainVocabulary.value.add({ 英文: uncertainItem, type: content });
-  }
-  console.log("uncertainVocabulary: ", uncertainVocabulary.value);
-}
-
 // 用于存储点击时间戳的 ref
 const firstClickTime = ref(null);
 const lastClickTime = ref(null);
 const totalTimeInterval = ref(0);
 const standardTimeInterval = ref(0);
 
-// const toggleCheckChinese = (index, index2) => {
-//   const key = `${index}-${index2}`;
-//   const checkboxRef = checkboxRefs.value[key];
-
-//   if (checkboxRef) {
-//     checkboxRef.toggle();
-//   }
-
-//   // 捕捉用户是否取消了选项
-//   const wasSelected = selectedIndexes.value[key]; // 之前的状态
-//   selectedIndexes.value[key] = !wasSelected; // 切换状态
-//   if (wasSelected && !synonymsOptions.value[index].is_spell) {
-//     addUncertain(index, "撤销");
-//   }
-
-//   const selectedChineses = selectedResults.value[index] || [];
-//   const currentChinese = synonymsOptions.value[index].中文[index2];
-//   const is_spell_selectedItems = synonymsOptions.value[index].is_spell;
-//   if (selectedIndexes.value[key]) {
-//     if (!selectedChineses.includes(currentChinese)) {
-//       selectedChineses.push(currentChinese);
-//       // 更新选中的项列表
-//       selectedItems.value.push({
-//         label: currentChinese,
-//         key: key,
-//         is_spell: is_spell_selectedItems,
-//       });
-//     }
-//   } else {
-//     const removeIndex = selectedChineses.indexOf(currentChinese);
-//     if (removeIndex !== -1) {
-//       selectedChineses.splice(removeIndex, 1);
-//     }
-//     // 从选中的项列表中移除
-//     selectedItems.value = selectedItems.value.filter(
-//       (item) => item.key !== key
-//     );
-//   }
-
-//   selectedResults.value[index] = selectedChineses;
-
-//   // 合并答案和选项
-//   mergedData.value = mergeAnswerAndSynonym();
-
-//   // 将用户选择转化为中文
-//   const synonymsSelectedChinese = convertSelections(
-//     synonymsSelected.value,
-//     synonymsOptions.value
-//   );
-
-//   // 将中文用户选择和选项答案合并
-//   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-// };
 let originalChinese = "";
 const toggleCheckChinese = (index, index2) => {
   const key = `${index}-${index2}`;
@@ -783,11 +705,9 @@ const toggleCheckChinese = (index, index2) => {
     return count;
   }, 0);
 };
-
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
-
 const submitFlag = ref(false);
 const goToNext = () => {
   // 获取当前轮播图的索引
@@ -806,6 +726,56 @@ const goToNext = () => {
     showFailToast("不能为空");
     return; // 如果没有选中项，直接返回，不进行后续操作
   }
+
+  // 计算时间间隔和迟疑库
+  const now = new Date().getTime();
+  if (firstClickTime.value === null) {
+    // 记录第一次点击的时间戳
+    firstClickTime.value = now;
+  } else {
+    // 计算点击间隔
+    const interval =
+      (now - (lastClickTime.value || firstClickTime.value)) / 1000;
+    totalTimeInterval.value += interval;
+    function addToUncertainVocabulary(interval) {
+      // 根据时间间隔获取 typeLabel
+      let typeLabel = "";
+      if (interval > 8) {
+        typeLabel = "8秒";
+      } else if (interval > 6) {
+        typeLabel = "6秒";
+      }
+
+      if (typeLabel) {
+        const uncertainItem = synonymsOptions.value[currentSlideIndex].英文;
+        let exists = Array.from(uncertainVocabulary.value).find((vocab) => {
+          return vocab.英文 === uncertainItem;
+        });
+
+        if (exists) {
+          // 如果存在相同的 '英文' 项，则在 type 中添加时间标签
+          const typeArray = exists.type.split(",");
+          if (!typeArray.includes(typeLabel)) {
+            typeArray.push(typeLabel);
+            exists.type = typeArray.join(",");
+          }
+        } else {
+          // 如果不存在相同的 '英文' 项，则添加新字典
+          uncertainVocabulary.value.add({
+            英文: uncertainItem,
+            type: typeLabel,
+          });
+        }
+      }
+    }
+
+    // 调用示例
+    addToUncertainVocabulary(interval);
+    // console.log("uncertainVocabulary: ", uncertainVocabulary.value);
+  }
+  // 更新最后一次点击的时间戳
+  lastClickTime.value = now;
+
   if (!isButtonDisabled.value) {
     const now = new Date().getTime();
     if (firstClickTime.value === null) {
@@ -873,7 +843,6 @@ const handleButtonClick = (buttonType) => {
 };
 const showOverlay = ref(true);
 const pauseSwipe = () => {
-  showAnswerButton.value = true;
   durationRolling.value = 2;
   rollingTextRef.value.reset();
   usercoinsStart.value = usercoins.value;
@@ -891,35 +860,33 @@ const pauseSwipe = () => {
   }
 };
 const continueSwipe = () => {
-  if (overlayOpenTime.value !== null) {
-    const now = new Date().getTime();
-    const interval = (now - overlayOpenTime.value) / 1000; // 计算时间间隔（秒）
-    standardTimeInterval.value += interval;
-    // console.log("Interval time:", interval.toFixed(2), "seconds");
-    // console.log(
-    //   "standardTimeInterval:",
-    //   standardTimeInterval.value.toFixed(2),
-    //   "s"
-    // );
-  }
-  showOverlay.value = false;
-  if (currentIndex.value != 0) {
-    resume();
-  }
+  // if (overlayOpenTime.value !== null) {
+  //   const now = new Date().getTime();
+  //   const interval = (now - overlayOpenTime.value) / 1000; // 计算时间间隔（秒）
+  //   standardTimeInterval.value += interval;
+  //   // console.log("Interval time:", interval.toFixed(2), "seconds");
+  //   console.log(
+  //     "standardTimeInterval:",
+  //     standardTimeInterval.value.toFixed(2),
+  //     "s"
+  //   );
+  // }
+  // showOverlay.value = false;
+  // if (currentIndex.value != 0) {
+  //   resume();
+  // }
 };
 // 场外支援
 
 // 购买魔法
-const priceMagic = ref(600);
+const priceMagic = ref(350);
 
-async function consumeMagic(type) {
+async function consumeMagic() {
   isLoading.value = true;
   let params = new URLSearchParams();
   params.append("method", "consumeMagic");
   params.append("username", username.value);
   params.append("priceMagic", priceMagic.value);
-  params.append("type", type);
-  params.append("account_data_nid", nid.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
   });
@@ -947,10 +914,10 @@ const purchaseMagic = (buttonStyle) => {
         }
         rollingTextRef.value.reset();
 
-        const res = await consumeMagic("回溯");
+        const res = await consumeMagic();
 
         // 更新 usercoinsEnd 并确保 DOM 已更新后触发动画
-        usercoinsEnd.value = res["coins"];
+        usercoinsEnd.value = res;
         await nextTick();
         rollingTextRef.value.start();
 
@@ -958,7 +925,7 @@ const purchaseMagic = (buttonStyle) => {
         await new Promise((resolve) => setTimeout(resolve, 3000));
 
         // 更新 usercoins
-        usercoins.value = res["coins"];
+        usercoins.value = res;
         isLoading.value = false;
         gotoPreHelp(true);
         numberPrev.value = 0;
@@ -986,54 +953,18 @@ const purchaseMagic = (buttonStyle) => {
       .then(async () => {
         rollingTextRef.value.reset();
 
-        const res = await consumeMagic("点金");
-        console.log("res: ", res);
+        const res = await consumeMagic();
 
-        if (res.content == "日期") {
-          const date = new Date(res.date);
-          const datePlusOneHour = new Date(date.getTime() + 3600000);
-          // console.log("datePlusOneHour: ", datePlusOneHour);
+        // 更新 usercoinsEnd 并确保 DOM 已更新后触发动画
+        usercoinsEnd.value = res;
+        await nextTick();
+        rollingTextRef.value.start();
 
-          const timeDifferenceInSeconds = computed(() => {
-            const now = new Date(); // 每次计算时动态获取当前时间
-            const timeDifferenceInMilliseconds = Math.abs(
-              datePlusOneHour - now
-            );
-            return Math.floor(timeDifferenceInMilliseconds / 1000); // 转换为秒
-          });
-          // console.log(
-          //   "timeDifferenceInSeconds: ",
-          //   timeDifferenceInSeconds.value
-          // );
-
-          const formattedTimeDifference = computed(() => {
-            const totalSeconds = timeDifferenceInSeconds.value;
-            const minutes = Math.floor(totalSeconds / 60); // 计算分钟
-            const seconds = totalSeconds % 60; // 剩余的秒数
-            return `${minutes}分${seconds}秒`;
-          });
-          // console.log(formattedTimeDifference.value);
-
-          showDialog({
-            title: "每小时点金只能购买3次",
-            message: `距离下次购买还有${formattedTimeDifference.value}`,
-            theme: "round-button",
-          });
-          isLoading.value = false;
-          numberShowAnswer.value = 0;
-          return;
-        }
-
-        if (res.content == "金币") {
-          usercoinsEnd.value = res["coins"];
-          await nextTick(); // 更新 usercoinsEnd 并确保 DOM 已更新后触发动画
-          rollingTextRef.value.start();
-          // 更新 usercoins
-          usercoins.value = res["coins"];
-          isLoading.value = false;
-          autoSelectAnswer(currentIndex.value, true);
-          numberShowAnswer.value = 0;
-        }
+        // 更新 usercoins
+        usercoins.value = res;
+        isLoading.value = false;
+        autoSelectAnswer(currentIndex.value, true);
+        numberShowAnswer.value = 0;
       })
       .catch(() => {
         // on cancel
@@ -1058,15 +989,15 @@ const purchaseMagic = (buttonStyle) => {
       .then(async () => {
         rollingTextRef.value.reset();
 
-        const res = await consumeMagic("透视");
+        const res = await consumeMagic();
 
         // 更新 usercoinsEnd 并确保 DOM 已更新后触发动画
-        usercoinsEnd.value = res["coins"];
+        usercoinsEnd.value = res;
         await nextTick();
         rollingTextRef.value.start();
 
         // 更新 usercoins
-        usercoins.value = res["coins"];
+        usercoins.value = res;
         isLoading.value = false;
         transparentHelp(true);
         numberTransparent.value = 0;
@@ -1082,12 +1013,9 @@ const disabledShowAnswer = ref(false);
 const showAnswerButton = ref(true);
 const showAnswerIsSpell = ref("");
 const autoSelectAnswer = (index, flag) => {
-  // if (flag == false && numberShowAnswer.value <= 0) {
-  //   disabledShowAnswer.value = true;
-  //   return;
-  // }
-  if (!synonymsOptions.value[index].is_spell) {
-    addUncertain(index, "点金");
+  if (flag == false && numberShowAnswer.value <= 0) {
+    showToast("次数为0，无法使用");
+    return;
   }
   const answerItem = answers.value.find(
     (item) => item.序号 === synonymsOptions.value[index].序号
@@ -1096,84 +1024,32 @@ const autoSelectAnswer = (index, flag) => {
     showMagicStart.value = false; // 隐藏魔法启动，变小字体
     swipeHelpRef.value.hide();
     const correctAnswers = answerItem.中文.split("；");
-    if (synonymsOptions.value[index]["is_spell"]) {
-      // 拼写题提示答案
-      function getRandomLetters(word) {
-        // 将字符串转换为字符数组
-        const letters = word.split("");
-        // 确保第一个字母始终显示
-        const result = [letters[0]];
+    let availableAnswers = correctAnswers.filter((answer) => {
+      const idx2 = synonymsOptions.value[index].中文.indexOf(answer);
+      return idx2 !== -1 && !isSelected(index, idx2);
+    });
 
-        // 计算需要显示的字母总数，除了第一个字母以外的1/3
-        const totalToShow = Math.ceil((letters.length - 1) / 3);
-
-        // 随机选择剩余字母的位置
-        const indices = new Set();
-        while (indices.size < totalToShow) {
-          const randomIndex =
-            Math.floor(Math.random() * (letters.length - 1)) + 1; // 从第二个字母开始
-          indices.add(randomIndex);
+    if (availableAnswers.length > 0) {
+      const randomCorrectAnswer =
+        availableAnswers[Math.floor(Math.random() * availableAnswers.length)];
+      const index2 =
+        synonymsOptions.value[index].中文.indexOf(randomCorrectAnswer);
+      if (index2 !== -1) {
+        numberShowAnswer.value -= 1;
+        toggleCheckChinese(index, index2);
+        changeOverlayColor("rgba(128, 128, 128, 0.6)");
+        handleButtonClick("autoSelectAnswer");
+        if (!isButtonTransparentDisabled.value) {
+          setTimeout(() => {
+            swipeHelpRef.value.show();
+            changeOverlayColor("#000000");
+            showMagicStart.value = true; // 恢复魔法启动，变回字体
+          }, 6000);
         }
-
-        // 构建结果字符串
-        for (let i = 1; i < letters.length; i++) {
-          if (letters[i] === " ") {
-            result.push("  "); // 如果是空格，继续用空格
-          } else if (indices.has(i)) {
-            result.push(letters[i]); // 显示随机选择的字母
-          } else {
-            result.push("()"); // 其余用 ___ 代替
-          }
-        }
-
-        // 返回结果字符串
-        return result.join("");
-      }
-      showAnswerIsSpell.value = getRandomLetters(answers.value[index].英文);
-      showOverlay.value = false;
-      currentRate.value = 100;
-      timerRate.value = 100;
-      continueSwipe();
-      numberShowAnswer.value -= 1;
-      if (flag == false && numberShowAnswer.value <= 0) {
-        disabledShowAnswer.value = true;
       }
     } else {
-      let availableAnswers = correctAnswers.filter((answer) => {
-        const idx2 = synonymsOptions.value[index].中文.indexOf(answer);
-        return idx2 !== -1 && !isSelected(index, idx2);
-      });
-
-      if (availableAnswers.length > 0) {
-        const randomCorrectAnswer =
-          availableAnswers[Math.floor(Math.random() * availableAnswers.length)];
-        const index2 =
-          synonymsOptions.value[index].中文.indexOf(randomCorrectAnswer);
-        if (index2 !== -1) {
-          numberShowAnswer.value -= 1;
-          if (flag == false && numberShowAnswer.value <= 0) {
-            disabledShowAnswer.value = true;
-          }
-          toggleCheckChinese(index, index2);
-          changeOverlayColor("rgba(128, 128, 128, 0.6)");
-          handleButtonClick("autoSelectAnswer");
-          showAnswerButton.value = false;
-          if (!isButtonTransparentDisabled.value) {
-            setTimeout(() => {
-              showAnswerButton.value = true;
-              swipeHelpRef.value.show();
-              changeOverlayColor("#000000");
-              showMagicStart.value = true; // 恢复魔法启动，变回字体
-            }, 6000);
-          }
-        }
-      } else {
-        showToast("已经全部显示");
-        if (numberShowAnswer.value > 0) {
-          numberShowAnswer.value -= 1;
-        }
-        disabledShowAnswer.value = numberShowAnswer.value === 0;
-      }
+      // console.log("No available answers to select.");
+      showToast("已经全部显示");
     }
   }
 };
@@ -1187,11 +1063,6 @@ const changeOverlayColor = (color) => {
 };
 
 const transparentHelp = (flag) => {
-  //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell) {
-    addUncertain(currentIndex.value, "透视");
-  }
-
   if (flag == false && numberTransparent.value <= 0) {
     showToast("次数为0，无法透视");
     return;
@@ -1201,7 +1072,6 @@ const transparentHelp = (flag) => {
     return;
   }
   showMagicStart.value = false; // 隐藏魔法启动
-  showAnswerButton.value = false;
   handleButtonClick("transparent");
   swipeHelpRef.value.hide();
   isButtonDisabled.value = false; // 下一个按钮变为可以点选
@@ -1224,11 +1094,6 @@ const gotoPreHelp = (flag) => {
     return;
   }
 
-  //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell) {
-    addUncertain(currentIndex.value, "回溯");
-  }
-
   flagSingleOrMultiChoice.value = getSingeOrMultiChoice(currentIndex.value - 1);
   handleButtonClick("gotoPre");
   const now = new Date().getTime();
@@ -1247,17 +1112,31 @@ const gotoPreHelp = (flag) => {
 // 动画场外支援
 const swipeHelpRef = ref(null);
 
+// 倒计时
+const countDownTime = ref(30 * 60 * 60 * 1000);
+const onFinishCountDown = () => {
+  clickSubmitUser();
+};
+
+// 动画喜洋洋
+const testAnimationRef = ref(null);
+function showAnimationTest() {
+  testAnimationRef.value.show();
+
+  // setTimeout(() => {
+  //   testAnimationRef.value.hide();
+  // }, 4000);
+}
+
 // 计时器
 const timerRate = ref(0);
-const autoplay2 = ref(8000);
-const autoplayInit = ref("");
+const autoplay2 = ref(10000);
 const currentRate = ref(100);
 const swipeRef = ref(null);
 const completeCount = ref("1");
 const currentIndex = ref(0);
 const totalSlides = ref(25); // 假设总共有5个轮播图项
 const isButtonDisabled = ref(false);
-const remainingSeconds = ref(0);
 // 使用computed计算属性来确定按钮的文本
 const textButtonNext = computed(() => {
   if (currentIndex.value === 0) {
@@ -1268,21 +1147,7 @@ const textButtonNext = computed(() => {
     return "下一个";
   }
 });
-// 计算按钮的背景颜色和透明度
-const buttonColor = computed(() => {
-  // 计算当前索引占总幻灯片数的比例
-  const ratio = currentIndex.value / (totalSlides.value - 1);
-  const alpha = 0.5 + 0.5 * ratio; // 透明度从0.5逐渐增加到1
 
-  if (currentIndex.value === totalSlides.value - 1) {
-    // 最后一个幻灯片使用蓝绿色且完全不透明
-    return `rgba(0, 176, 155, 1)`;
-  } else {
-    // 根据比例调整绿色深浅和透明度，起始绿色设为105，透明度从0.5到1
-    const green = 105 + Math.round(70 * (1 - ratio));
-    return `rgba(0, ${green}, 0, ${alpha})`;
-  }
-});
 function getSingeOrMultiChoice(currentIndex) {
   if (synonymsOptions.value[currentIndex]["is_spell"]) {
     return "多选";
@@ -1333,52 +1198,21 @@ const resetTimer = () => {
 
       // console.log("totalTimeInterval: ", totalTimeInterval.value);
       // console.log("standardTimeInterval: ", standardTimeInterval.value);
-      if (totalTimeInterval.value <= standardTimeInterval.value) {
-        clickSubmitUser();
-      } else {
-        showFailToast("监测到作弊行为，请重新作答");
-      }
+
+      clickSubmitUser();
     }
   }, 0);
-};
-const executedWords = new Set();
-const handleTimerRate = () => {
-  const currentWordIndex = currentIndex.value; // 当前词的索引
-
-  // 检查 timerRate.value 是否小于 20 且当前词没有被执行过
-  const now = new Date().getTime();
-  const interval = (now - (lastClickTime.value || firstClickTime.value)) / 1000;
-  // if (timerRate.value < 20 && !executedWords.has(currentWordIndex)) {
-  // console.log('interval', interval);
-  if (
-    interval > 6 &&
-    !executedWords.has(currentWordIndex) &&
-    !synonymsOptions.value[currentWordIndex].is_spell
-  ) {
-    addUncertain(currentIndex.value, "超时");
-    // 将当前词标记为已执行
-    executedWords.add(currentWordIndex);
-  }
-};
-
-watch(currentIndex, () => {
-  resetExecutionForNewWord();
-});
-const resetExecutionForNewWord = () => {
-  executedWords.clear(); // 清空已执行的记录
-  // 你也可以根据需要在这里处理其他逻辑
 };
 const { pause, resume } = useIntervalFn(
   () => {
     if (currentRate.value > 0) {
       // console.log(totalSlides.value);
       timerRate.value -= 100 / (autoplay2.value / 70);
-      handleTimerRate();
       if (
         timerRate.value <= 20 &&
         currentIndex.value != totalSlides.value - 1
       ) {
-        isButtonDisabled.value = true; // 禁用按钮
+        isButtonDisabled.value = false; // 禁用按钮
       }
     } else {
       resetTimer();
@@ -1388,14 +1222,7 @@ const { pause, resume } = useIntervalFn(
   { immediate: false }
 );
 const handleSwipeChange = (index) => {
-  if (synonymsOptions.value[index].is_spell) {
-    autoplay2.value = autoplayInit.value + 17000;
-  } else {
-    autoplay2.value = autoplayInit.value;
-  }
-  // console.log(autoplay2.value);
   showAnswerIsSpell.value = "";
-  // selectedItems.value = [];
   currentIndex.value = index;
   currentRate.value = 100;
   timerRate.value = 100;
@@ -1411,15 +1238,7 @@ watch(overlayColor, (newColor) => {
 });
 // const handleBeforeUnload = (event) => {
 const handlePageHide = (event) => {
-  sessionStorage.setItem(
-    "numberShowAnswer",
-    JSON.stringify(numberShowAnswer.value)
-  );
-  sessionStorage.setItem(
-    "numberTransparent",
-    JSON.stringify(numberTransparent.value)
-  );
-  sessionStorage.setItem("numberPrev", JSON.stringify(numberPrev.value));
+  sessionStorage.setItem("testFreshFlag", true);
 };
 const titleData = ref("");
 const username = ref("");
@@ -1434,13 +1253,27 @@ const durationRolling = ref(0.8);
 const isRewardEligible = ref(true);
 const lock_spell = ref(false);
 const spellVocabulary = ref([]);
+const coinsFlag = ref(true);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onMounted(async () => {
+  showAnimationTest();
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
   // 监测恶意刷新
+  console.log(sessionStorage.getItem("testFreshFlag"));
+  if (sessionStorage.getItem("testFreshFlag") == "true") {
+    showDialog({
+      title: "抱歉",
+      message: "检测到可能的作弊行为，请重新登陆",
+      theme: "round-button",
+    }).then(() => {
+      router.push({
+        path: "/",
+      });
+    });
+  }
   numberShowAnswer.value = JSON.parse(
     sessionStorage.getItem("numberShowAnswer")
   );
@@ -1467,9 +1300,7 @@ onMounted(async () => {
       message: "监测到可能的恶意刷新\n场外支援被重置到刷新前状态",
     });
   }
-  if (numberShowAnswer.value == 0) {
-    disabledShowAnswer.value = true;
-  }
+
   currentRate.value = 100;
   timerRate.value = 100;
   isLoading.value = true;
@@ -1479,19 +1310,12 @@ onMounted(async () => {
   );
 
   const initData = async () => {
+    try {
       // 初始化数据
-      console.log("history.state: ", history.state);
       const data = JSON.parse(history.state.data);
       console.log("data: ", data);
 
-      autoplay2.value = history.state.autoplay2;
-      autoplayInit.value = history.state.autoplay2;
-      // console.log("autoplay2: ", autoplay2.value);
-
-      remainingSeconds.value = (autoplay2.value / 1000).toString();
       totalSlides.value = data.answers.length;
-
-      // console.log('totalSlides', totalSlides.value);
       alias.value = data.alias;
       lock_spell.value = history.state.lock_spell;
       if (lock_spell.value) {
@@ -1520,9 +1344,6 @@ onMounted(async () => {
       }
       nid.value = history.state.nid;
       synonymsOptions.value = data.synonyms;
-
-      console.log("synonymsOptions: ", synonymsOptions.value);
-
       answers.value = data.answers;
       synonymsOptions.value.forEach((item) => {
         if (item.is_spell) {
@@ -1534,43 +1355,31 @@ onMounted(async () => {
           }
         }
       });
-      console.log("answers: ", answers.value);
-
       titleData.value = data.title;
 
       // console.log("titleData: ", titleData.value);
-
-      const keywords = [
-        "中考",
-        "初中",
-        "七年级",
-        "八年级",
-        "九年级",
-        "小升初",
-        "六年级",
-      ];
-      if (keywords.some((keyword) => titleData.value.includes(keyword))) {
-        numberShowAnswer.value = 1;
-        numberTransparent.value = 1;
-        numberPrev.value = 1;
-      }
 
       username.value = data.username;
 
       submittoken.value = new Date().getTime();
       // console.log("submittoken: ", submittoken.value);
-
+      // console.log("totalSlides", totalSlides.value);
+      // console.log("autoplay2", autoplay2.value);
       const trueCount_is_spell =
         synonymsOptions.value.filter((item) => item.is_spell === true).length ||
         0;
       standardTimeInterval.value =
-        (totalSlides.value - 1) * (autoplay2.value / 1000) +
+        totalSlides.value * (autoplay2.value / 1000) +
         0.2 * totalSlides.value +
         trueCount_is_spell * 17000 +
         3;
-      // console.log("standardTimeInterval: ", standardTimeInterval.value);
+      console.log("standardTimeInterval: ", standardTimeInterval.value);
 
       flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+      // 初始化计时器
+      countDownTime.value = answers.value.length * 10 * 1000;
+      // countDownTime.value = 8 * 1000;
+      // console.log(countDownTime.value);
 
       // 获取用户金币
       const getUserCoins = async () => {
@@ -1592,15 +1401,16 @@ onMounted(async () => {
 
       // 启动滚动文字动画
       await nextTick(); // 确保 DOM 更新完毕后再启动动画
-      rollingTextRef.value.start();
+      // rollingTextRef.value.start();
 
       // 在动画启动后隐藏覆盖层
       setTimeout(() => {
         showOverlay.value = false;
       }, 1500);
-
+    } catch (error) {
+      console.error("Error initializing data:", error);
+    }
   };
-
   // 调用初始化函数
   initData();
 });
@@ -1610,114 +1420,27 @@ onMounted(async () => {
   <div class="parent-container">
     <div class="nav-bar-container">
       <van-nav-bar
-        title="学生题目"
+        title="考试现场"
         :left-text="`${completeCount}/${synonymsOptions.length}`"
       >
       </van-nav-bar>
     </div>
-
-    <van-overlay
-      :show="showOverlay"
-      z-index="100"
-      class="overlay-container"
-      @click="continueSwipe"
-    >
-      <van-icon name="cross" class="close-icon" @click.stop="continueSwipe" />
-      <div class="swipe-help-container">
-        <swipeHelp ref="swipeHelpRef" style="margin-right: 10px" />
-      </div>
-      <div class="space">
-        <div class="space-buttons">
-          <div style="color: gray; font-size: 12px; margin-left: 10px">
-            剩余
-            <van-rolling-text
-              ref="rollingTextRef"
-              :start-num="usercoinsStart"
-              :target-num="usercoinsEnd"
-              :auto-start="false"
-              :duration="durationRolling"
-              style="
-                --van-rolling-text-color: gray;
-                --van-rolling-text-item-width: 10px;
-                --van-rolling-text-font-size: 12px;
-                --van-rolling-text-gap: -2px;
-              "
-            />
-            金币：每次消费 {{ priceMagic }}
-          </div>
-          <div
-            v-show="showAnswerButton"
-            class="button-container"
-            style="margin-top: -15px"
-          >
-            <van-button
-              type="warning"
-              block
-              @click.stop="gotoPreHelp(false)"
-              icon="replay"
-              class="custom-button"
-              >回溯 🚗 + {{ numberPrev }}</van-button
-            >
-            <van-button
-              icon="plus"
-              type="warning"
-              color="linear-gradient(to right, #FFD1B3, #FF6034)"
-              class="custom-button-plus"
-              @click.stop="purchaseMagic('gotoPre')"
-            >
-              购买</van-button
-            >
-          </div>
-
-          <div class="button-description">回退到上一个单词</div>
-          <div class="button-container" style="margin-top: -5px">
-            <van-button
-              :disabled="disabledShowAnswer"
-              type="success"
-              block
-              @click.stop="autoSelectAnswer(currentIndex, false)"
-              icon="aim"
-              class="custom-button"
-              >点金 🎉 + {{ numberShowAnswer }}</van-button
-            >
-            <van-button
-              icon="plus"
-              type="warning"
-              color="linear-gradient(to right, #A4E8C0, #0DC160)"
-              class="custom-button-plus"
-              @click.stop="purchaseMagic('autoSelect')"
-            >
-              购买</van-button
-            >
-          </div>
-          <div class="button-description">随机赠送一个答案</div>
-          <div class="button-container" style="margin-top: -5px">
-            <van-button
-              type="primary"
-              block
-              :disabled="isButtonTransparentDisabled"
-              @click.stop="transparentHelp(false)"
-              icon="eye-o"
-              class="custom-button"
-              >透视 👓 + {{ numberTransparent }}</van-button
-            >
-            <van-button
-              icon="plus"
-              type="warning"
-              color="linear-gradient(to right, #A3C9FA, #1A89FA)"
-              class="custom-button-plus"
-              @click.stop="purchaseMagic('transparent')"
-            >
-              购买</van-button
-            >
-          </div>
-          <div class="button-description">时间被凝固</div>
-        </div>
-      </div>
-    </van-overlay>
-
+    <van-row justify="center" style="margin-top: 30px; height: 13px">
+      <van-count-down
+        :time="countDownTime"
+        format="mm 分 ss 秒"
+        @finish="onFinishCountDown"
+      >
+        <template #default="timeData">
+          <span class="colon">提交倒计时：</span>
+          <span class="block">{{ timeData.minutes }}</span>
+          <span class="colon">:</span>
+          <span class="block">{{ timeData.seconds }}</span>
+        </template>
+      </van-count-down>
+    </van-row>
     <van-row justify="center">
-      <van-col span="23" style="margin-top: -10px">
+      <van-col span="23" style="margin-top: -20px">
         <van-swipe
           class="my-swipe"
           :show-indicators="false"
@@ -1749,7 +1472,6 @@ onMounted(async () => {
                             {{ flagSingleOrMultiChoice }}
                           </div>
                         </div>
-
                         <div v-show="item.is_spell" class="selected-tags">
                           <div
                             v-for="(selected, index2) in selectedItems"
@@ -1759,7 +1481,6 @@ onMounted(async () => {
                             "
                             :key="index2"
                             style="color: orange; font-size: smaller"
-                            class="flying-tag"
                             @click="removeSelected(index2)"
                             :style="{
                               padding: '0.2rem 0px 0.3rem 0px',
@@ -1808,55 +1529,20 @@ onMounted(async () => {
       </van-col>
     </van-row>
 
-    <van-row class="my-swipe-container" justify="space-between">
-      <van-col span="20" offset="">
-        <van-row>
-          <van-col span="8">
-            <van-button
-              type="success"
-              @click="goToNext"
-              size="normal"
-              :disabled="isButtonDisabled"
-              :style="{ backgroundColor: buttonColor }"
-              style="width: 87.5px"
-              >{{ textButtonNext }}</van-button
-            >
-          </van-col>
-          <van-col
-            span="14"
-            style="
-              font-size: 18px;
-              color: #ff976a;
-              font-weight: 700;
-              display: flex;
-              align-items: center;
-              padding-right: 10%;
-            "
-          >
-            {{ showAnswerIsSpell }}
-          </van-col>
-          <van-col span="2" offset="">
-            <van-circle
-              v-model:current-rate="currentRate"
-              :rate="timerRate"
-              :speed="0"
-              stroke-width="120"
-              layer-color="#ebedf0"
-              color="red"
-              size="50"
-              class="time-circle"
-            >
-            </van-circle>
-          </van-col>
-        </van-row>
-        <van-row style="margin-top: px">
-          <van-col span="9" offset="">
-            <van-button type="warning" @click="pauseSwipe" size="normal"
-              >场外支援</van-button
-            >
-          </van-col>
-        </van-row>
+    <van-row class="my-swipe-container" style="position: relative">
+      <van-col span="2"></van-col>
+      <van-col span="14">
+        <van-button
+          type="warning"
+          @click="goToNext"
+          size="large"
+          class="left-button"
+          :disabled="isButtonDisabled"
+          >{{ textButtonNext }}</van-button
+        >
       </van-col>
+      <van-col span="2"></van-col>
+      <testAnimation ref="testAnimationRef" />
     </van-row>
 
     <submitloading v-if="isLoading" />
@@ -1874,7 +1560,7 @@ html {
   margin-top: 30px;
 }
 
-.overlay-container .van-overlay {
+.overlay-container > .van-overlay {
   display: flex;
   flex-direction: column;
   background-color: var(--van-overlay-background);
@@ -2017,7 +1703,7 @@ html {
 }
 
 .my-swipe-container {
-  margin-top: 20px;
+  margin-top: 10px;
   margin-left: auto;
   margin-right: auto;
   display: flex;
@@ -2033,30 +1719,19 @@ html {
   }
 }
 
-.selected-tags {
-  min-height: 30px;
-  display: flex;
-  margin-bottom: -2px;
-  margin-top: 2px;
-}
-.tag-placeholder {
-  margin-top: 2px;
-  margin-bottom: -2px;
+.colon {
   display: inline-block;
-  height: 30px; /* 和 van-tag 的高度保持一致 */
+  margin: 0 4px;
+  color: #1989fa;
+  height: 12px;
 }
-.flying-tag {
-  animation: fly-up 0.5s ease-out;
-}
-
-@keyframes fly-up {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+.block {
+  display: inline-block;
+  width: 22px;
+  color: #fff;
+  font-size: 12px;
+  text-align: center;
+  background-color: #1989fa;
+  height: 20px;
 }
 </style>

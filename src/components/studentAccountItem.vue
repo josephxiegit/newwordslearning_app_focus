@@ -6,6 +6,8 @@ import {
   getCurrentInstance,
   onBeforeUpdate,
   computed,
+  nextTick,
+  onBeforeUnmount,
 } from "vue";
 import {
   showFailToast,
@@ -42,6 +44,9 @@ const submitSelection = () => {
   showDialogSubmit.value = true;
 };
 const mergeSynonymAndSelections = (synonymsSelectedChinese) => {
+  // console.log("mergedData", mergedData.value);
+  // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
+  // console.log("---------------------------");
   return mergedData.value.map((item) => {
     const 用户选择 = synonymsSelectedChinese[item.序号 - 1].中文;
     return {
@@ -57,7 +62,9 @@ const mergeAnswerAndSynonym = () => {
     obj["序号"] = synonymsOptions.value[i].序号;
     obj["中文"] = synonymsOptions.value[i].中文;
     obj["英文"] = synonymsOptions.value[i].英文;
+    obj["is_spell"] = synonymsOptions.value[i].is_spell;
     obj["答案"] = answers.value[i].中文;
+    obj["正确答案"] = answers.value[i].正确答案;
     newList.push(obj);
   }
   return newList;
@@ -87,34 +94,70 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
     (a, b) => a.序号 - b.序号
   ); // 确保结果是按序号排序的
 };
+
 const compareAndAddFlag = (dictArray) => {
   return dictArray.map((item) => {
-    const { 答案, 用户选择 } = item;
+    const { 答案, 用户选择, 正确答案, is_spell } = item;
 
-    // 分割答案，如果有"；"则按"；"分割，否则作为单个元素的数组
-    const 答案数组 = 答案.includes("；") ? 答案.split("；") : [答案];
+    // 统一处理分隔符，将所有中文分号和逗号替换为英文逗号，然后进行分割和修整
+    const normalize = (str) =>
+      str
+        .replace(/；/g, ",")
+        .replace(/，/g, ",")
+        .split(",")
+        .map((s) => s.trim());
+
+    const answerArray = normalize(答案).sort();
+    // console.log('answerArray', answerArray);
+
+    const correctAnswerArray = 正确答案 ? normalize(正确答案).sort() : [];
+    const userSelectionArray = normalize(用户选择.join(",")).sort();
+    // console.log('userSelectionArray', userSelectionArray);
 
     // 计算匹配情况
     let flag = "false"; // 默认为没有匹配
-    if (
-      答案数组.length === 用户选择.length &&
-      答案数组.every((ans) => 用户选择.includes(ans))
-    ) {
-      // 完全匹配：答案数组与用户选择数组长度相同且元素完全相同
-      flag = "true";
-    } else if (答案数组.some((ans) => 用户选择.includes(ans))) {
-      // 部分匹配：用户选择数组至少包含一个答案数组中的元素
-      flag = "half";
-    }
-    // 如果既不是完全匹配也不是部分匹配，则flag保持为"false"
 
+    if (is_spell) {
+      // 当 is_spell 为 true 时，使用新的逻辑
+      const userSelectionString = 用户选择.join("").replace(/\s/g, "");
+      const correctAnswerString = 正确答案.replace(/\s/g, "");
+
+      if (userSelectionString === correctAnswerString) {
+        flag = "true";
+      } else {
+        flag = "false";
+      }
+    } else {
+      // 完全匹配：用户选择和答案（或正确答案）完全一致
+      if (
+        userSelectionArray.join(",") === answerArray.join(",") ||
+        (correctAnswerArray.length &&
+          userSelectionArray.join(",") === correctAnswerArray.join(","))
+      ) {
+        flag = "true";
+      }
+      // 如果答案为“以上都不对”，且用户选择与正确答案完全匹配
+      else if (
+        答案 === "以上都不对" &&
+        correctAnswerArray.length &&
+        userSelectionArray.join(",") === correctAnswerArray.join(",")
+      ) {
+        flag = "true";
+      }
+      // 部分匹配：用户选择数组至少包含一个答案数组中的元素
+      else if (answerArray.some((ans) => userSelectionArray.includes(ans))) {
+        flag = "half";
+      }
+    }
+    // 返回结果
     return {
       ...item,
       flag,
     };
   });
 };
-const clickSubmitUser = (action, done) => {
+
+const clickSubmitUser = async (action, done) => {
   // 输入用户名后，确认提交
   if (action === "confirm") {
     // 合并答案和选项
@@ -126,21 +169,174 @@ const clickSubmitUser = (action, done) => {
       synonymsSelected.value,
       synonymsOptions.value
     );
-
+    // console.log('synonymsSelectedChinese', synonymsSelectedChinese)
     // 将中文用户选择和选项答案合并
     const synonymAndSelections = mergeSynonymAndSelections(
       synonymsSelectedChinese
     );
-
+    // console.log('synonymAndSelections', synonymAndSelections)
     // 比对结果给出flag
     const compareResult = compareAndAddFlag(synonymAndSelections);
 
+    // 处理迟疑库
+    function handleUncertain(uncertainVocabulary, compareResult) {
+      // 转换 uncertainVocabulary 为可以快速查找的 Map 结构
+      let uncertainVocabularyMap = new Map(
+        [...uncertainVocabulary].map((item) => [item.英文, item])
+      );
+
+      // 遍历 compareResult，检查条件并移除符合条件的 uncertainVocabulary 项
+      compareResult.forEach((result) => {
+        if (result.flag !== "true") {
+          if (uncertainVocabularyMap.has(result.英文)) {
+            uncertainVocabularyMap.delete(result.英文);
+          }
+        }
+      });
+
+      // 对于未移除的项，添加 "答案" 和 "正确答案"
+      let updatedUncertainVocabulary = new Set();
+      uncertainVocabularyMap.forEach((item, key) => {
+        let correspondingResult = compareResult.find(
+          (result) => result.英文 === key
+        );
+        if (correspondingResult) {
+          item["答案"] = correspondingResult.答案;
+
+          // 检查是否存在“正确答案”，如果存在则添加到 item 中
+          if (correspondingResult.正确答案 !== undefined) {
+            item["正确答案"] = correspondingResult.正确答案;
+          } else {
+            // 如果没有“正确答案”，可以选择添加一个默认值，或者直接不添加该键
+            item["正确答案"] = "无"; // 或者直接跳过这行代码
+          }
+        }
+        updatedUncertainVocabulary.add(item);
+      });
+
+      // 输出处理后的 uncertainVocabulary 集合
+      return updatedUncertainVocabulary;
+    }
+    uncertainVocabulary.value = handleUncertain(
+      uncertainVocabulary.value,
+      compareResult
+    );
+    // console.log("uncertainVocabulary", uncertainVocabulary.value);
+
+    // 计算拼写库
+    // console.log('lock_spell', lock_spell.value);
+    if (!lock_spell.value) {
+      function getSpellVocabulary(compareResult, uncertainVocabulary) {
+        const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
+        const addedEnglishSet = new Set();
+        const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
+
+        function isPhrase(text) {
+          return /\s|,|\/|\.|…/.test(text);
+        }
+
+        compareResult.forEach((item) => {
+          let english = item.英文;
+          let correctAnswer = item.正确答案;
+          let answer = item.答案;
+
+          if (chineseCharacterRegex.test(english)) {
+            if (correctAnswer !== undefined) {
+              [english, correctAnswer] = [correctAnswer, english];
+              answer = correctAnswer;
+            } else {
+              [english, answer] = [answer, english];
+              correctAnswer = answer;
+            }
+          }
+
+          if (
+            item.flag !== "true" &&
+            !addedEnglishSet.has(english) 
+            && !isPhrase(english)
+          ) {
+            spellVocabularyResult.push({
+              英文: english,
+              答案: answer,
+              正确答案: correctAnswer,
+              flag: item.flag,
+            });
+            addedEnglishSet.add(english);
+          }
+        });
+
+        uncertainVocabulary.forEach((item) => {
+          let english = item.英文;
+          let correctAnswer = item.正确答案;
+          let answer = item.答案;
+
+          if (chineseCharacterRegex.test(english)) {
+            if (correctAnswer !== undefined) {
+              [english, correctAnswer] = [correctAnswer, english];
+              answer = correctAnswer;
+            } else {
+              [english, answer] = [answer, english];
+              correctAnswer = answer;
+            }
+          }
+
+          if (
+            item.type.includes(",") &&
+            item.is_spell === false &&
+            !addedEnglishSet.has(english) &&
+            !isPhrase(english)
+          ) {
+            spellVocabularyResult.push({
+              英文: english,
+              答案: answer,
+              正确答案: correctAnswer,
+              flag: item.type,
+            });
+            addedEnglishSet.add(english);
+          }
+        });
+
+        return spellVocabularyResult; // 返回局部变量
+      }
+
+      spellVocabulary.value = getSpellVocabulary(
+        compareResult,
+        uncertainVocabulary.value
+      ); // 确保将结果赋值给响应式变量的 .value 属性
+    } else {
+      spellVocabulary.value = spellVocabulary.value; // 保持 spellVocabulary 的值
+    }
+
+    // console.log("spellVocabulary", spellVocabulary.value);
+
+    // 计算金币
+    // console.log('isRewardEligible: ', isRewardEligible);
+    function calculateAccuracy(compareResult) {
+      const total = compareResult.length;
+      const correct = compareResult.filter(
+        (item) => item.flag === "true"
+      ).length;
+      return ((correct / total) * 100).toFixed(2);
+    }
+    if (isRewardEligible.value) {
+      // console.log('calculateAccuracy', calculateAccuracy(compareResult))
+      if (calculateAccuracy(compareResult) < 55) {
+        totalCoins.value = 0;
+      } else {
+        totalCoins.value = compareResult.reduce((coins, item) => {
+          return item.flag === "true" ? coins + 5 : coins;
+        }, 0);
+      }
+    } else {
+      totalCoins.value = 0;
+    }
+    console.log("totalCoins: ", totalCoins.value);
+    console.log("compareResult:", compareResult);
     let containsUnselected = compareResult.some((item) =>
       item.用户选择.includes("无")
     );
     // containsUnselected = false;
     // console.log("containsUnselected", containsUnselected);
-
     if (containsUnselected) {
       function notifyDataEmpty() {
         showDataEmpty.value = true;
@@ -170,7 +366,6 @@ const clickSubmitUser = (action, done) => {
             }
           }
         }
-
         if (trueCount === compareResult.length) {
           return 1;
         }
@@ -182,107 +377,279 @@ const clickSubmitUser = (action, done) => {
       console.log("rate: ", rate);
 
       async function updateAccountData() {
-        // 更新attempt和rate
+        // 更新AccountData
         let params = new URLSearchParams();
         params.append("method", "updateUserData");
+        params.append("submittoken", submittoken.value);
         params.append("nid", nid.value);
         params.append("rate", rate);
         params.append("swipe", 0);
-        return await axios.post("words/", params).then((ret) => {
-          return ret.data;
-        });
-      }
+        params.append("type", 0);
+        params.append("coins", totalCoins.value);
 
-      async function updateAccountlog() {
-        // 结果存储到日志
-        let params = new URLSearchParams();
-        params.append("method", "updateUserlog");
+        // 更新Accountlog
         params.append("log", JSON.stringify(compareResult));
         params.append("title", titleData.value);
         params.append("username", username.value);
         params.append("alias", alias.value);
         params.append("mode", "普通");
+        params.append("numberprev", 0);
+        params.append("numbershowanswer", 0);
+        params.append("numbertransparent", 0);
+
+        // 更新spell vocabulary
+        params.append("data_words", JSON.stringify(spellVocabulary.value));
+        params.append("lock_spell", lock_spell.value);
         return await axios.post("words/", params).then((ret) => {
           return ret.data;
         });
       }
+
+      async function updateUncertain(accountLogResult) {
+        // 延迟库
+        let params = new URLSearchParams();
+        params.append("method", "updateUncertain");
+        params.append("username", username.value);
+        params.append("account_data_nid", nid.value);
+        params.append("new_log_nid", accountLogResult);
+        params.append("type", "普通");
+        params.append(
+          "vocabulary",
+          JSON.stringify(Array.from(uncertainVocabulary.value))
+        );
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data;
+        });
+      }
+
       isLoading.value = true;
+
+      // console.log('compareResult', compareResult);
       if (compareResult.length == 0) {
         showFailToast("提交数据不能为空");
+        isLoading.value = false;
         return;
       } else {
-        function timeoutPromise(ms, promise) {
-          return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-              reject(new Error("Request timed out"));
-            }, ms);
-
-            promise
-              .then((value) => {
-                clearTimeout(timer);
-                resolve(value);
-              })
-              .catch((error) => {
-                clearTimeout(timer);
-                reject(error);
-              });
+        function redirect() {
+          router.push({
+            path: "/studentAccountAnswer",
+            state: {
+              uncertainResult: JSON.stringify(
+                Array.from(uncertainVocabulary.value)
+              ),
+              compareResult: JSON.stringify(compareResult),
+              userSelected: JSON.stringify(synonymsSelected.value),
+              nid: nid.value,
+              rate: accountDataResult.rate,
+              halfTrue: rate,
+              newCoins: totalCoins.value,
+              username: username.value,
+              account_log_id: accountDataResult["new_log_nid"],
+              spellVocabulary: JSON.stringify(spellVocabulary.value),
+              lock_spell: lock_spell.value,
+            },
           });
         }
-
-        Promise.race([
-          timeoutPromise(
-            15000,
-            Promise.all([updateAccountData(), updateAccountlog()])
-          ),
-        ])
-          .then((results) => {
-            const accountDataResult = results[0]; // updateAccountData 的结果
-            const accountLogResult = results[1]; // updateAccountlog 的结果
-            console.log(accountDataResult);
-            console.log(accountLogResult);
-            // showLoadingToast.close;
-            isLoading.value = false;
-            return accountDataResult;
-          })
-          .then((accountDataResult) => {
-            // 执行页面跳转
-            router.push({
-              path: "/studentAccountAnswer",
-              state: {
-                compareResult: JSON.stringify(compareResult),
-                userSelected: JSON.stringify(synonymsSelected.value),
-                nid: nid.value,
-                rate: accountDataResult.rate,
-                halfTrue: rate,
-              },
-            });
-          })
-          .catch((error) => {
-            console.error("An error occurred:", error);
-            if (error.message === "Request timed out") {
-              // 处理超时情况
-              // 通知后端取消操作
-              fetch("/cancelOperation", {
-                method: "POST",
-                body: JSON.stringify({ operation: "updateUserlog" }),
-                headers: {
-                  "Content-Type": "application/json",
-                },
-              });
-              isLoading.value = false;
-              showFailToast("网络超时");
-            } else {
-              // 处理其他错误
-              isLoading.value = false;
-              // showFailToast("提交失败");
-            }
+        // 如果 updateAccountlog 成功，继续执行其他操作
+        const accountDataResult = await updateAccountData();
+        // console.log("accountDataResult: ", accountDataResult);
+        if (accountDataResult === "不能提交相同内容") {
+          isLoading.value = false;
+          showDialog({
+            title: "错误",
+            message: "数据已提交，点击跳转答案页",
+            theme: "round-button",
+          }).then(() => {
+            redirect();
           });
+          return;
+        }
+
+        let UncertainResult;
+        console.log("uncertainVocabulary:", uncertainVocabulary.value);
+        // console.log(accountDataResult.new_log_nid);
+        if (uncertainVocabulary.value.size != 0) {
+          await updateUncertain(accountDataResult.new_log_nid);
+        }
+        // console.log('UncertainResult', UncertainResult);
+
+        console.log("spellVocabulary:", spellVocabulary.value);
+
+        // 如果所有操作都成功，处理结果
+        isLoading.value = false;
+        // console.log(accountDataResult);
+        // console.log(rate);
+
+        // 清楚store
+        sessionStorage.removeItem("showAnswerMagic");
+        sessionStorage.removeItem("showMagic");
+        sessionStorage.removeItem("flagHelp");
+        // 执行页面跳转等其他操作
+        redirect();
       }
     }
   } else {
     // 如果用户点击取消或遮罩层，直接关闭对话框
     showDialogSubmit.value = false;
   }
+};
+
+// 拼写tag
+const selectedItems = ref([]);
+const removeSelected = (index) => {
+  const selectedItem = selectedItems.value[index];
+  const [i, j] = selectedItem.key.split("-").map(Number);
+
+  // 移除selectedItems中的项
+  selectedItems.value.splice(index, 1);
+
+  // 同步更新复选框状态
+  if (checkboxRefs.value[selectedItem.key]) {
+    checkboxRefs.value[selectedItem.key].toggle();
+  }
+
+  // 更新selectedIndexes和selectedResults
+  selectedIndexes.value[selectedItem.key] = false;
+  const removeChinese = synonymsOptions.value[i].中文[j];
+  const removeIndex = selectedResults.value[i].indexOf(removeChinese);
+
+  if (removeIndex !== -1) {
+    selectedResults.value[i].splice(removeIndex, 1);
+  }
+
+  // 更新合并后的数据
+  mergedData.value = mergeAnswerAndSynonym();
+
+  // 将用户选择转化为中文
+  const synonymsSelectedChinese = convertSelections(
+    synonymsSelected.value,
+    synonymsOptions.value
+  );
+
+  console.log("selectedItems: ", selectedItems);
+  // 将中文用户选择和选项答案合并
+  resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
+};
+
+// 购买功能
+
+const showMagic = ref(false);
+const showAnswerMagic = ref(false);
+const popup = ref(null);
+const yesornotShowAnswer = ref(false);
+const isabledPurchase = ref(false);
+const usercoinsStart = ref(0);
+const usercoinsEnd = ref(0);
+const rollingTextRef = ref(null);
+const durationRolling = ref(1);
+const priceMagic = ref(800);
+const usercoins = ref(0);
+const compareResultFalse = ref([]);
+const overlayColor = ref("rgba(128, 128, 128, 0.6)"); // 设定默认颜色
+const themeVars = {
+  "--van-popup-background": "transparent",
+};
+
+// 获取用户金币
+const getUserCoins = async () => {
+  let params = new URLSearchParams();
+  params.append("method", "getUserCoins");
+  params.append("username", username.value);
+  const response = await axios.post("words/", params);
+  return response.data;
+};
+async function consumeMagic() {
+  isLoading.value = true;
+  let params = new URLSearchParams();
+  params.append("method", "consumeMagic");
+  params.append("username", username.value);
+  params.append("priceMagic", priceMagic.value);
+  params.append("type", "普通");
+  params.append("account_data_nid", nid.value);
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
+}
+const purchaseMagic = async () => {
+  if (yesornotShowAnswer.value) {
+    showAnswerMagic.value = true;
+  } else {
+    showMagic.value = true;
+    const res = await getUserCoins();
+    flagHelp.value = false;
+    usercoins.value = res["data_coins"][0]['coins'];
+    usercoinsEnd.value = res["data_coins"][0]['coins'];;
+    await nextTick(); // 确保 DOM 更新完毕后再启动动画
+    rollingTextRef.value.start();
+  }
+};
+const handlePurchaseMagic = (action, done) => {
+  if (action === "confirm" || action === "cancel") {
+    done();
+  }
+};
+const purchaseConfirm = async () => {
+  // 合并答案和选项
+  mergedData.value = mergeAnswerAndSynonym();
+
+  // 将用户选择转化为中文
+  const synonymsSelectedChinese = convertSelections(
+    synonymsSelected.value,
+    synonymsOptions.value
+  );
+
+  // 将中文用户选择和选项答案合并
+  const synonymAndSelections = mergeSynonymAndSelections(
+    synonymsSelectedChinese
+  );
+
+  // 比对结果给出flag
+  const compareResult = compareAndAddFlag(synonymAndSelections);
+  console.log("compareResult: ", compareResult);
+  const allFlagsTrue = compareResult.every((item) => item.flag == "true");
+  if (allFlagsTrue) {
+    showAnimationShineHelpForGood();
+    isabledPurchase.value = true;
+    return;
+  }
+  // 计算金币
+  totalCoins.value = compareResult.reduce((coins, item) => {
+    return item.flag === "true" ? coins + 5 : coins;
+  }, 0);
+  console.log("totalCoins: ", totalCoins.value);
+
+  // const containsUnselected = compareResult.some((item) =>
+  //   item.用户选择.includes("无")
+  // );
+  // if (containsUnselected) {
+  //   showFailToast("需要全部完成");
+  //   return;
+  // } else {
+  if (usercoins.value < priceMagic.value) {
+    showFailToast("余额不足");
+    return;
+  } else {
+    compareResultFalse.value = compareResult.filter(
+      (item) => item.flag != "true"
+    );
+    // 购买成功
+
+    rollingTextRef.value.reset();
+    const res = await consumeMagic();
+    usercoinsEnd.value = res["coins"];
+    await nextTick();
+    rollingTextRef.value.start();
+    usercoins.value = res;
+    isLoading.value = false;
+    isabledPurchase.value = true;
+    yesornotShowAnswer.value = true;
+
+    setTimeout(() => {
+      showAnswerMagic.value = true;
+      showMagic.value = false;
+    }, 2000);
+  }
+  // }
 };
 
 // 添加滚动功能
@@ -348,61 +715,206 @@ const buttonStyle = computed(() => {
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
 const completeCount = ref("0");
+const uncertainVocabulary = ref(new Set());
+let originalChinese = "";
 const toggleCheckChinese = (index, index2) => {
   const key = `${index}-${index2}`;
   const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
     checkboxRef.toggle();
   }
-  selectedIndexes.value[key] = !selectedIndexes.value[key];
+
+  // 捕捉用户是否取消了选项
+  const wasSelected = selectedIndexes.value[key]; // 之前的状态
+  selectedIndexes.value[key] = !wasSelected; // 切换状态
+
+  if (wasSelected && !synonymsOptions.value[index].is_spell) {
+    const content = "撤销";
+    const uncertainItem = synonymsOptions.value[index].英文;
+
+    const exists = Array.from(uncertainVocabulary.value).find((vocab) => {
+      return vocab.英文 === uncertainItem;
+    });
+
+    if (exists) {
+      const types = exists.type.split(","); // 将 type 字符串分割为数组
+      let updated = false;
+
+      const updatedTypes = types.map((type) => {
+        if (type.startsWith(content)) {
+          const match = type.match(/(.+)\+(\d+)/);
+          if (match) {
+            const [_, baseContent, count] = match;
+            updated = true;
+            return `${baseContent}+${parseInt(count, 10) + 1}`;
+          } else {
+            updated = true;
+            return `${content}+1`; // 初次重复时加上 "+1"
+          }
+        }
+        return type;
+      });
+
+      if (!updated) {
+        updatedTypes.push(content);
+      }
+
+      exists.type = updatedTypes.join(",");
+    } else {
+      uncertainVocabulary.value.add({ 英文: uncertainItem, type: content });
+    }
+  }
 
   // 更新选择结果
   const selectedChineses = selectedResults.value[index] || [];
+  const currentChinese = synonymsOptions.value[index].中文[index2];
+  const is_spell_selectedItems = synonymsOptions.value[index].is_spell;
   if (selectedIndexes.value[key]) {
-    selectedChineses.push(synonymsOptions.value[index].中文[index2]);
+    // 如果选中，添加到累积数组中
+    selectedChineses.push(currentChinese);
   } else {
-    const removeIndex = selectedChineses.indexOf(
-      synonymsOptions.value[index].中文[index2]
-    );
-    selectedChineses.splice(removeIndex, 1);
+    // 如果取消选中，从累积数组中移除
+    const removeIndex = selectedChineses.indexOf(currentChinese);
+    if (removeIndex !== -1) {
+      selectedChineses.splice(removeIndex, 1);
+    }
   }
-  selectedResults.value[index] = selectedChineses;
+  selectedResults.value[index] = selectedChineses; // 更新累积的选项结果
+  // console.log("selectedChineses", selectedChineses);
+  // 累积选中的选项转换为字符串
+  let mergedChinese = selectedChineses.join("");
+
+  // 与 answers.value[index].英文 比对长度
+  const answerEnglish = answers.value[index]?.英文;
+  // 在相同位置添加空格
+
+  let addedChinese = "";
+  const containsSpace = answerEnglish.includes(" ");
+  const containsChinese = /[\u4e00-\u9fa5]/.test(answerEnglish); // 使用正则表达式检查中文字符
+
+  if (containsSpace && !containsChinese) {
+    if (answerEnglish && mergedChinese.length <= answerEnglish.length) {
+      let spacedChinese = "";
+      let chineseIndex = 0;
+
+      for (let i = 0; i < answerEnglish.length; i++) {
+        if (answerEnglish[i] === " ") {
+          spacedChinese += " "; // 在相同位置添加空格
+        } else {
+          spacedChinese += mergedChinese[chineseIndex] || ""; // 添加中文字符
+          chineseIndex++;
+        }
+      }
+
+      mergedChinese = spacedChinese.trim(); // 更新带空格的字符串
+      // console.log("mergedChinese: ", mergedChinese);
+
+      // 计算新增的部分
+
+      let originalIndex = 0;
+
+      // 比较 mergedChinese 和 originalChinese，找出新增的部分
+      for (let i = 0; i < mergedChinese.length; i++) {
+        // 如果 originalIndex 已经到达 originalChinese 的末尾，或者字符不相等，则记录新增部分
+        if (
+          originalIndex >= originalChinese.length ||
+          mergedChinese[i] !== originalChinese[originalIndex]
+        ) {
+          // 如果是空格，则替换成两个空格
+          if (mergedChinese[i] === " ") {
+            addedChinese += "  "; // 替换空格为两个空格
+          } else {
+            addedChinese += mergedChinese[i]; // 记录新增的字符
+          }
+        } else {
+          originalIndex++; // 如果字符相同，则移动 originalChinese 的指针
+        }
+      }
+
+      // console.log("addedChinese: ", addedChinese); // 输出新增的部分
+      // console.log("addedChinese: ", addedChinese.length); // 输出新增的部分
+    }
+    // 更新选中的项列表
+    const existingItemIndex = selectedItems.value.findIndex(
+      (item) => item.key === key
+    );
+    if (selectedIndexes.value[key]) {
+      if (existingItemIndex !== -1) {
+        // 如果选项已存在，更新其 label
+        selectedItems.value[existingItemIndex].label = mergedChinese;
+      } else {
+        // 如果选项不存在，添加新的选项
+        selectedItems.value.push({
+          label: addedChinese, // 使用带空格的字符串作为 label
+          key: key,
+          is_spell: is_spell_selectedItems,
+        });
+      }
+    } else {
+      // 从选中的项列表中移除
+      selectedItems.value = selectedItems.value.filter(
+        (item) => item.key !== key
+      );
+    }
+  } else {
+    const existingItemIndex = selectedItems.value.findIndex(
+      (item) => item.key === key
+    );
+    if (selectedIndexes.value[key]) {
+      if (existingItemIndex !== -1) {
+        // 如果选项已存在，更新其 label
+        selectedItems.value[existingItemIndex].label = mergedChinese;
+      } else {
+        // 如果选项不存在，添加新的选项
+        selectedItems.value.push({
+          label: currentChinese, // 使用带空格的字符串作为 label
+          key: key,
+          is_spell: is_spell_selectedItems,
+        });
+      }
+    } else {
+      // 从选中的项列表中移除
+      selectedItems.value = selectedItems.value.filter(
+        (item) => item.key !== key
+      );
+    }
+  }
+  originalChinese = mergedChinese;
+  // console.log("originalChinese: ", originalChinese);
+  // console.log(selectedItems.value);
 
   // 合并答案和选项
   mergedData.value = mergeAnswerAndSynonym();
-  // console.log("合并答案和选项：", mergedData.value);
 
   // 将用户选择转化为中文
   const synonymsSelectedChinese = convertSelections(
     synonymsSelected.value,
     synonymsOptions.value
   );
-  // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
 
   // 将中文用户选择和选项答案合并
   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-  // console.log("synonymAndSelections", synonymAndSelections);
   completeCount.value = resultDataTempt.value.reduce((count, item) => {
     if (item.用户选择[0] !== "无") {
       return count + 1;
     }
     return count;
   }, 0);
-  // console.log("completeCount: ", completeCount.value);
 
   // 判断是否超过一半的选项被选中
-  const halfOptions = synonymsOptions.value.length / 2;
-  // console.log("halfOptions: ", halfOptions);
+  const halfOptions = Math.ceil(synonymsOptions.value.length / 2);
   if (completeCount.value == halfOptions) {
     showAnimationShineEncouragement(); // 调用动画显示方法
   }
 };
+
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
 
 // 场外支援
 const flagHelp = ref(true);
+const totalCoins = ref(0);
 const helpOutside = () => {
   if (flagHelp.value) {
     showConfirmDialog({
@@ -424,9 +936,41 @@ const helpOutside = () => {
         synonymsSelectedChinese
       );
 
+      // console.log(synonymAndSelections);
+      const hasNoneSelected = synonymAndSelections.some((item) =>
+        item.用户选择.includes("无")
+      );
+      if (hasNoneSelected) {
+        showFailToast("需要全部完成");
+        return;
+      }
+      console.log("synonymAndSelections", synonymAndSelections);
       // 比对结果给出flag
+
       const compareResult = compareAndAddFlag(synonymAndSelections);
-      console.log("compareResult: ", compareResult);
+
+      // 计算金币
+      function calculateAccuracy(compareResult) {
+        const total = compareResult.length;
+        const correct = compareResult.filter(
+          (item) => item.flag === "true"
+        ).length;
+        return ((correct / total) * 100).toFixed(2);
+      }
+
+      if (isRewardEligible.value) {
+        // console.log('calculateAccuracy', calculateAccuracy(compareResult));
+        if (calculateAccuracy(compareResult) < 55) {
+          totalCoins.value = 0;
+        } else {
+          totalCoins.value = compareResult.reduce((coins, item) => {
+            return item.flag === "true" ? coins + 5 : coins;
+          }, 0);
+        }
+      } else {
+        totalCoins.value = 0;
+      }
+      console.log("totalCoins: ", totalCoins.value);
 
       const containsUnselected = compareResult.some((item) =>
         item.用户选择.includes("无")
@@ -448,11 +992,6 @@ const helpOutside = () => {
         );
         // console.log(countFlags);
         if (countFlags.falseCount == 0 && countFlags.halfCount == 0) {
-          // showDialog({
-          //   title: "恭喜，全对了",
-          //   theme: "round-button",
-          //   message: "可以提交答案了！",
-          // });
           showAnimationShineHelpForGood();
         } else {
           // showAnimationShineHelpForBad();
@@ -506,18 +1045,90 @@ function showAnimationShineHelpForGood() {
 const titleData = ref("");
 const username = ref("");
 const alias = ref("");
+const submittoken = ref(null);
+const isRewardEligible = ref(true);
+const lock_spell = ref(false);
+const spellVocabulary = ref([]);
+const handlePageHide = (event) => {
+  sessionStorage.setItem(
+    "showAnswerMagic",
+    JSON.stringify(showAnswerMagic.value)
+  );
+  sessionStorage.setItem("showMagic", JSON.stringify(showMagic.value));
+  sessionStorage.setItem("flagHelp", JSON.stringify(flagHelp.value));
+};
+onBeforeUnmount(() => {
+  window.removeEventListener("pagehide", handlePageHide);
+});
 onMounted(async () => {
+  // 监测恶意刷新
+  window.addEventListener("pagehide", handlePageHide);
+  showAnswerMagic.value = JSON.parse(sessionStorage.getItem("showAnswerMagic"));
+  if (showAnswerMagic.value == null) showAnswerMagic.value = false;
+  showMagic.value = JSON.parse(sessionStorage.getItem("showMagic"));
+  if (showMagic.value == null) showMagic.value = false;
+  flagHelp.value = JSON.parse(sessionStorage.getItem("flagHelp"));
+  if (flagHelp.value == null) {
+    flagHelp.value = true;
+  } else {
+    showDialog({
+      title: "警告",
+      theme: "round-button",
+      message: "监测到可能的恶意刷新\n场外支援被重置到刷新前状态",
+    });
+  }
+
   const data = JSON.parse(history.state.data);
   // console.log('data: ', data);
   alias.value = data.alias;
+  alias.value = data.alias;
+  lock_spell.value = history.state.lock_spell;
+  // console.log('lock_spell', lock_spell.value);
+  if (lock_spell.value) {
+    async function getSpellVocabulary() {
+      let params = new URLSearchParams();
+      params.append("method", "getSpellVocabulary");
+      params.append("username", data.username);
+      params.append("account_data_id", data.nid);
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data.spell_vocabulary_records;
+      });
+    }
+    getSpellVocabulary().then((res) => {
+      spellVocabulary.value = res.flatMap((item) => {
+        let dataString = item["data_words"]
+          .replace(/(\W)'|'(\W)/g, '$1"$2')
+          .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3');
+        return JSON.parse(dataString);
+      });
+      console.log("spellVocabulary", spellVocabulary.value);
+    });
+  }
+
+  // isRewardEligible.value = history.state.isRewardEligible;
+  if (data.coins >= 2000) {
+    isRewardEligible.value = false;
+  }
   nid.value = history.state.nid;
   synonymsOptions.value = data.synonyms;
   answers.value = data.answers;
   titleData.value = data.title;
   username.value = data.username;
-  console.log("username: ", username.value);
-
-  console.log(synonymsOptions.value);
+  submittoken.value = new Date().getTime();
+  // console.log("submittoken: ", submittoken.value);
+  // console.log("username: ", username.value);
+  synonymsOptions.value.forEach((item) => {
+    if (item.is_spell) {
+      const answerItem = answers.value.find(
+        (answer) => answer.序号 === item.序号
+      );
+      if (answerItem) {
+        answerItem.正确答案 = answerItem.英文;
+      }
+    }
+  });
+  console.log("synonymsOptions", synonymsOptions.value);
+  console.log("answers", answers.value);
 });
 </script>
 
@@ -528,10 +1139,22 @@ onMounted(async () => {
         title="学生题目"
         :left-text="`${completeCount}/${synonymsOptions.length}`"
       >
+        <template #left>
+          <div class="nav-bar-left">
+            <span class="nav-button-left">
+              {{ `${completeCount}/${synonymsOptions.length}` }}
+            </span>
+            <span class="nav-button-left" @click="purchaseMagic"> 购买 </span>
+          </div>
+        </template>
         <template #right>
           <div class="nav-bar-right">
-            <span class="nav-button" @click="helpOutside"> 场外支援 </span>
-            <span class="nav-button" @click="submitSelection"> 提交 </span>
+            <span class="nav-button-right" @click="helpOutside">
+              场外支援
+            </span>
+            <span class="nav-button-right" @click="submitSelection">
+              提交
+            </span>
           </div>
         </template>
       </van-nav-bar>
@@ -548,6 +1171,101 @@ onMounted(async () => {
     <van-notify v-model:show="showDataEmpty" type="warning">
       <span>试题未完成，不能提交</span>
     </van-notify>
+
+    <!-- 购买魔法 -->
+    <div>
+      <div>
+        <van-dialog
+          v-model:show="showMagic"
+          :title="`是否购买标识答案（${priceMagic}金币）？`"
+          class="custom-dark-dialog-checkAnswer"
+          :before-close="handlePurchaseMagic"
+          :overlay="false"
+        >
+          <template #default>
+            <div class="dialog-content">
+              <p>标识错误单词，但不显示答案</p>
+              账户剩余
+              <van-rolling-text
+                ref="rollingTextRef"
+                :start-num="usercoinsStart"
+                :target-num="usercoinsEnd"
+                :auto-start="false"
+                :duration="durationRolling"
+                style="
+                  --van-rolling-text-color: gray;
+                  --van-rolling-text-item-width: 10px;
+                  --van-rolling-text-font-size: 12px;
+                  --van-rolling-text-gap: -2px;
+                "
+              />
+              金币
+
+              <van-icon
+                name="cross"
+                class="close-icon-checkAnswer"
+                @click="showMagic = false"
+              />
+            </div>
+          </template>
+          <template #footer>
+            <div class="custom-button-checkAnswer-group">
+              <van-button
+                size="large"
+                type="danger"
+                plain
+                hairline
+                text="放弃"
+                class="custom-button-checkAnswer"
+                @click="showMagic = false"
+              />
+              <van-button
+                size="large"
+                type="primary"
+                plain
+                hairline
+                :disabled="isabledPurchase"
+                text="购买"
+                class="custom-button-checkAnswer"
+                @click="purchaseConfirm"
+              />
+            </div>
+          </template>
+        </van-dialog>
+      </div>
+      <div>
+        <van-config-provider :theme-vars="themeVars">
+          <van-popup
+            ref="popup"
+            class="custom-popup"
+            closeable
+            v-model:show="showAnswerMagic"
+            position="bottom"
+            :style="{ height: '50%' }"
+          >
+            <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+              错误词汇
+            </div>
+            <van-cell-group
+              inset
+              style="margin-top: 0.5rem; margin-left: -0.2rem"
+            >
+              <van-cell-group>
+                <div v-for="(item, index) in compareResultFalse" :key="index">
+                  <van-cell
+                    :title="`${item.序号}. ${item.英文}`"
+                    :value="item.用户选择.join('，')"
+                    @click="scrollToItem(item.序号 - 1)"
+                    is-link=""
+                  >
+                  </van-cell>
+                </div>
+              </van-cell-group>
+            </van-cell-group>
+          </van-popup>
+        </van-config-provider>
+      </div>
+    </div>
 
     <!-- 预览滚动 -->
     <van-floating-panel
@@ -605,7 +1323,43 @@ onMounted(async () => {
           <!-- 显示英文单词和序号，加粗显示 -->
           <van-cell clickable class="bold-title border-cell">
             <template #title>
-              <div>{{ item.序号 + ". " + item.英文 }}</div>
+              <div style="display: flex; align-items: center">
+                <div
+                  style="
+                    line-height: 1;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                  "
+                >
+                  {{ item.序号 + ". " + item.英文 }}
+                </div>
+                <div
+                  class="selected-tags"
+                  style="
+                    margin-left: 20px;
+                    line-height: 1;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                  "
+                >
+                  <div
+                    v-for="(selected, index2) in selectedItems"
+                    v-show="
+                      selected.is_spell == true &&
+                      selected.key.split('-')[0] == String(index)
+                    "
+                    :key="index2"
+                    style="color:orange"
+                    class="flying-tag"
+                    @click="removeSelected(index2)"
+                    :style="{ padding: '0px 0px 0.3rem 0px', 'white-space': 'pre' }"
+                  >
+                    {{ selected.label }}
+                  </div>
+                </div>
+              </div>
             </template>
           </van-cell>
 
@@ -645,7 +1399,11 @@ onMounted(async () => {
 
 
 
-<style>
+<style scoped>
+.custom-popup + .van-overlay {
+  transition: background-color 0.3s;
+}
+
 .checkbox-container {
   width: 100%;
   margin: 0 auto;
@@ -711,15 +1469,24 @@ onMounted(async () => {
   top: 0;
   z-index: 100;
 }
-.nav-bar-right {
+.nav-bar-right nav-bar-left {
   display: flex;
   align-items: center;
 }
-.nav-button {
+.nav-button-right {
   margin-left: 10px;
   padding: 5px 5px;
   margin-top: 4px;
-  color: #208BFA;
+  color: #208bfa;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nav-button-left {
+  margin-left: 0px;
+  padding: 5px 5px;
+  margin-top: 5px;
+  color: #208bfa;
   cursor: pointer;
   user-select: none;
 }

@@ -2,7 +2,7 @@
   <div v-if="visible" :class="['help_for_good-overlay', { 'exit': isExiting, 'enter': isEntering }]">
     <div class="help_for_good">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <img src="../assets/victory5.gif" alt="help_for_good">
+      <img :src="srcTheme" alt="help_for_good">
       <!-- 添加艺术字体的文字 -->
       <div class="help_for_good-text">全对了！</div>
     </div>
@@ -10,7 +10,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import { ref, onMounted, defineExpose, inject } from 'vue';
+// 主题路径
+import victory5SrcGoatAndWolf from '../assets/victory5.gif';
+import victory5SrcBears from '../assets/Boonie Bears/victory5.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
+
 
 const visible = ref(false);
 const isEntering = ref(false);
@@ -43,6 +49,12 @@ const methods = { show, hide };
 defineExpose({ ...methods, visible });
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = victory5SrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = victory5SrcBears;
+  }
   isEntering.value = false;
 });
 </script>

@@ -1,13 +1,18 @@
 <template>
   <div v-if="visible" :class="['help_for_bad-overlay', { 'exit': isExiting }]">
     <div class="help_for_bad">
-      <img src="../assets/fail1.gif" alt="help_for_bad">
+      <img :src="srcTheme" alt="help_for_bad">
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import { ref, onMounted, defineExpose, inject } from 'vue';
+// 主题路径
+import fail1SrcGoatAndWolf from '../assets/fail1.gif';
+import fail1SrcBears from '../assets/Boonie Bears/fail1.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 
 const visible = ref(false);
 const isEntering = ref(false);
@@ -31,6 +36,12 @@ const methods = { show, hide };
 defineExpose({ ...methods, visible });
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = fail1SrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = fail1SrcBears;
+  }
   visible.value = false;
 });
 </script>

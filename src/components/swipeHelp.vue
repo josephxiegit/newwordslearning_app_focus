@@ -2,7 +2,8 @@
   <div v-if="visible" :class="['swipeHelp-overlay', { 'exit': isExiting, 'enter': isEntering }]">
     <div class="swipeHelp">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <img src="../assets/swipeHelp.gif" alt="swipeHelp">
+       
+      <img :src="srcTheme" alt="swipeHelp">
       <!-- 添加艺术字体的文字 -->
       <div class="swipeHelp-text">magic！</div>
     </div>
@@ -10,7 +11,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import { ref, onMounted, defineExpose, inject } from 'vue';
+// 主题路径
+import swipeHelpSrcGoatAndWolf from '../assets/swipeHelp.gif';
+import swipeHelpSrcBears from '../assets/Boonie Bears/swipeHelp3.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 
 const visible = ref(false);
 const isEntering = ref(false);
@@ -39,12 +45,17 @@ const methods = { show, hide };
 defineExpose({ ...methods, visible });
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = swipeHelpSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = swipeHelpSrcBears;
+  }
   isEntering.value = false;
 });
 </script>
 
 <style scoped>
-/* @import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&display=swap'); */
 
 .swipeHelp-overlay {
   position: fixed;
@@ -59,6 +70,12 @@ onMounted(() => {
   padding: 20px; /* 添加一些内边距 */
   z-index: 9999;
   transition: transform 1s linear; /* 添加平滑过渡效果 */
+}
+@media (min-width: 557px) {
+  .swipeHelp-overlay {
+    width: 100vw;
+  }
+  
 }
 
 .swipeHelp-overlay.enter {

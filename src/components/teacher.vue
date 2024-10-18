@@ -230,7 +230,7 @@ const reloadPage = () => {
       />
     </div>
 
-    <router-view />
+    <!-- <router-view />
     <van-tabbar route>
       <van-tabbar-item icon="home-o" replace to="/teacher"
         >首页</van-tabbar-item
@@ -238,7 +238,7 @@ const reloadPage = () => {
       <van-tabbar-item icon="friends-o" replace to="/xlsmList"
         >用户xlsm</van-tabbar-item
       >
-      <van-tabbar-item icon="search" replace to="/teacherComment"
+      <van-tabbar-item icon="todo-list-o" replace to="/teacherComment"
         >试题</van-tabbar-item
       >
       <van-tabbar-item icon="list-switch" replace to="/logList"
@@ -247,7 +247,10 @@ const reloadPage = () => {
       <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
         >单词本</van-tabbar-item
       >
-    </van-tabbar>
+      <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
+        >消费</van-tabbar-item
+      >
+    </van-tabbar> -->
 
     <!-- 数据列表 -->
     <van-cell-group v-model="selectedItems" style="margin-bottom: 80px">

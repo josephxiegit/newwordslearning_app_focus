@@ -4,10 +4,11 @@ import {
   onMounted,
   ref,
   getCurrentInstance,
+  onBeforeUnmount,
   onBeforeUpdate,
   computed,
 } from "vue";
-import { showDialog, showToast } from "vant";
+import { Divider, showDialog, showToast } from "vant";
 import { useRouter } from "vue-router";
 import WolfBack from "./wolfBack.vue";
 import VictorySheep from "./victorySheep.vue";
@@ -29,7 +30,7 @@ const falseCount = computed(() => {
 });
 // 继续跳转做题
 const gotoNext = () => {
-
+  handleAnswerSheetClose();
   async function refreshAccountData() {
     // 重新查找用户数据
     let params = new URLSearchParams();
@@ -43,7 +44,9 @@ const gotoNext = () => {
     router.push({
       path: "/studentAccountList",
       state: {
-        data: JSON.stringify(res),
+        data: JSON.stringify(res.data),
+        unique_aliases: JSON.stringify(res.unique_aliases),
+        username: res.username,
         flagRate: rate.value,
       },
     });
@@ -111,6 +114,7 @@ const scrollToItem = (index) => {
 // 弹出欢迎
 const showWelcome = ref(false);
 const showWelcomeHalf = ref(false);
+const showWelcomeAllTrue = ref(false);
 const showStar = ref(false);
 const rate = ref("");
 const halfTrue = ref("");
@@ -138,9 +142,160 @@ function showAnimationShineVictory() {
     victorySheepRef.value.hide();
   }, 8000);
 }
+
+// 延迟库
+const showUncertain = ref(false);
+const uncertainResult = ref("");
+const showUncertainDot = ref(false);
+const showUncertainAndSpell = () => {
+  showWelcomeHalf.value = false;
+  showWelcome.value = false;
+  showUncertain.value = true;
+  showUncertainDot.value = false;
+  handleUncertainClose();
+};
+const showUncertainResult = () => {
+  showUncertain.value = true;
+  showUncertainDot.value = false;
+  handleUncertainClose();
+};
+
+// 记录答案时间
+const createTimeAnswer = ref("");
+const createTimeUncertain = ref("");
+const account_data_id = ref(0);
+const account_log_id = ref(0);
+const username = ref("");
+const handleAnswerSheetClose = () => {
+  // 关闭答案页面执行
+  const endTime = new Date();
+  const timeDifference = endTime - createTimeAnswer.value;
+  const minutes = Math.floor(timeDifference / 1000 / 60);
+  const seconds = Math.floor((timeDifference / 1000) % 60);
+  const formattedTimeDifference = `${minutes}分${seconds}秒`;
+  console.log("Time Difference:", formattedTimeDifference);
+
+  const date = new Date(createTimeAnswer.value);
+  const formattedDateStr = `${date.getFullYear()}年${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}月${date.getDate().toString().padStart(2, "0")}日${date
+    .getHours()
+    .toString()
+    .padStart(2, "0")}时${date.getMinutes().toString().padStart(2, "0")}分${date
+    .getSeconds()
+    .toString()
+    .padStart(2, "0")}秒`;
+
+  async function updateAnswerDuration() {
+    // 上传时间
+    let params = new URLSearchParams();
+    params.append("method", "updateAnswerDuration");
+    params.append("username", username.value);
+    params.append("account_data_id", account_data_id.value);
+    params.append("account_log_id", account_log_id.value);
+    params.append("type", "检查");
+    params.append("create_time", formattedDateStr);
+    params.append("duration", formattedTimeDifference);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  updateAnswerDuration().then((res) => {
+    console.log(res);
+  });
+};
+async function updateUncertainDuration(formattedDateStr) {
+  // 上传时间
+  let params = new URLSearchParams();
+  params.append("method", "updateAnswerDuration");
+  params.append("username", username.value);
+  params.append("account_data_id", account_data_id.value);
+  params.append("account_log_id", account_log_id.value);
+  params.append("type", "迟疑");
+  params.append("create_time", formattedDateStr);
+  params.append("duration", 0);
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
+}
+const handleUncertainClose = () => {
+  const date = new Date();
+  const formattedDateStr = `${date.getFullYear()}年${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}月${date.getDate().toString().padStart(2, "0")}日${date
+    .getHours()
+    .toString()
+    .padStart(2, "0")}时${date.getMinutes().toString().padStart(2, "0")}分${date
+    .getSeconds()
+    .toString()
+    .padStart(2, "0")}秒`;
+  // console.log("formattedDateStr:", formattedDateStr);
+
+  updateUncertainDuration(formattedDateStr).then((res) => {
+    console.log(res);
+  });
+};
+
+const handlePageUnload = () => {
+  // 页面关闭
+  handleAnswerSheetClose();
+};
+
+const newCoins = ref(0);
+const lock_spell = ref(false);
+const spellVocabulary = ref([]);
+onBeforeUnmount(() => {
+  // document.removeEventListener("visibilitychange", handleVisibilityChange);
+  window.removeEventListener("beforeunload", handlePageUnload);
+  // window.removeEventListener("pagehide", handlePageUnload);
+});
 onMounted(async () => {
+  // document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("beforeunload", handlePageUnload);
+  // window.addEventListener("pagehide", handlePageUnload);
+  createTimeAnswer.value = new Date();
+  // console.log("createTimeAnswer:", createTimeAnswer.value);
+
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
+
+    // console.log("compareResult:", compareResult.value);
+    account_data_id.value = history.state.nid;
+    account_log_id.value = history.state.account_log_id;
+    username.value = history.state.username;
+
+    uncertainResult.value = JSON.parse(history.state.uncertainResult);
+    spellVocabulary.value = JSON.parse(history.state.spellVocabulary);
+    lock_spell.value = history.state.lock_spell;
+    // console.log("spellVocabulary: ", spellVocabulary.value);
+    // console.log("lock_spell: ", lock_spell.value);
+
+    uncertainResult.value.sort((a, b) => {
+      const importantTypes = ["点金", "透视", "回溯"];
+
+      const aHasImportantType = importantTypes.some((type) =>
+        a.type.includes(type)
+      );
+      const bHasImportantType = importantTypes.some((type) =>
+        b.type.includes(type)
+      );
+
+      // 如果 a 有重要类型而 b 没有，a 排在前面
+      if (aHasImportantType && !bHasImportantType) {
+        return -1;
+      }
+      // 如果 b 有重要类型而 a 没有，b 排在前面
+      if (bHasImportantType && !aHasImportantType) {
+        return 1;
+      }
+      // 如果两者都有或都没有重要类型，则保持原顺序
+      return 0;
+    });
+    if (uncertainResult.value.length != 0) {
+      showUncertainDot.value = true;
+    }
+
+    newCoins.value = history.state.newCoins;
     userSelected.value = JSON.parse(history.state.userSelected);
     rate.value = history.state.rate;
     nid.value = history.state.nid;
@@ -149,21 +304,19 @@ onMounted(async () => {
   });
   res.then((res) => {
     console.log("compareResult", res);
-    console.log('trueCount.value: ', trueCount.value);
-    console.log('compareResult.value: ', compareResult.value.length);
+    console.log("uncertainResult", uncertainResult.value);
+    // console.log('trueCount.value: ', trueCount.value);
+    // console.log('compareResult.value: ', compareResult.value.length);
+
     if (trueCount.value == compareResult.value.length) {
-      // showStar.value = true;
-      // setTimeout(() => {
-      //   showStar.value = false; // 3秒后隐藏星星
-      // }, 5000);
       showAnimationShineVictory();
+      showWelcomeAllTrue.value = true;
     } else if (halfTrue.value == 0.5) {
       showWelcomeHalf.value = true;
       showAnimationHalfTrue();
     } else {
       showWelcome.value = true;
       showAnimationShine();
-      
     }
   });
 });
@@ -186,6 +339,19 @@ onMounted(async () => {
           <div class="result-row">正确{{ trueCount }}道题</div>
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
+          <div class="result-row">新获得{{ newCoins }}金币</div>
+          <Divider></Divider>
+          <van-tag type="warning" size="large" round
+            >下次将进行拼写考察，点击
+            <van-tag
+              type="danger"
+              size="large"
+              round
+              @click="showUncertainAndSpell"
+              >迟疑/拼写</van-tag
+            >
+            复习</van-tag
+          >
         </div>
       </template>
     </van-dialog>
@@ -205,12 +371,42 @@ onMounted(async () => {
           <div class="result-row">正确{{ trueCount }}道题</div>
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
+          <div class="result-row">新获得{{ newCoins }}金币</div>
+          <Divider></Divider>
+          <van-tag type="warning" size="large" round
+            >下次将进行拼写考察，点击
+            <van-tag
+              type="danger"
+              size="large"
+              round
+              @click="showUncertainAndSpell"
+              >迟疑/拼写</van-tag
+            >
+            复习</van-tag
+          >
+        </div>
+      </template>
+    </van-dialog>
+
+    <!-- 弹出提示 -->
+    <van-dialog
+      v-model:show="showWelcomeAllTrue"
+      title="完成试题"
+      theme="round-button"
+      class="custom-dialog"
+    >
+      <template #title>
+        <div class="custom-title">恭喜，全对了！</div>
+      </template>
+      <template #default>
+        <div class="custom-content">
+          <div class="result-row">新获得{{ newCoins }}金币</div>
         </div>
       </template>
     </van-dialog>
     <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar title="背诵答案" right-text="继续" @click-right="gotoNext()">
+      <van-nav-bar title="背诵答案">
         <template #left>
           <div
             style="
@@ -227,9 +423,20 @@ onMounted(async () => {
               style="margin-left: -5px; margin-right: 5px"
               size="28"
             />
-            <span style="color: rgb(64, 135, 242)"
-              >正确率：{{ trueCount }}/{{ compareResult.length }}</span
-            >
+            <span style="color: rgb(64, 135, 242)">
+              正确率：{{ trueCount }}/{{ compareResult.length }}
+            </span>
+          </div>
+        </template>
+        <template #right>
+          <div style="margin-right: 1rem" @click="showUncertainResult()">
+            <van-badge :dot="showUncertainDot">
+              <span style="color: rgb(64, 135, 242)">迟疑 / 拼写</span>
+            </van-badge>
+          </div>
+
+          <div @click="gotoNext()">
+            <span style="color: rgb(64, 135, 242)"> 继续 </span>
           </div>
         </template>
       </van-nav-bar>
@@ -269,6 +476,95 @@ onMounted(async () => {
       </van-cell-group>
     </van-floating-panel>
 
+    <!-- 延迟库 -->
+    <van-popup
+      v-model:show="showUncertain"
+      position="left"
+      :style="{ height: '100%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset>
+        <div style="margin-left: 0.5rem; font-weight: 700; margin-right: 2rem">
+          <p style="font-size: 20px; color: black; margin-top: 2rem">迟疑库</p>
+          <p style="color: red; margin-top: -1rem">
+            监测到以下词汇不够熟练，请再次复习!
+          </p>
+          <div
+            style="
+              font-size: 16px;
+              margin-top: -0.5rem;
+              font-weight: 400;
+              color: gray;
+            "
+          >
+            共{{ uncertainResult.length }}词
+          </div>
+        </div>
+        <div v-for="(item, index) in uncertainResult" :key="index">
+          <van-cell
+            :label="
+              item.正确答案 === '无'
+                ? `答案：${item.答案}`
+                : `答案：${item.正确答案}`
+            "
+            :value="item.type"
+          >
+            <template #title>
+              <div style="font-size: larger; font-weight: 700">
+                {{ item.英文 }}
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+      <van-divider></van-divider>
+      <div style="margin-left: 1.5rem; font-weight: 700; margin-right: 2rem">
+        <p style="font-size: 20px; color: black; margin-top: 1rem">拼写库</p>
+        <div v-if="lock_spell">
+          <p style="color: red; margin-top: -1rem">
+            拼写库被锁死，继续复习以下词汇
+          </p>
+        </div>
+        <div v-else>
+          <p style="color: red; margin-top: -1rem">
+            监测到以下词汇为非常不熟练，将进行拼写考察，请重视！
+          </p>
+        </div>
+
+        <div
+          style="
+            font-size: 16px;
+            margin-top: -0.5rem;
+            font-weight: 400;
+            color: gray;
+          "
+        >
+          共{{ spellVocabulary.length }}词
+        </div>
+      </div>
+      <div
+        v-for="(item, index) in spellVocabulary"
+        :key="index"
+        style="margin-left: 1rem"
+      >
+        <van-cell
+          :label="
+            item.正确答案 === '无'
+              ? `答案：${item.答案}`
+              : `答案：${item.正确答案}`
+          "
+          :value="item.type"
+        >
+          <template #title>
+            <div style="font-size: larger; font-weight: 700">
+              {{ item.英文 }}
+            </div>
+          </template>
+        </van-cell>
+      </div>
+    </van-popup>
+
     <!-- 列表 -->
     <van-checkbox-group v-model="userSelected" class="checkbox-container">
       <van-cell-group>
@@ -304,13 +600,55 @@ onMounted(async () => {
                   :name="`${item.序号}-${index2 + 1}`"
                   :disabled="true"
                   :checked="userSelected.includes(`${item.序号}-${index2 + 1}`)"
-                  
                 />
               </template>
             </van-cell>
-            <van-cell v-if="item.flag !== 'true'" class="answer-cell">
+
+            <!-- 当 item.is_spell 为 true 且 item.flag 为 false 时，显示橙色背景和正确答案 -->
+            <van-cell
+              v-if="item.is_spell && item.flag === 'false'"
+              style="background-color: bisque"
+            >
               <template #title>
-                <div style="text-align: left">答案：{{ item.答案 }}</div>
+                正确答案：{{ item.正确答案 }} ｜ 用户选择:
+                {{ item.用户选择.join("") }}</template
+              >
+            </van-cell>
+
+            <!-- 当 item.is_spell 为 true 且 item.flag 为 true 时，显示绿色背景和正确答案 -->
+            <van-cell
+              v-else-if="item.is_spell && item.flag === 'true'"
+              style="background-color: lightgreen"
+            >
+              <template #title> 正确答案：{{ item.正确答案 }} </template>
+            </van-cell>
+
+            <!-- 当 item.flag 不为 true 且不属于 is_spell 的情况，显示答案 -->
+            <van-cell
+              v-if="
+                item.flag !== 'true' &&
+                (!item.is_spell || item.flag !== 'false')
+              "
+              class="answer-cell"
+            >
+              <template #title>
+                <div v-if="item.答案 === '以上都不对'">
+                  以上都不对 ｜ 正确答案：{{ item.正确答案 }}
+                </div>
+                <div v-else>答案：{{ item.答案 }}</div>
+              </template>
+            </van-cell>
+
+            <van-cell
+              v-if="
+                (item.flag === 'true' || item.flag === 'half') &&
+                item.答案 === '以上都不对' &&
+                !item.is_spell
+              "
+              style="background-color: lightgreen"
+            >
+              <template #title>
+                <div>以上都不对 ｜ 正确答案：{{ item.正确答案 }}</div>
               </template>
             </van-cell>
           </van-cell-group>
@@ -324,8 +662,6 @@ onMounted(async () => {
     <VictorySheep ref="victorySheepRef" />
     <HalfTrue ref="halfTrueRef" />
   </div>
-
-  
 </template>
 
 
@@ -335,23 +671,19 @@ onMounted(async () => {
 .checkbox-container {
   width: 100%;
   margin: 0 auto;
-  
-  
 }
 @media (min-width: 431px) {
   .checkbox-container {
     width: 90%;
     box-shadow: -5px 0 8px rgba(0, 0, 0, 0.2), 5px 0 8px rgba(0, 0, 0, 0.2);
-    padding: 10px; 
-    margin-top:10px
+    padding: 10px;
+    margin-top: 10px;
   }
 }
 
 .bottom-placeholder {
   height: 80px;
 }
-
-
 
 .border-cell {
   border-top: 4px solid #eee; /* 每组的顶部边框加粗 */

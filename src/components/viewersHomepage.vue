@@ -7,7 +7,6 @@ import {
   onBeforeUpdate,
   computed,
   onUnmounted,
-  inject
 } from "vue";
 import Typed from "typed.js";
 
@@ -23,7 +22,6 @@ import { useRouter } from "vue-router";
 import loading from "./loading.vue";
 import QuickSwitchingText from "./QuickSwitchingText.vue";
 
-const flagTheme = inject("flagTheme");
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -357,15 +355,15 @@ const buttonStyle = computed(() => {
 const showAccountPop = ref(true);
 const missyouFlag = ref(false);
 const missDays = ref(2);
-const userAccount = ref("");
-const passwordAccount = ref("");
+const viewerAccount = ref("zhangliang");
+const passwordAccount = ref("123456");
 const showHell = () => {
   showAccountPop.value = true;
 };
 async function submitAccountData() {
   let params = new URLSearchParams();
-  params.append("method", "getUserData");
-  params.append("user", userAccount.value);
+  params.append("method", "getViewerData");
+  params.append("viewer", viewerAccount.value);
 
   params.append("password", passwordAccount.value);
 
@@ -375,103 +373,41 @@ async function submitAccountData() {
 }
 const submitAccount = () => {
   // isLoading.value = true;
-  if (passwordAccount.value.trim() && userAccount.value.trim()) {
+  if (passwordAccount.value.trim() && viewerAccount.value.trim()) {
     submitAccountData().then((res) => {
-      console.log('res: ', res);
+      // console.log('res: ', res);
       if (res == "用户名不存在") {
         showFailToast("用户名不存在");
       } else if (res == "密码错误") {
         showFailToast("密码错误");
       } else {
-        // 主题选择
-        localStorage.setItem('theme_name', res.theme.theme_name);
-        if(res.theme.theme_name == "喜羊羊与灰太狼") {flagTheme.value = 1}
-        if(res.theme.theme_name == "熊出没") {flagTheme.value = 2}
-
-
-        async function missTask() {
-          let params = new URLSearchParams();
-          params.append("method", "missTask");
-          params.append("user", userAccount.value);
-          return await axios.post("words/", params).then((ret) => {
-            return ret.data;
-          });
-        }
-
-        async function userTestUpdate() {
-          let params = new URLSearchParams();
-          params.append("method", "userTestUpdate");
-          return await axios.post("words/", params).then((ret) => {
-            return ret.data;
-          });
-        }
-
         async function executeTasks() {
-          try {
-            // 先执行 missTask
-            // isLoading.value = true;
-            const res_miss = await missTask();
-            if (res_miss.message != "无") {
-              missyouFlag.value = true;
-              missDays.value = res_miss.message;
-              console.log("missDays.value: ", missDays.value);
-            }
-
-            // 然后执行后续逻辑
-            if (userAccount.value == "user" || userAccount.value == "teacher") {
-              await userTestUpdate();
-              router.push({
-                path: "/studentAccountList",
-                state: {
-                  data: JSON.stringify(res),
-                  missyouflag: missyouFlag.value,
-                  missDays: missDays.value,
-                },
-              });
-            } else {
-              const userData = {
-                username: userAccount.value.trim(),
-                password: passwordAccount.value.trim(),
-              };
-              const now = new Date();
-              const expirationDate = new Date(
-                now.getTime() + 7 * 24 * 60 * 60 * 1000
-              );
-              localStorage.setItem("userData", JSON.stringify(userData));
-              localStorage.setItem(
-                "expirationDate",
-                expirationDate.toISOString()
-              );
-              isLoading.value = false;
-              router.push({
-                path: "/studentAccountList",
-                state: {
-                  data: JSON.stringify(res),
-                  missyouflag: missyouFlag.value,
-                  missDays: missDays.value,
-                },
-              });
-            }
-          } catch (error) {
-            console.error("Error executing tasks:", error);
-          }
+          // isLoading.value = true;
+          const viewerData = {
+            viewername: viewerAccount.value.trim(),
+            password: passwordAccount.value.trim(),
+          };
+          const now = new Date();
+          const expirationDate = new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000
+          );
+          localStorage.setItem("viewerData", JSON.stringify(viewerData));
+          localStorage.setItem("expirationDateViewer", expirationDate.toISOString());
+          // isLoading.value = false;
+          router.push({
+            path: "/viewers",
+            state: {
+              data: JSON.stringify(res),
+            },
+          });
         }
         executeTasks();
       }
+      
     });
   } else {
     showFailToast("账号密码不能为空");
   }
-};
-const pushUserTest = () => {
-  let res = new Promise((resolve, reject) => {
-    userAccount.value = "user";
-    passwordAccount.value = "password";
-    resolve("ok");
-  });
-  res.then((res) => {
-    submitAccount();
-  });
 };
 
 const typed = ref(null);
@@ -497,34 +433,33 @@ const wordList = [
   "高考英语",
 ];
 
-const gotoParent = () => {
+const gotoStudent = () => {
   router.push({
-    path: "/viewersHomepage",
+    path: "/homepage",
   });
-};
-
+}
 onMounted(async () => {
-  const expirationDate = localStorage.getItem("expirationDate");
+  const expirationDate = localStorage.getItem("expirationDateViewer");
   // console.log("expirationDate: ", expirationDate);
   if (expirationDate) {
     const now = new Date();
     const expiration = new Date(expirationDate);
     if (now >= expiration) {
-      localStorage.removeItem("userData");
-      localStorage.removeItem("expirationDate");
+      localStorage.removeItem("viewerData");
+      localStorage.removeItem("expirationDateViewer");
     } else {
       let res = new Promise((resolve, reject) => {
-        const userData = JSON.parse(localStorage.getItem("userData"));
-        console.log("userData: ", userData);
-        userAccount.value = userData["username"];
-        passwordAccount.value = userData["password"];
+        const viewerData = JSON.parse(localStorage.getItem("viewerData"));
+        // console.log("viewerData: ", viewerData);
+        viewerAccount.value = viewerData["viewername"];
+        passwordAccount.value = viewerData["password"];
         resolve("ok");
       });
       res.then(() => {
         submitAccountData().then((res) => {
-          console.log("res: ", res);
+          // console.log("res: ", res);
           router.push({
-            path: "/studentAccountList",
+            path: "/viewers",
             state: {
               data: JSON.stringify(res),
             },
@@ -533,13 +468,13 @@ onMounted(async () => {
       });
     }
   } else {
-    userAccount.value = "";
+    viewerAccount.value = "";
     passwordAccount.value = "";
   }
 
   // 开场动画
   const options = {
-    strings: ["每天10分钟", "扫码背单词"],
+    strings: ["每天3分钟", "扫码来监督"],
     typeSpeed: 140, // 第一个字符串的打字速度
     backSpeed: 60, // 默认退格速度
     showCursor: false,
@@ -637,45 +572,41 @@ onUnmounted(() => {
         <!-- 滚动动画 -->
         <!-- 打字动画 -->
         <div ref="pRef" class="content"></div>
-
         <!-- designed by xie -->
-        
+        <!-- <div class="parent-version">家长版</div> -->
         <div class="logo-container" style="margin-top: 40">
-          <div
-            class="logo"
-            data-text="♠ Designed by xie ♠"
-            style="margin-top: 100%"
-          >
+          <div class="logo" data-text="♠ Designed by xie ♠">
             ♠ Designed by xie ♠
           </div>
         </div>
-        <!-- <div class="student-version">学生版</div> -->
       </div>
 
-      <div style="position: fixed; bottom: 0; width: 100%">
+      <div style="position: fixed; bottom: 2%; width: 100%">
         <van-cell-group inset style="margin-top: 80px">
           <div
             style="display: flex; margin: 20px; justify-content: space-between"
           >
-            <div style="font-weight: 700; font-size: 20">
-              请输入账户名和密码
-            </div>
-            <div
+          <div style="font-weight: 700; font-size: 20; margin: 0px">
+            请输入账户名和密码
+          </div>
+          <div
               style="
                 font-size: 10px;
                 border-radius: 3px;
                 padding: 3px 5px;
                 color: white;
-                background-color: rgb(47, 255, 134);
+                background-color: red;
                 margin-top: 5px;
+                height: 20%;
               "
-              @click="gotoParent()"
+              @click="gotoStudent()"
             >
-              前往家长版
+              前往学生版
             </div>
           </div>
+
           <van-field
-            v-model="userAccount"
+            v-model="viewerAccount"
             label="用户"
             placeholder="请输入用户名"
           />
@@ -697,26 +628,6 @@ onUnmounted(() => {
             @click="showAccountPop == false"
             >关闭</van-button
           >
-        </div>
-        <div
-          style="
-            display: flex;
-            justify-content: flex-end;
-            width: 96%;
-            margin-top: 5%;
-            margin-bottom: 5%;
-          "
-        >
-          <div>
-            <van-button
-              type="warning"
-              plain
-              @click="pushUserTest"
-              size="normal"
-              style="margin-top: 5%; margin-bottom: 5%"
-              >点击体验</van-button
-            >
-          </div>
         </div>
       </div>
     </van-popup>
@@ -746,92 +657,6 @@ onUnmounted(() => {
       <span>试题未完成，不能提交</span>
     </van-notify>
 
-    <!-- 预览滚动 -->
-    <van-floating-panel
-      v-model:height="heightScroll"
-      :anchors="anchorsScrolls"
-      v-show="showScroll"
-      :content-draggable="false"
-    >
-      <van-button
-        plain
-        type="default"
-        block
-        style="margin-bottom: 0px; font-weight: bold; height: 6%"
-        :style="buttonStyle"
-        @click="closePanel"
-        >{{ buttonText }}</van-button
-      >
-      <van-cell
-        title="上拉增大导航"
-        value="点击跳转"
-        style="color: blue; font-weight: bold"
-      />
-      <van-cell-group v-for="(item, index) in synonymsOptions" :key="index">
-        <van-cell
-          @click="scrollToItem(item.序号 - 1)"
-          is-link
-          :title="item.序号 + '. ' + item.英文"
-          size="large"
-          :style="{
-            color:
-              selectedResults[index] && selectedResults[index].length > 0
-                ? 'red'
-                : '',
-          }"
-        >
-          <template #default>
-            <span
-              v-if="selectedResults[index] && selectedResults[index].length"
-              >{{ selectedResults[index].join("; ") }}</span
-            >
-          </template>
-        </van-cell>
-      </van-cell-group>
-    </van-floating-panel>
-
-    <!-- 显示列表单词 -->
-    <van-checkbox-group v-model="synonymsSelected" style="margin-bottom: 80px">
-      <van-cell-group>
-        <div
-          v-for="(item, index) in synonymsOptions"
-          :key="index"
-          class="custom-cell-group"
-          :ref="setItemRef"
-        >
-          <!-- 显示英文单词和序号，加粗显示 -->
-          <van-cell clickable class="bold-title border-cell">
-            <template #title>
-              <div>{{ item.序号 + ". " + item.英文 }}</div>
-            </template>
-          </van-cell>
-
-          <!-- 显示对应的中文选项 -->
-          <van-cell-group>
-            <van-cell
-              v-for="(chinese, index2) in item.中文"
-              :key="index2"
-              clickable
-              @click="toggleCheckChinese(index, index2)"
-              :class="isSelected(index, index2) ? 'selected-cell' : ''"
-              class="chinese-cell"
-            >
-              <template #title>
-                <div style="text-align: left">{{ chinese }}</div>
-              </template>
-              <template #right-icon>
-                <van-checkbox
-                  :name="`${index + 1}-${index2 + 1}`"
-                  :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
-                  @click.stop.prevent="toggleCheckChinese(index, index2)"
-                />
-              </template>
-            </van-cell>
-          </van-cell-group>
-        </div>
-      </van-cell-group>
-    </van-checkbox-group>
-
     <loading v-if="isLoading" />
   </div>
 </template>
@@ -851,25 +676,34 @@ onUnmounted(() => {
   .content {
     margin-top: 30%;
   }
+
 }
 
 @media (min-width: 768px) and (orientation: landscape) {
   .content {
     margin-top: 15%;
   }
+  .parent-version {
+    top: 35%;
+  }
 }
+
+.logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: fixed;
+  bottom: 60%;
+  width: 100%;
+}
+
 .logo {
   font-size: 20px;
   font-family: "SourceHanSansCN-Bold" !important;
   font-weight: 700;
   color: #222;
-  position: fixed;
-  bottom: 60%;
-  width: 100%;
   text-align: center; /* 水平居中文本 */
-  display: flex;
-  justify-content: center; /* Flexbox 水平居中所有内容 */
-  overflow: hidden; /* 防止超出内容影响布局 */
+  margin-top: 10px; /* 增加间距以避免重叠 */
 }
 
 .logo::after {
@@ -891,6 +725,23 @@ onUnmounted(() => {
   animation: move 5s linear infinite;
   white-space: nowrap; /* 防止文本折行 */
 }
+
+.parent-version {
+  position: fixed;
+  top: 30%;
+  background-color: rgb(47, 255, 134);
+  color: white;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 3px;
+}
+@media (min-width: 765px) {
+  .parent-version {
+    top: 35%;
+  }
+}
+
+
 
 @keyframes move {
   0%,
@@ -952,28 +803,5 @@ onUnmounted(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-}
-
-.student-version {
-  position: fixed;
-  top: 30%;
-  background-color: red;
-  color: white;
-  padding: 5px 10px;
-  font-size: 12px;
-  border-radius: 3px;
-}
-@media (min-width: 765px) {
-  .parent-version {
-    top: 35%;
-  }
-}
-.logo-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: fixed;
-  bottom: 60%;
-  width: 100%;
 }
 </style>

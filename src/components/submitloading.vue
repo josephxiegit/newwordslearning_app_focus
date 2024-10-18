@@ -1,20 +1,31 @@
 <template>
   <div class="loading-overlay">
     <div class="loading">
-      <img src="../assets/submitloading.gif" alt="Loading" class="loading-icon" />
+      <img :src="srcTheme" alt="Loading" class="loading-icon" />
       <span class="loading-text">{{ loadingText }}</span>
     </div>
   </div>
 </template>
   
   <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, inject } from "vue";
+// 主题路径
+import submitloadingSrcGoatAndWolf from '../assets/submitloading.gif';
+import submitloadingSrcBears from '../assets/Boonie Bears/submitloading.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 
 const dotCount = ref(1);
 
 const loadingText = computed(() => `提交中${".".repeat(dotCount.value)}`);
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = submitloadingSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = submitloadingSrcBears;
+  }
   const interval = setInterval(() => {
     dotCount.value = (dotCount.value % 3) + 1;
   }, 500); // 每 500 毫秒更新一次

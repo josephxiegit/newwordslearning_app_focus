@@ -1,14 +1,19 @@
 <template>
   <div v-if="visible" :class="['victory-sheep-overlay', { 'exit': isExiting, 'enter': isEntering }]">
     <div class="victory-sheep">
-      <img src="../assets/wolfkiss.gif" alt="sheep victory">
+      <img :src="srcTheme" alt="sheep victory">
       <button class="close-button" @click="hide">关闭</button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, defineExpose } from 'vue';
+import { ref, onMounted, defineExpose, inject } from 'vue';
+// 主题路径
+import wolfkissSrcGoatAndWolf from '../assets/wolfkiss.gif';
+import wolfkissSrcBears from '../assets/Boonie Bears/wolfkiss.gif';
+const flagTheme = inject("flagTheme");
+const srcTheme = ref("");
 
 const visible = ref(false);
 const isEntering = ref(false);
@@ -36,6 +41,12 @@ const methods = { show, hide };
 defineExpose({ ...methods, visible });
 
 onMounted(() => {
+  if (flagTheme.value == 1) {
+    srcTheme.value = wolfkissSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = wolfkissSrcBears;
+  }
   isEntering.value = false;
 });
 </script>

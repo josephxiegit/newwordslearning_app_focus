@@ -8,7 +8,7 @@ import {
   computed,
   nextTick,
 } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import {
   showSuccessToast,
   showFailToast,
@@ -19,6 +19,7 @@ import {
   showToast,
 } from "vant";
 const router = useRouter();
+const route = useRoute();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 
@@ -49,31 +50,79 @@ function formatDateString(dateString) {
 }
 
 function processData(res) {
-  return res.map((item) => {
-    const { title, username, log, create_time, nid, swipe } = item;
-    const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
+  return res
+    .map((item) => {
+      const {
+        title,
+        username,
+        log,
+        create_time,
+        nid,
+        swipe,
+        numberprev,
+        numbershowanswer,
+        numbertransparent,
+      } = item;
+      const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
-    let dataString = log.replace(/(\W)'|'(\W)/g, '$1"$2');
-    dataString = dataString.replace(
-      /([{,]\s*)'([^']+?)'(\s*[:])/g,
-      '$1"$2"$3'
-    );
+      // console.log("log", log);
+      // console.log("______________________________");
 
-    try {
-      const parsedLog = JSON.parse(dataString); // 尝试解析 log 字段
+      // let dataString = log.replace(/(\W)'|'(\W)/g, '$1"$2');
+      // dataString = dataString.replace(
+      //   /([{,]\s*)'([^']+?)'(\s*[:])/g,
+      //   '$1"$2"$3'
+      // );
+      // dataString = dataString
+      //   .replace(/\bFalse\b/g, "false")
+      //   .replace(/\bTrue\b/g, "true");
+      // dataString = dataString.replace(/\bNone\b/g, "null");
+
+      // 替换所有的'变为".然后把s" 变为s' 。
+      let dataString = log
+        .replace(/'/g, '"')
+        .replace(/s" /g, "s\' ")
+        .replace(/"s /g, "\'s ")
+        .replace(/"t /g, "\'t ")
+        .replace(/"m /g, "'m ")
+        .replace(/can"t/g, "\can't")
+        .replace(/mustn"t/g, "\mustn't")
+        .replace(/won"t/g, "won't")
+
+      // 保布尔及类型等准JSON规则一致各解析逻辑:
+      dataString = dataString
+        .replace(/\bFalse\b/g, "false")
+        .replace(/\bTrue\b/g, "true")
+        .replace(/\bNone\b/g, "null");
+      // console.log("dataString: ", dataString);
+      const parsedLog = JSON.parse(dataString);
+
+
+      // dataString = JSON.stringify(dataString)
+      // let parsedLog = eval("("+dataString+")")
 
       const falseCount = parsedLog.reduce((count, logItem) => {
-        return count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0);
+        return (
+          count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
+        );
       }, 0);
 
       parsedLog.falseCount = falseCount; // 添加 falseCount 到 parsedLog 中
 
-      return { title, username, log: parsedLog, create_time: formattedCreateTime, falseCount, nid, swipe };
-    } catch (error) {
-      console.error("Error parsing JSON data: ", error);
-      return null; // 返回 null 或适当的错误处理代码
-    }
-  }).filter(item => item !== null); // 过滤掉任何因错误而生成的 null 项
+      return {
+        title,
+        username,
+        log: parsedLog,
+        create_time: formattedCreateTime,
+        falseCount,
+        nid,
+        swipe,
+        numberprev,
+        numbershowanswer,
+        numbertransparent,
+      };
+    })
+    .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
 }
 
 function getListData() {
@@ -97,25 +146,22 @@ const onLoad = async () => {
   if (loading.value || finished.value) {
     return;
   }
-  try {
-    const params = new URLSearchParams();
-    params.append("method", "filterLog");
-    // params.append("alias", title);
-    params.append("filterStudent", valueSearchStudent.value);
-    params.append("filterXlsm", valueSearchLog.value);
-    params.append("page", pageIndex.value + 1); // 请求下一页的数据
-    params.append("page_size", 20); // 每页数据大小
+  const params = new URLSearchParams();
+  params.append("method", "filterLog");
+  // params.append("alias", title);
+  params.append("filterStudent", valueSearchStudent.value);
+  params.append("filterXlsm", valueSearchLog.value);
+  params.append("page", pageIndex.value + 1); // 请求下一页的数据
+  params.append("page_size", 20); // 每页数据大小
 
-    const response = await axios.post("words/", params);
-    let moreData = response.data.data;
-    console.log("moreData: ", moreData);
-    moreData = processData(moreData);
-    filteredFiles.value.push(...moreData);
-    pageIndex.value++;
-    finished.value = !response.data.has_more;
-  } catch (error) {
-    console.error("Failed to fetch data:", error);
-  }
+  const response = await axios.post("words/", params);
+  let moreData = response.data.data;
+  moreData = processData(moreData);
+  filteredFiles.value.push(...moreData);
+  console.log("moreData: ", moreData);
+  pageIndex.value++;
+  finished.value = !response.data.has_more;
+
   loading.value = false;
   return filteredFiles.value;
 };
@@ -125,29 +171,34 @@ const clearFilterData = () => {
   valueSearchLog.value = "";
   valueAliasLog.value = "";
 };
+async function filterData() {
+  let params = new URLSearchParams();
+  params.append("method", "filterLog");
+  params.append("filterStudent", valueSearchStudent.value);
+  params.append("filterXlsm", valueSearchLog.value);
+  params.append("alias", valueAliasLog.value);
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
+}
 const filteredStudent = () => {
   if (valueSearchStudent.value == "" && valueSearchLog.value == "") {
     return;
-  }
-  async function filterData() {
-    let params = new URLSearchParams();
-    params.append("method", "filterLog");
-    params.append("filterStudent", valueSearchStudent.value);
-    params.append("filterXlsm", valueSearchLog.value);
-    params.append("alias", valueAliasLog.value);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
   }
   filterData().then((res) => {
     console.log("res: ", res);
     let data = processData(res.data);
     filteredFiles.value = [...data];
     showFliterBox.value = false;
-   
   });
 };
-
+const generateTitle = (item) => {
+  const titleFirstPart = item.title.split(".")[0]; // 只保留第一部分
+  if (item.swipe === "游戏") {
+    return `${titleFirstPart} | ${item.swipe} ${item.numberprev}${item.numbershowanswer}${item.numbertransparent}`;
+  }
+  return `${titleFirstPart} | ${item.swipe}`;
+};
 // 日志详情
 const showDetail = ref(false);
 const detailName = ref("");
@@ -155,29 +206,97 @@ const detailDate = ref("");
 const detailXlsmName = ref("");
 const detailRate = ref("");
 const detailMode = ref("");
+const detailNid = ref("");
 const detailList = ref([]);
+const numberprev = ref(0);
+const numbershowanswer = ref(0);
+const numbertransparent = ref(0);
+// 延迟库
+async function getUncertain(nid) {
+  loadingUncertain.value = true;
+  let params = new URLSearchParams();
+  params.append("method", "getUncertain");
+  params.append("nid", nid);
+  return await axios.post("words/", params).then((ret) => {
+    loadingUncertain.value = false;
+    const res = JSON.parse(ret.data["uncertain_vocabulary"]);
+    return res;
+  });
+}
+const getUncertainVocabulary = () => {
+  getUncertain(detailNid.value).then((res) => {
+    res.value.sort((a, b) => {
+      const importantTypes = ["点金", "透视", "回溯"];
+
+      const aHasImportantType = importantTypes.some((type) =>
+        a.type.includes(type)
+      );
+      const bHasImportantType = importantTypes.some((type) =>
+        b.type.includes(type)
+      );
+
+      // 如果 a 有重要类型而 b 没有，a 排在前面
+      if (aHasImportantType && !bHasImportantType) {
+        return -1;
+      }
+      // 如果 b 有重要类型而 a 没有，b 排在前面
+      if (bHasImportantType && !aHasImportantType) {
+        return 1;
+      }
+      // 如果两者都有或都没有重要类型，则保持原顺序
+      return 0;
+    });
+    uncertainResult.value = res;
+  });
+};
+
 const toggleDetail = (index) => {
   const detail = filteredFiles.value[index];
-  detailMode.value = detail['swipe'];
+  detailMode.value = detail["swipe"];
   detailName.value = detail["username"];
   detailDate.value = detail["create_time"];
   detailXlsmName.value = detail["title"];
+  detailNid.value = detail["nid"];
+
+  numberprev.value = detail["numberprev"];
+  numbershowanswer.value = detail["numbershowanswer"];
+  numbertransparent.value = detail["numbertransparent"];
+
   detailRate.value =
     detail["log"].length - detail["falseCount"] + "/" + detail["log"].length;
   detailList.value = detail["log"];
   console.log("detail: ", detail);
   showDetail.value = true;
+
+  getUncertain(detail["nid"]).then((res) => {
+    if (res) {
+      uncertainResult.value = res;
+    }
+  });
 };
 
-const isCorrectAnswer = (userChoices, answerString) => {
-  const answers = answerString.split("；").sort(); // 将答案字符串分割成数组并排序
-  const sortedUserChoices = [...userChoices].sort(); // 复制用户选择数组并排序
+const isCorrectAnswer = (
+  userChoices,
+  answerString,
+  correctAnswer,
+  is_spell
+) => {
+  if (is_spell) {
+    const userChoicesString = userChoices.join("");
+    const correctAnswerString = correctAnswer.replace(/\s+/g, "");
+    return userChoicesString === correctAnswerString;
+  } else {
+    const answers = answerString.split("；").sort(); // Split answer string into an array and sort
+    const sortedUserChoices = [...userChoices].sort(); // Copy userChoices array and sort
 
-  if (sortedUserChoices.length !== answers.length) {
-    return false; // 如果两个数组长度不相等，直接返回false
+    if (sortedUserChoices.length !== answers.length) {
+      return false; // If lengths are not equal, return false
+    }
+
+    return sortedUserChoices.every(
+      (choice, index) => choice === answers[index]
+    );
   }
-
-  return sortedUserChoices.every((choice, index) => choice === answers[index]);
 };
 
 // 删除日志
@@ -213,12 +332,60 @@ const deleteItem = (item, index) => {
   });
 };
 
-onMounted(async () => {
-});
+// 查看答案日志
+const showAnswerLog = ref(false);
+const answerLogResult = ref([]);
+const answerUsername = ref("");
+const answerAttempt = ref("");
+const answerSwipe = ref("");
+const answerLens = ref("");
+const answerRate = ref("");
+const answerTitle = ref("");
+const answerTureRate = ref("");
+const searchAnswer = (item, index) => {
+  console.log(item);
+  answerUsername.value = item.username;
+  answerAttempt.value = item.attempt;
+  answerSwipe.value = item.swipe;
+
+  answerRate.value = item.rate;
+  answerTitle.value = item.alias;
+  const lenData = item.log.length;
+  const trueCount = item.log.filter((item) => item.flag === "true").length;
+  answerTureRate.value = trueCount + " / " + lenData;
+  async function getAnswerLog() {
+    let params = new URLSearchParams();
+    params.append("method", "getAnswerLogBylog");
+    params.append("account_log_id", item.nid);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data.answer_log;
+    });
+  }
+  getAnswerLog().then((res) => {
+    console.log(res);
+    if (res.length == 0) {
+      showToast("没有查询到数据");
+    } else {
+      showAnswerLog.value = true;
+      answerLogResult.value = res;
+    }
+  });
+};
+// 延迟库
+const showUncertain = ref(false);
+const uncertainResult = ref("");
+const loadingUncertain = ref(false);
+const showUncertainResult = () => {
+  showUncertain.value = true;
+};
+
+// 搜索
+onMounted(async () => {});
 
 // 刷新页面
 const reloadPage = () => {
   let res = new Promise((resolve, reject) => {
+    clearFilterData();
     getListData();
     resolve("ok");
   });
@@ -242,20 +409,26 @@ const reloadPage = () => {
 
     <router-view />
     <van-tabbar route>
-      <van-tabbar-item icon="home-o" replace to="/teacher"
+      <!-- <van-tabbar-item icon="home-o" replace to="/teacher"
         >首页</van-tabbar-item
-      >
+      > -->
       <van-tabbar-item icon="friends-o" replace to="/xlsmList"
         >用户xlsm</van-tabbar-item
       >
-      <van-tabbar-item icon="search" replace to="/teacherComment"
+      <van-tabbar-item icon="todo-list-o" replace to="/teacherComment"
         >试题</van-tabbar-item
       >
       <van-tabbar-item icon="list-switch" replace to="/logList"
         >日志</van-tabbar-item
       >
+      <van-tabbar-item icon="records-o" replace to="/viewersHomepage"
+        >监督</van-tabbar-item
+      >
       <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
         >单词本</van-tabbar-item
+      >
+      <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
+        >消费</van-tabbar-item
       >
     </van-tabbar>
 
@@ -306,14 +479,13 @@ const reloadPage = () => {
     </van-popup>
 
     <!-- 日志列表 -->
-    <!-- <van-cell-group style="margin-bottom: 80px"> -->
     <van-list
-        v-model="loading"
-        :finished="finished"
-        finished-text="没有更多了"
-        @load="onLoad"
-        style="margin-bottom: 80px"
-      >
+      v-model="loading"
+      :finished="finished"
+      finished-text="没有更多了"
+      @load="onLoad"
+      style="margin-bottom: 80px"
+    >
       <van-swipe-cell
         v-for="(item, index) in filteredFiles"
         :key="index"
@@ -327,8 +499,16 @@ const reloadPage = () => {
             @click="deleteItem(item, index)"
           />
         </template>
+        <template #left>
+          <van-button
+            square
+            type="primary"
+            text="答案"
+            @click="searchAnswer(item, index)"
+          />
+        </template>
         <van-cell
-          :title="`${item.title} | ${item.swipe}`"
+          :title="generateTitle(item)"
           :label="item.create_time"
           is-link
           @click="toggleDetail(index)"
@@ -345,11 +525,56 @@ const reloadPage = () => {
       </van-swipe-cell>
     </van-list>
 
+    <!-- 答案日志 -->
+    <van-popup
+      v-model:show="showAnswerLog"
+      position="bottom"
+      :style="{ height: '80%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset>
+        <div style="margin-left: 0.5rem; font-weight: 700; margin-right: 2rem">
+          <p style="font-size: 20px; color: black; margin-top: 1rem">
+            答案日志
+          </p>
+        </div>
+
+        <div
+          style="
+            font-size: 14px;
+            color: gray;
+            margin-left: 0.5rem;
+            margin-top: -1rem;
+          "
+        >
+          <div>{{ answerUsername }} ｜ {{ answerTureRate }}</div>
+          <div style="margin-top: 0.3rem">
+            {{ answerSwipe }}
+          </div>
+        </div>
+        <div v-for="(item, index) in answerLogResult" :key="index">
+          <van-cell :value="item.duration" :label="item.create_time">
+            <template #title>
+              <div style="font-size: larger; font-weight: 700">
+                {{ item.type }}
+              </div>
+            </template>
+            <template #value>
+              <div style="margin-top: 0.2rem; font-size: smaller">
+                <div>{{ item.duration }}</div>
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+    </van-popup>
+
     <!-- 日志详情 -->
     <van-popup
       v-model:show="showDetail"
       position="bottom"
-      :style="{ height: '70%' }"
+      :style="{ height: '90%' }"
       closeable
       :lock-scroll="false"
     >
@@ -377,29 +602,130 @@ const reloadPage = () => {
               font-size: 13px;
             "
           >
-            <div style="margin-left: 1rem; color: blue; font-weight: 600">
+            <div
+              style="
+                margin-left: 1rem;
+                color: blue;
+                font-weight: 600;
+                display: flex;
+              "
+            >
               {{ detailRate }}
+              <div style="display: flex; margin-top: -0.1rem">
+                <span
+                  style="margin-left: 1rem; color: blueviolet"
+                  @click="showUncertainResult"
+                  >迟疑库 {{ uncertainResult.length }}</span
+                >
+                <div style="display: flex; margin-top: 0.1rem">
+                  <van-icon
+                    name="replay"
+                    v-show="!loadingUncertain"
+                    @click="getUncertainVocabulary()"
+                  />
+                  <van-loading
+                    size="14"
+                    v-show="loadingUncertain"
+                    style="margin-left: 0.3rem"
+                  />
+                </div>
+              </div>
             </div>
+
             <div style="margin-right: 0rem; color: gray">
               {{ detailXlsmName }}
             </div>
           </div>
+          <div
+            v-if="detailMode === '游戏'"
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+              color: gray;
+              margin: 5px 0 0px 0;
+            "
+          >
+            <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
+            <div>答案:{{ numbershowanswer }}</div>
+            <div>透视:{{ numbertransparent }}</div>
+          </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
-          <van-cell :label="`答案：${item.答案}`">
+          <van-cell
+            :label="
+              item.is_spell ? `答案：${item.正确答案}` : `答案：${item.答案}`
+            "
+          >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
                 {{ item.英文 }}
+                <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
               </div>
               <div
                 style="margin-top: 0.5rem"
                 :style="{
-                  color: isCorrectAnswer(item.用户选择, item.答案)
+                  color: isCorrectAnswer(
+                    item.用户选择,
+                    item.答案,
+                    item.正确答案,
+                    item.is_spell
+                  )
                     ? 'gray'
                     : 'red',
                 }"
               >
                 用户选择：{{ item.用户选择.join("/") }}
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+    </van-popup>
+
+    <!-- 延迟库 -->
+    <van-popup
+      v-model:show="showUncertain"
+      position="bottom"
+      :style="{ height: '70%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset>
+        <div style="margin-left: 0.5rem; font-weight: 700; margin-right: 2rem">
+          <p style="font-size: 20px; color: black; margin-top: 1.5rem">
+            迟疑库
+          </p>
+        </div>
+        <div
+          style="
+            font-size: 14px;
+            color: gray;
+            margin-left: 0.5rem;
+            margin-top: -1rem;
+          "
+        >
+          <div>
+            {{ uncertainResult.length }} /
+            {{ detailList.length }} &nbsp;&nbsp;&nbsp; 点金:{{
+              numbershowanswer
+            }}
+            | 回溯:{{ numberprev }} ｜ 透视:{{ numbertransparent }}
+          </div>
+          <div>{{ detailName }} | {{ detailXlsmName }}</div>
+        </div>
+        <div v-for="(item, index) in uncertainResult" :key="index">
+          <van-cell
+            :value="item.type"
+            :label="
+              item.正确答案 === '无'
+                ? `答案：${item.答案}`
+                : `答案：${item.正确答案}`
+            "
+          >
+            <template #title>
+              <div style="font-size: larger; font-weight: 700">
+                {{ item.英文 }}
               </div>
             </template>
           </van-cell>
