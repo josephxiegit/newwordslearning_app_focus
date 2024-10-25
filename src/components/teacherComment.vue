@@ -62,6 +62,7 @@ function processDatetime(res) {
       is_spell_number,
       spell_words,
       lock_spell,
+      is_pinned
     } = item;
 
     const formattedCreateTime = formatDateString(create_time);
@@ -116,6 +117,7 @@ function processDatetime(res) {
       spell_words,
       lock_spell: lock_spell_format,
       spell_words_length: spell_words_length,
+      is_pinned
     };
   });
 }
@@ -130,6 +132,7 @@ async function queryData() {
 
 function getListData() {
   queryData().then((res) => {
+    // console.log('res: ', res);
     res = processDatetime(res);
     originalData.value = [...res];
     filterXlsmData.value = [...res];
@@ -503,6 +506,7 @@ function processData(res) {
       is_spell_number,
       lock_spell,
       spell_words,
+      is_pinned
     } = item;
     // let dataAnswers = answers.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
     // dataAnswers = dataAnswers.replace(
@@ -554,6 +558,7 @@ function processData(res) {
       is_spell_number,
       lock_spell: lock_spell_format,
       spell_words,
+      is_pinned
     };
   });
 }
@@ -692,6 +697,7 @@ const valueReversed = ref(0);
 const valueNoneOfAbove = ref(0);
 const valueCoins = ref(2000);
 const valueContents = ref("");
+const valueIsPinned = ref("");
 const valueNid = ref("");
 const valueIsSpell = ref(3);
 const editData = (index) => {
@@ -699,6 +705,7 @@ const editData = (index) => {
   console.log("itemEdit: ", itemEdit.value);
 
   showReviseData.value = true;
+  valueIsPinned.value = itemEdit.value.is_pinned ? 1 : 0;
   valueAlias.value = itemEdit.value.alias;
   valueTitle.value = itemEdit.value.title;
   valueStar.value = itemEdit.value.rate;
@@ -773,7 +780,6 @@ const showSpellVocabulary = async () => {
   // 二执行
   let selectSpellWords;
   if (res.length) {
-    console.log("res: ", res);
     // selectSpellWords = JSON.parse(res[0].data_words);
     let dataString = res[0].data_words.replace(/(\W)'|'(\W)/g, '$1"$2');
     selectSpellWords = JSON.parse(
@@ -837,6 +843,7 @@ async function reviseUserData() {
   params.append("merge_option", valueMerge.value);
   params.append("reversd_number", valueReversed.value);
   params.append("none_of_above", valueNoneOfAbove.value);
+  params.append("is_pinned", valueIsPinned.value);
   params.append("is_spell_number", valueIsSpell.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
@@ -1444,7 +1451,8 @@ const reloadPage = () => {
           <template #title>
             <div style="display: flex; flex-direction: column">
               <van-tag color="#ffe1e1" text-color="#ad0000" plain
-                >{{ item.username }} ｜ 游戏{{ item.swipe }}次</van-tag
+                >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon color="blue"  style="font-weight:700" v-if="item.is_pinned && item.rate < 3" name="link-o" />
+                </van-tag
               >
               <van-tag
                 v-if="item.lock_spell == true"
@@ -1546,12 +1554,15 @@ const reloadPage = () => {
               >
                 {{ item.attempt }}次
               </div>
+
               <div v-if="item.view == null">
                 <div style="margin-left: -2rem">0次</div>
               </div>
               <div v-else>
-                <div style="margin-left: -2rem">{{ item.view }}次</div>
+                  
+                  <div style="margin-left: -2rem">{{ item.view }}次</div>
               </div>
+
             </div>
           </template>
           <template #right-icon>
@@ -1685,6 +1696,11 @@ const reloadPage = () => {
         <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
           正常选项数：0｜以上都不对：1
         </div>
+        <van-field
+          v-model="valueIsPinned"
+          label="置顶"
+          placeholder="请输入0或1"
+        />
         <van-field
           v-model="valueIsSpell"
           label="拼写"

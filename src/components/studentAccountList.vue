@@ -47,6 +47,7 @@ const gobackHomepage = () => {
   localStorage.removeItem("expirationDate");
   sessionStorage.removeItem("missyouAnimationShown");
   sessionStorage.removeItem("shineThreeStarShown");
+  localStorage.removeItem("theme_name");
   router.push({
     path: "/homepage",
   });
@@ -1310,11 +1311,9 @@ watch(showChooseMode, (newValue) => {
 const gotoItem = (index) => {
   indexAnswer.value = index;
   // 预热熊出没
-  if(originalData.value[index]["alias"] == "期中庆典"){
+  if (originalData.value[index]["alias"] == "期中庆典") {
     showbearWarmup();
   }
-
-
 
   // 是否限制普通模式
   if (originalData.value[index]["type"] == 1) {
@@ -1845,8 +1844,37 @@ const onLoadOriginalData = async (title = "全部") => {
             };
           }
         });
+        // // 根据标题的固定部分分组
+        // const groups = moreData.reduce((acc, item) => {
+        //   const base = item.title_base;
+        //   if (!acc[base]) {
+        //     acc[base] = [];
+        //   }
+        //   acc[base].push(item);
+        //   return acc;
+        // }, {});
+        // // 对每个分组进行排序，并且对整个分组也按照 create_time 进行排序
+        // const sortedGroups = Object.values(groups)
+        //   .map((group) => {
+        //     group.sort((a, b) => a.title_num - b.title_num); // 组内按 title_num 升序
+        //     return group;
+        //   })
+        //   .sort(
+        //     (a, b) => new Date(b[0].create_time) - new Date(a[0].create_time)
+        //   ); // 组间按 create_time 降序
+
+        // // 将分组后的数据合并回数组
+        // const result = sortedGroups.flat();
+        // 将 is_pinned 为 true 且 rate < 3 的项放到最前面
+        const pinnedItems = moreData.filter(
+          (item) => item.is_pinned && item.rate < 3
+        );
+        const otherItems = moreData.filter(
+          (item) => !(item.is_pinned && item.rate < 3)
+        );
+
         // 根据标题的固定部分分组
-        const groups = moreData.reduce((acc, item) => {
+        const groups = otherItems.reduce((acc, item) => {
           const base = item.title_base;
           if (!acc[base]) {
             acc[base] = [];
@@ -1854,6 +1882,7 @@ const onLoadOriginalData = async (title = "全部") => {
           acc[base].push(item);
           return acc;
         }, {});
+
         // 对每个分组进行排序，并且对整个分组也按照 create_time 进行排序
         const sortedGroups = Object.values(groups)
           .map((group) => {
@@ -1865,7 +1894,8 @@ const onLoadOriginalData = async (title = "全部") => {
           ); // 组间按 create_time 降序
 
         // 将分组后的数据合并回数组
-        const result = sortedGroups.flat();
+        const result = [...pinnedItems, ...sortedGroups.flat()];
+
         return result;
       }
 
@@ -2012,6 +2042,69 @@ function showToggleTheme() {
   }
   animationVisible.value = !animationVisible.value;
 }
+
+// 临考模式
+const selectedItems = ref([]);
+const valueDropdown = ref(0);
+const optionDropdown = ref([
+  { text: "普通模式", value: 0 },
+  { text: "临考模式", value: 1 },
+]);
+const cellValue = ref(true);
+const isMultiSelectMode = ref(false);
+const toggleMultiSelectMode = () => {
+  cellValue.value = !cellValue.value;
+  isMultiSelectMode.value = !isMultiSelectMode.value;
+  if (!isMultiSelectMode.value) {
+    // 清除所有选择
+    selectedItems.value = [];
+  }
+};
+const selectItem = (index) => {
+  const selectedIndex = selectedItems.value.indexOf(index);
+  if (selectedIndex !== -1) {
+    selectedItems.value.splice(selectedIndex, 1);
+  } else {
+    selectedItems.value.push(index);
+  }
+};
+const gotoPreExam = () => {
+  // console.log(originalData.value);
+  if(selectedItems.value.length == 1) {
+    showFailToast("至少选择俩项");
+    return;
+  }
+  const titles = selectedItems.value.map(id => {
+    return originalData.value[id].title;
+  });
+  const titlesHtml = titles.map(item => `<div style="text-align: left;">${item}</div>`).join('');
+  showConfirmDialog({
+    title: '确定将以下生成考前复习',
+    message: titlesHtml,
+    theme: 'round-button',
+    allowHtml: true
+  })
+  .then(async () => {
+    // let account_id_list = selectedItems.value.map(id => originalData.value[id].nid);
+    // const params = new URLSearchParams();
+    // params.append("method", "getPreExam");
+    // params.append("account_id_list", JSON.stringify(account_id_list));
+    // isLoading.value = true;
+    // const dataPreExam = await axios.post("words/", params);
+    // console.log('dataPreExam: ', dataPreExam.data);
+    // isLoading.value = false;
+    showToast("敬请期待")
+  })
+
+
+
+
+  // console.log('account_id_list:', account_id_list);
+  
+}
+
+
+
 onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("beforeunload", handlePageUnload);
@@ -2029,12 +2122,38 @@ function showbearWarmup() {
 }
 // 主题
 onMounted(async () => {
-  if (flagTheme.value == 1) {
-    srcTheme.value = chooseModelSrcGoatAndWolf;
+  const user =
+    (history.state.data && JSON.parse(history.state.data).username) ||
+    history.state.username;
+
+  async function getUserTheme() {
+    let params = new URLSearchParams();
+    params.append("method", "getUserTheme");
+    params.append("user", user);
+
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data.theme;
+    });
   }
-  if (flagTheme.value == 2) {
-    srcTheme.value = chooseModelSrcBears;
-  }
+  getUserTheme().then((res) => {
+    // console.log("userTheme", res);
+    if (res.theme == 1) {
+      localStorage.setItem("theme_name", "喜羊羊与灰太狼");
+    }
+    if (res.theme == 2) {
+      localStorage.setItem("theme_name", "熊出没");
+    }
+
+    flagTheme.value = res.theme;
+    // console.log("flagTheme.value", flagTheme.value);
+
+    if (flagTheme.value == 1) {
+      srcTheme.value = chooseModelSrcGoatAndWolf;
+    }
+    if (flagTheme.value == 2) {
+      srcTheme.value = chooseModelSrcBears;
+    }
+  });
 
   document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("beforeunload", handlePageUnload);
@@ -2053,7 +2172,6 @@ onMounted(async () => {
   missDays.value = history.state?.missDays ?? NaN;
   await nextTick(); // 等待页面完全渲染
 
-  console.log("flagRate: ", flagRate.value);
   // flagRate.value = 3;
   if (flagRate.value !== undefined) {
     if (flagRate.value > 2.8) {
@@ -2067,7 +2185,7 @@ onMounted(async () => {
       sessionStorage.setItem("shineThreeStarShown", "true");
     }
   }
-
+  console.log("flagRate: ", flagRate.value);
   // 加载数据
   originalData.value = [];
   let res = new Promise((resolve, reject) => {
@@ -2116,7 +2234,6 @@ onMounted(async () => {
     }
     // console.log('username', username.value);
     getUserCoins().then((res) => {
-      console.log("res: ", res);
       usercoins.value = res["data_coins"][0]["coins"];
       console.log("usercoins: ", usercoins.value);
     });
@@ -2124,10 +2241,7 @@ onMounted(async () => {
   });
   // flagRate.value = 3;
   res = res.then(() => {
-    if (
-      flagRate.value === 3 &&
-      !sessionStorage.getItem("shineThreeStarShown")
-    ) {
+    if (flagRate.value >= 3 && !localStorage.getItem("giveBears")) {
       // 判断赠送 Bears
       async function checkExecutionBears() {
         let params = new URLSearchParams();
@@ -2153,6 +2267,7 @@ onMounted(async () => {
             console.log("res", res);
             flagTheme.value = 2;
             localStorage.setItem("theme_name", "熊出没");
+            localStorage.setItem("giveBears", true);
             showToggleTheme();
           });
         }
@@ -2167,12 +2282,25 @@ onMounted(async () => {
     <div class="nav-bar-container">
       <van-nav-bar
         :right-text="username"
-        left-text="首页"
-        @click-left="gobackHomepage"
+        :left-text="isMultiSelectMode ? '确定选择' : '首页'"
+        @click-left="isMultiSelectMode ? gotoPreExam() : gobackHomepage()"
       >
         <template #title>
           <div>任务列表</div>
         </template>
+
+        <!-- <template #right>
+          <div
+            @click="toggleMultiSelectMode"
+            style="margin-right: 1rem; color: #1a89fa; font-size: 14px"
+          >
+            <div v-if="isMultiSelectMode">取消</div>
+            <div v-else>临考模式</div>
+            
+          </div>
+          <div style="color: #1a89fa; font-size: 14px">{{ username }}</div>
+        </template> -->
+
       </van-nav-bar>
     </div>
 
@@ -2213,6 +2341,7 @@ onMounted(async () => {
         <!-- 共完成任务 -->
         <div style="display: flex; margin-top: 2rem">
           <div style="margin-top: 0.2rem">共完成</div>
+
           <img
             src="../assets/item_list_complete.png"
             style="
@@ -2245,6 +2374,14 @@ onMounted(async () => {
       </div>
     </div>
 
+    <van-dropdown-menu>
+      <van-dropdown-item
+        v-model="valueDropdown"
+        :options="optionDropdown"
+        @change="toggleMultiSelectMode(valueSort)"
+      />
+    </van-dropdown-menu>
+
     <van-tabs
       v-model:active="activeTabs"
       @click-tab="onClickTab"
@@ -2265,7 +2402,8 @@ onMounted(async () => {
                 is-link
                 center
                 clickable
-                @click="gotoItem(index)"
+                @click="isMultiSelectMode ? selectItem(index) : gotoItem(index)"
+                :class="{ 'pin-background': item.is_pinned && item.rate < 3 }"
                 class="custom-cell"
               >
                 <template #icon>
@@ -2306,7 +2444,6 @@ onMounted(async () => {
                     v-if="item.swipe == 0"
                     style="display: flex; align-items: flex-start; width: 160%"
                   >
-                  
                     <img
                       v-show="item.alias == '期中庆典'"
                       src="../assets/Boonie Bears/edge.png"
@@ -2333,7 +2470,7 @@ onMounted(async () => {
                     v-else
                     style="display: flex; align-items: flex-start; width: 160%"
                   >
-                  <img
+                    <img
                       v-show="item.alias == '期中庆典'"
                       src="../assets/Boonie Bears/edge.png"
                       style="
@@ -2450,6 +2587,26 @@ onMounted(async () => {
                       :show-pivot="true"
                       :inactive="item.progressPercentage === 100"
                     />
+                  </div>
+                </template>
+
+                <template #right-icon>
+                  <van-checkbox
+                    v-if="isMultiSelectMode"
+                    :checked="selectedItems.includes(index)"
+                    @click.stop="selectItem(index)"
+                  />
+                  <div v-else>
+                    <div
+                      v-if="item.is_pinned && item.rate < 3"
+                      style="display: flex; flex-direction: column"
+                    >
+                      <van-icon name="link-o" style="margin-bottom: 1.7rem" />
+                      <van-icon name="arrow" style="margin-bottom: 1.95rem" />
+                    </div>
+                    <div v-else>
+                      <van-icon name="arrow" style="margin-bottom: 1rem" />
+                    </div>
                   </div>
                 </template>
               </van-cell>
@@ -2599,7 +2756,7 @@ onMounted(async () => {
                   is-link
                   center
                   clickable
-                  @click="gotoItem(index)"
+                  @click="isMultiSelectMode ? selectItem(index) : gotoItem(index)"
                   class="custom-cell"
                 >
                   <template #icon>
@@ -2806,6 +2963,17 @@ onMounted(async () => {
                       />
                     </div>
                   </template>
+
+                  <template #right-icon>
+                    <van-checkbox
+                      v-if="isMultiSelectMode"
+                      :checked="selectedItems.includes(index)"
+                      @click.stop="selectItem(index)"
+                    />
+                    <div v-else>
+                      <van-icon name="arrow" style="margin-bottom: 1rem" />
+                    </div>
+                  </template>
                 </van-cell>
               </div>
 
@@ -2983,6 +3151,15 @@ onMounted(async () => {
               class="close-icon-checkAnswer"
               @click="handleCloseClickCheckAnswer"
             />
+            <p
+              style="color: lightcoral"
+              v-if="
+                originalData[gotoIndex]['is_pinned'] &&
+                originalData[gotoIndex]['rate'] < 3
+              "
+            >
+              <van-icon name="link-o" /> 老师置顶了这组试题，希望你尽快完成
+            </p>
           </div>
         </template>
         <template #footer>
@@ -3117,6 +3294,15 @@ onMounted(async () => {
         <div>
           <div style="margin-bottom: 1rem; margin-top: -0.8rem">
             模式选择
+            <p
+              style="color: lightcoral; font-size: smaller; margin-top: -0.1rem"
+              v-if="
+                originalData[gotoIndex]['is_pinned'] &&
+                originalData[gotoIndex]['rate'] < 3
+              "
+            >
+              <van-icon name="link-o" /> 老师置顶了这组试题，希望你尽快完成
+            </p>
             <van-progress
               style="margin-top: 0.5rem"
               :pivot-text="`选项难度 ${difficultyCoefficient}`"
@@ -3204,11 +3390,7 @@ onMounted(async () => {
     </div>
 
     <!-- 预热庆祝 -->
-    <bearWarmup
-      ref="bearWarmupRef"
-      v-if="showbearWarmup"
-    />
-
+    <bearWarmup ref="bearWarmupRef" v-if="showbearWarmup" />
 
     <angryWolf ref="wolfBackRef" :dialogPosition="dialogPosition" />
     <missyou ref="missyouRef" :days="missDays" />
@@ -3359,5 +3541,30 @@ onMounted(async () => {
   .custom-cell {
     width: 95%;
   }
+}
+
+.pin-background {
+  background-color: rgba(245, 245, 245, 0.5); /* 浅灰色背景 */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(200, 200, 200, 0.1) 5px,
+    /* 更浅的灰色线条 */ rgba(245, 245, 245, 0.5) 10px /* 浅灰色交错 */
+  );
+}
+
+.van-dropdown-menu {
+  --van-dropdown-menu-height: 40px;
+  --van-dropdown-menu-shadow: 0 0 0 0;
+  --van-dropdown-menu-background: transparent;
+  width: 20%;
+  margin-bottom: -0.5rem;
+  margin-top: -0.5rem;
+}
+.van-dropdown-menu__title {
+  padding-left: 0.3rem;
+  background-color: transparent;
+  font-size: 13px !important;
 }
 </style>

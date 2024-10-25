@@ -474,8 +474,10 @@ const showViewers = (item, index) => {
     columnsReviseViewers.value = [];
     columnsReviseViewers.value = viewerData.map((item) => item.viewer_name);
 
-    checkedRevisedViewers.value = res;
-    // console.log("checkedRevisedViewers: ", checkedRevisedViewers.value);
+    checkedRevisedViewers.value = res['viewer_name_list'];
+    checkedRevisedThemes.value = res['theme_name_list'];
+    console.log("checkedRevisedViewers: ", checkedRevisedViewers.value);
+    console.log("checkedRevisedThemes: ", checkedRevisedThemes.value);
     columnsReviseViewers.value.sort((a, b) => {
       if (
         checkedRevisedViewers.value.includes(a) &&
@@ -496,6 +498,7 @@ const showViewers = (item, index) => {
 };
 const toggleViewerRevised = (index) => {
   checkboxRefsViewerRevised.value[index].toggle();
+  
 };
 
 const viewersRevised = () => {
@@ -509,6 +512,7 @@ const viewersRevised = () => {
     let params = new URLSearchParams();
     params.append("method", "reviseUserViewers");
     params.append("viewer_names", JSON.stringify(checkedRevisedViewers.value));
+    params.append("theme_names", JSON.stringify(checkedRevisedThemes.value));
     params.append("username", userAccount.value);
     params.append("location", valueLocation.value);
     params.append("grade", valueGrade.value);
@@ -525,6 +529,15 @@ const viewersRevised = () => {
     .then(() => {
       closeToast();
     });
+};
+
+// 学生显示已有theme
+const columnsReviseThemes = ref(["喜羊羊与灰太狼", "熊出没"]);
+const checkedRevisedThemes = ref([]);
+const checkboxRefsThemeRevised = ref([]);
+const toggleThemeRevised = (index) => {
+  checkboxRefsThemeRevised.value[index].toggle();
+  // console.log("checkedRevisedThemes: ", checkedRevisedThemes.value);
 };
 
 // 地点
@@ -551,9 +564,7 @@ const columnsStatus = [
 const onConfirmStatus = ({ selectedValues }) => {
   showStatusPicker.value = false;
   valueStatus.value = selectedValues[0];
-}
-
-
+};
 
 // 增加新生
 const showNewStudent = ref(false);
@@ -1964,6 +1975,30 @@ const viewersConfirm = () => {
           </van-cell>
         </van-cell-group>
       </van-checkbox-group>
+
+        <!-- 主题查看 -->
+        <van-checkbox-group v-model="checkedRevisedThemes">
+        <van-cell-group inset>
+          <div style="margin: 1rem 0 0 0.1rem">主题查看</div>
+          <van-cell
+            v-for="(item, index) in columnsReviseThemes"
+            clickable
+            :key="item"
+            :title="`${item}`"
+            @click="item !== '喜羊羊与灰太狼' && toggleThemeRevised(index)"
+          >
+            <template #right-icon>
+              <van-checkbox
+                :name="item"
+                :ref="(el) => (checkboxRefsThemeRevised[index] = el)"
+                :disabled="item === '喜羊羊与灰太狼'"
+                @click.stop
+              />
+            </template>
+          </van-cell>
+        </van-cell-group>
+      </van-checkbox-group>
+
       <van-button
         type="warning"
         block
@@ -1994,19 +2029,6 @@ const viewersConfirm = () => {
 .van-checkbox {
   margin-left: 0px;
 }
-/* .selected-cell {
-  background-color: #f0f0f0;
-}
-.gray-background {
-  background-color: #faf0ff;
-  background-image: repeating-linear-gradient(
-    45deg,
-    transparent,
-    transparent 2px,
-    rgba(128, 0, 128, 0.1) 5px,
-    rgba(128, 0, 128, 0.1) 10px
-  );
-} */
 
 .selected-cell2 {
   background-color: #faf0ff;

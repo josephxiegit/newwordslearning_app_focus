@@ -130,7 +130,7 @@ const searchpurchase = (item, index) => {
             }
           }
         });
-      } 
+      }
       // console.log("purchaseLog", purchaseDetail.value);
       resolve();
     });
@@ -542,6 +542,8 @@ const onLoadOriginalData = async (title = "全部") => {
       };
       originalData.value.push(newItem);
     });
+    originalItems.value = [...originalData.value];
+    valueSort.value = 0;
     pageIndexOriginalData.value++;
   }
   finishedOriginalData.value = !response.data.has_more;
@@ -710,11 +712,43 @@ const toggleLocationSelection = (index) => {
   onLoadOriginalData(listTabs[activeTabs.value]);
 };
 
+// 排序页面
+const valueSort = ref(0);
+const originalItems = ref([]);
+const optionSort = [
+  { text: "默认排序", value: 0 },
+  { text: "置顶排序", value: 1 },
+];
+const onclickOptionSort = (valueSort) => {
+  if (valueSort === 0) {
+    // 取消置顶
+    originalData.value = [...originalItems.value];
+  }
+
+  if (valueSort == 1) {
+    // 选中置顶
+    originalItems.value = [...originalData.value];
+    originalData.value = [...originalData.value].sort((a, b) => {
+      // 判断a和b是否满足is_pinned为true且rate小于3
+      const aPinnedAndLowRate = a.is_pinned && a.rate < 3;
+      const bPinnedAndLowRate = b.is_pinned && b.rate < 3;
+
+      if (aPinnedAndLowRate && !bPinnedAndLowRate) {
+        return -1;
+      } else if (!aPinnedAndLowRate && bPinnedAndLowRate) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+  }
+};
+
 const viewername = ref("");
 const usersData = ref("");
 onMounted(async () => {
   const data = JSON.parse(history.state.data);
-  // console.log("data: ", data);
+  console.log("data: ", data);
   viewername.value = data.viewer_data[0].viewer_name;
   if (viewername.value === "josephxie") showGridLocation.value = true;
   // console.log("viewername: ", viewername.value);
@@ -777,11 +811,13 @@ const reloadPage = () => {
     </van-tabbar>
 
     <!-- 数据列表 -->
+    <!-- Grid -->
     <van-grid
       v-show="showGridLocation"
       direction="horizontal"
       clickable
-      icon-size="18"
+      icon-size="14"
+      :column-num="4"
     >
       <van-grid-item
         v-for="(item, index) in locationitems"
@@ -790,8 +826,17 @@ const reloadPage = () => {
         :text="item.text"
         :class="{ selected: selectedIndexLocation === index }"
         @click="toggleLocationSelection(index)"
+        class="custom-grid-item"
       />
     </van-grid>
+    <!-- Dropdown -->
+    <van-dropdown-menu>
+      <van-dropdown-item
+        v-model="valueSort"
+        :options="optionSort"
+        @change="onclickOptionSort(valueSort)"
+      />
+    </van-dropdown-menu>
 
     <van-tabs
       class="tabs-container"
@@ -936,6 +981,23 @@ const reloadPage = () => {
                         "
                       >
                         {{ processedTitle(item.title) }}
+                      </div>
+                    </template>
+
+                    <template #right-icon>
+                      <div
+                        v-if="item.is_pinned && item.rate < 3"
+                        style="display: flex; flex-direction: column"
+                      >
+                        <van-icon
+                          name="link-o"
+                          size="0.6rem"
+                          style="
+                            margin-bottom: 4.4rem;
+                            margin-left: -0.8rem;
+                            color: blue;
+                          "
+                        />
                       </div>
                     </template>
                   </van-cell>
@@ -1213,6 +1275,23 @@ const reloadPage = () => {
                           <div>{{ processedTitle(item.title) }}</div>
                         </div>
                       </template>
+
+                      <template #right-icon>
+                        <div
+                          v-if="item.is_pinned && item.rate < 3"
+                          style="display: flex; flex-direction: column"
+                        >
+                          <van-icon
+                            name="link-o"
+                            size="0.6rem"
+                            style="
+                              margin-bottom: 4.3rem;
+                              margin-left: -0.8rem;
+                              color: blue;
+                            "
+                          />
+                        </div>
+                      </template>
                     </van-cell>
                   </div>
 
@@ -1401,7 +1480,7 @@ const reloadPage = () => {
         </div>
 
         <!-- 购买星星记录 -->
-         <div v-if="Object.keys(purchaseDetail).length > 0">
+        <div v-if="Object.keys(purchaseDetail).length > 0">
           <div
             style="
               margin: 1rem 0 1rem 1rem;
@@ -1418,7 +1497,7 @@ const reloadPage = () => {
               <span>本次背诵购买了{{ type }}{{ count }}次</span>
             </div>
           </div>
-          <van-divider  />
+          <van-divider />
         </div>
 
         <!-- 预习记录 -->
@@ -1930,5 +2009,14 @@ const reloadPage = () => {
 .selected {
   background-color: #1e90ff; /* 自定义深蓝色 */
   color: #1e90ff; /* 可选：改变文字颜色 */
+}
+
+.van-dropdown-menu {
+  --van-dropdown-menu-title-font-size: 12px;
+  --van-dropdown-menu-height: 30px;
+  --van-dropdown-menu-shadow: 0 0 0 0;
+  width: 20%;
+  margin-bottom: -0.5rem;
+  margin-left: 0rem;
 }
 </style>

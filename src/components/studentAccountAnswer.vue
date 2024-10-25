@@ -298,6 +298,7 @@ onMounted(async () => {
     newCoins.value = history.state.newCoins;
     userSelected.value = JSON.parse(history.state.userSelected);
     rate.value = history.state.rate;
+    console.log("rate", rate.value);
     nid.value = history.state.nid;
     halfTrue.value = history.state.halfTrue;
     resolve(compareResult.value);

@@ -452,7 +452,7 @@ const clickSubmitUser = async (action, done) => {
         }
         // 如果 updateAccountlog 成功，继续执行其他操作
         const accountDataResult = await updateAccountData();
-        // console.log("accountDataResult: ", accountDataResult);
+        console.log("accountDataResult: ", accountDataResult);
         if (accountDataResult === "不能提交相同内容") {
           isLoading.value = false;
           showDialog({
@@ -477,7 +477,7 @@ const clickSubmitUser = async (action, done) => {
 
         // 如果所有操作都成功，处理结果
         isLoading.value = false;
-        // console.log(accountDataResult);
+        console.log(accountDataResult);
         // console.log(rate);
 
         // 清楚store

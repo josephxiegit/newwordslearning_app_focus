@@ -233,7 +233,14 @@ const globalState = reactive({
     user: '',
     password: ''
 });
-const flagTheme = ref(1);
+// const flagTheme = ref(1);
+const theme_name = localStorage.getItem("theme_name");
+const themeMapping = {
+    "喜羊羊与灰太狼": 1,
+    "熊出没": 2,
+  };
+const flagTheme = ref(themeMapping[theme_name] || 1);
+
 
 import {
     Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps,Divider, ActionSheet,
