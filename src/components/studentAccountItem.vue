@@ -252,8 +252,8 @@ const clickSubmitUser = async (action, done) => {
 
           if (
             item.flag !== "true" &&
-            !addedEnglishSet.has(english) 
-            && !isPhrase(english)
+            !addedEnglishSet.has(english) &&
+            !isPhrase(english)
           ) {
             spellVocabularyResult.push({
               英文: english,
@@ -423,6 +423,17 @@ const clickSubmitUser = async (action, done) => {
       }
 
       isLoading.value = true;
+      const redirectTimeout = setTimeout(() => {
+        isLoading.value = false; // 先停止加载状态
+
+        showDialog({
+          title: "网络延迟",
+          message: "请重新登陆，上次答题将会正常提交",
+          theme: "round-button",
+        }).then(() => {
+          router.push("/homepage");
+        });
+      }, 20000);
 
       // console.log('compareResult', compareResult);
       if (compareResult.length == 0) {
@@ -431,6 +442,7 @@ const clickSubmitUser = async (action, done) => {
         return;
       } else {
         function redirect() {
+          clearTimeout(redirectTimeout);
           router.push({
             path: "/studentAccountAnswer",
             state: {
@@ -577,8 +589,8 @@ const purchaseMagic = async () => {
     showMagic.value = true;
     const res = await getUserCoins();
     flagHelp.value = false;
-    usercoins.value = res["data_coins"][0]['coins'];
-    usercoinsEnd.value = res["data_coins"][0]['coins'];;
+    usercoins.value = res["data_coins"][0]["coins"];
+    usercoinsEnd.value = res["data_coins"][0]["coins"];
     await nextTick(); // 确保 DOM 更新完毕后再启动动画
     rollingTextRef.value.start();
   }
@@ -1013,6 +1025,19 @@ const helpOutside = () => {
     });
   }
 };
+// 单词发音
+const speakWord = (word) => {
+  // 发音
+  let utterance;
+  utterance = new SpeechSynthesisUtterance(word);
+  if (!/[a-zA-Z]/.test(word)) {
+    utterance.lang = "zh-CN";
+  } else {
+    utterance.lang = "en-US";
+  }
+  window.speechSynthesis.speak(utterance);
+  
+}
 
 // 动画鼓励
 const encouragementRef = ref(null);
@@ -1323,7 +1348,7 @@ onMounted(async () => {
           <!-- 显示英文单词和序号，加粗显示 -->
           <van-cell clickable class="bold-title border-cell">
             <template #title>
-              <div style="display: flex; align-items: center">
+              <div style="display: flex; align-items: center" @click="speakWord(item.英文)">
                 <div
                   style="
                     line-height: 1;
@@ -1333,6 +1358,10 @@ onMounted(async () => {
                   "
                 >
                   {{ item.序号 + ". " + item.英文 }}
+                  <img
+                    src="../assets/speaker.png"
+                    style="width: 12px; height: auto; margin-left: 0.5rem;margin-top: 0.1rem"
+                  />
                 </div>
                 <div
                   class="selected-tags"
@@ -1351,10 +1380,13 @@ onMounted(async () => {
                       selected.key.split('-')[0] == String(index)
                     "
                     :key="index2"
-                    style="color:orange"
+                    style="color: orange"
                     class="flying-tag"
                     @click="removeSelected(index2)"
-                    :style="{ padding: '0px 0px 0.3rem 0px', 'white-space': 'pre' }"
+                    :style="{
+                      padding: '0px 0px 0.3rem 0px',
+                      'white-space': 'pre',
+                    }"
                   >
                     {{ selected.label }}
                   </div>

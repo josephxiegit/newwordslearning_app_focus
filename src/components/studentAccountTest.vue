@@ -451,7 +451,20 @@ const clickSubmitUser = async (action, done) => {
     console.log("newCoins: ", newCoins);
 
     isLoading.value = true;
+    const redirectTimeout = setTimeout(() => {
+      isLoading.value = false; // 先停止加载状态
+
+      showDialog({
+        title: "网络延迟",
+        message: "请重新登陆，上次答题将会正常提交",
+        theme: "round-button",
+      }).then(() => {
+        router.push("/homepage");
+      });
+    }, 20000);
+
     function redirect() {
+      clearTimeout(redirectTimeout);
       router.push({
         path: "/studentAccountAnswer",
         state: {
@@ -1391,7 +1404,7 @@ onMounted(async () => {
       };
 
       const res = await getUserCoins();
-      usercoins.value = res["data_coins"][0]['coins'];
+      usercoins.value = res["data_coins"][0]["coins"];
       // console.log("usercoins: ", usercoins.value);
 
       usercoinsStart.value = 0;

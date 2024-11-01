@@ -257,7 +257,7 @@ const clickSubmitUser = async (action, done) => {
       const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
       function isPhrase(text) {
-          return /\s|,|\/|\.|…/.test(text);
+        return /\s|,|\/|\.|…/.test(text);
       }
 
       compareResult.forEach((item) => {
@@ -429,7 +429,20 @@ const clickSubmitUser = async (action, done) => {
   // console.log("newCoins: ", newCoins);
 
   isLoading.value = true;
+  const redirectTimeout = setTimeout(() => {
+    isLoading.value = false; // 先停止加载状态
+
+    showDialog({
+      title: "网络延迟",
+      message: "请重新登陆，上次答题将会正常提交",
+      theme: "round-button",
+    }).then(() => {
+      router.push("/homepage");
+    });
+  }, 20000);
+
   function redirect() {
+    clearTimeout(redirectTimeout);
     router.push({
       path: "/studentAccountAnswer",
       state: {
@@ -545,59 +558,6 @@ const lastClickTime = ref(null);
 const totalTimeInterval = ref(0);
 const standardTimeInterval = ref(0);
 
-// const toggleCheckChinese = (index, index2) => {
-//   const key = `${index}-${index2}`;
-//   const checkboxRef = checkboxRefs.value[key];
-
-//   if (checkboxRef) {
-//     checkboxRef.toggle();
-//   }
-
-//   // 捕捉用户是否取消了选项
-//   const wasSelected = selectedIndexes.value[key]; // 之前的状态
-//   selectedIndexes.value[key] = !wasSelected; // 切换状态
-//   if (wasSelected && !synonymsOptions.value[index].is_spell) {
-//     addUncertain(index, "撤销");
-//   }
-
-//   const selectedChineses = selectedResults.value[index] || [];
-//   const currentChinese = synonymsOptions.value[index].中文[index2];
-//   const is_spell_selectedItems = synonymsOptions.value[index].is_spell;
-//   if (selectedIndexes.value[key]) {
-//     if (!selectedChineses.includes(currentChinese)) {
-//       selectedChineses.push(currentChinese);
-//       // 更新选中的项列表
-//       selectedItems.value.push({
-//         label: currentChinese,
-//         key: key,
-//         is_spell: is_spell_selectedItems,
-//       });
-//     }
-//   } else {
-//     const removeIndex = selectedChineses.indexOf(currentChinese);
-//     if (removeIndex !== -1) {
-//       selectedChineses.splice(removeIndex, 1);
-//     }
-//     // 从选中的项列表中移除
-//     selectedItems.value = selectedItems.value.filter(
-//       (item) => item.key !== key
-//     );
-//   }
-
-//   selectedResults.value[index] = selectedChineses;
-
-//   // 合并答案和选项
-//   mergedData.value = mergeAnswerAndSynonym();
-
-//   // 将用户选择转化为中文
-//   const synonymsSelectedChinese = convertSelections(
-//     synonymsSelected.value,
-//     synonymsOptions.value
-//   );
-
-//   // 将中文用户选择和选项答案合并
-//   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-// };
 let originalChinese = "";
 const toggleCheckChinese = (index, index2) => {
   const key = `${index}-${index2}`;
@@ -786,6 +746,15 @@ const toggleCheckChinese = (index, index2) => {
 
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
+}
+function speakWord(word) {
+  // 发音
+  const utterance = new SpeechSynthesisUtterance(word);
+  // utterance.lang = 'en-US';
+  utterance.lang = "zh-CN";
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance);
+  }, 800);
 }
 
 const submitFlag = ref(false);
@@ -1394,6 +1363,8 @@ const handleSwipeChange = (index) => {
     autoplay2.value = autoplayInit.value;
   }
   // console.log(autoplay2.value);
+  speakWord(synonymsOptions.value[index]["英文"]);
+
   showAnswerIsSpell.value = "";
   // selectedItems.value = [];
   currentIndex.value = index;
@@ -1479,126 +1450,126 @@ onMounted(async () => {
   );
 
   const initData = async () => {
-      // 初始化数据
-      console.log("history.state: ", history.state);
-      const data = JSON.parse(history.state.data);
-      console.log("data: ", data);
+    // 初始化数据
+    console.log("history.state: ", history.state);
+    const data = JSON.parse(history.state.data);
+    console.log("data: ", data);
 
-      autoplay2.value = history.state.autoplay2;
-      autoplayInit.value = history.state.autoplay2;
-      // console.log("autoplay2: ", autoplay2.value);
+    autoplay2.value = history.state.autoplay2;
+    autoplayInit.value = history.state.autoplay2;
+    // console.log("autoplay2: ", autoplay2.value);
 
-      remainingSeconds.value = (autoplay2.value / 1000).toString();
-      totalSlides.value = data.answers.length;
+    remainingSeconds.value = (autoplay2.value / 1000).toString();
+    totalSlides.value = data.answers.length;
 
-      // console.log('totalSlides', totalSlides.value);
-      alias.value = data.alias;
-      lock_spell.value = history.state.lock_spell;
-      if (lock_spell.value) {
-        async function getSpellVocabulary() {
-          let params = new URLSearchParams();
-          params.append("method", "getSpellVocabulary");
-          params.append("username", data.username);
-          params.append("account_data_id", data.nid);
-          return await axios.post("words/", params).then((ret) => {
-            return ret.data.spell_vocabulary_records;
-          });
-        }
-        getSpellVocabulary().then((res) => {
-          spellVocabulary.value = res.flatMap((item) => {
-            let dataString = item["data_words"]
-              .replace(/(\W)'|'(\W)/g, '$1"$2')
-              .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3');
-            return JSON.parse(dataString);
-          });
-          console.log("spellVocabulary", spellVocabulary.value);
+    // console.log('totalSlides', totalSlides.value);
+    alias.value = data.alias;
+    lock_spell.value = history.state.lock_spell;
+    if (lock_spell.value) {
+      async function getSpellVocabulary() {
+        let params = new URLSearchParams();
+        params.append("method", "getSpellVocabulary");
+        params.append("username", data.username);
+        params.append("account_data_id", data.nid);
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data.spell_vocabulary_records;
         });
       }
-
-      if (data.coins >= 2000) {
-        isRewardEligible.value = false;
-      }
-      nid.value = history.state.nid;
-      synonymsOptions.value = data.synonyms;
-
-      console.log("synonymsOptions: ", synonymsOptions.value);
-
-      answers.value = data.answers;
-      synonymsOptions.value.forEach((item) => {
-        if (item.is_spell) {
-          const answerItem = answers.value.find(
-            (answer) => answer.序号 === item.序号
-          );
-          if (answerItem) {
-            answerItem.正确答案 = answerItem.英文;
-          }
-        }
+      getSpellVocabulary().then((res) => {
+        spellVocabulary.value = res.flatMap((item) => {
+          let dataString = item["data_words"]
+            .replace(/(\W)'|'(\W)/g, '$1"$2')
+            .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3');
+          return JSON.parse(dataString);
+        });
+        console.log("spellVocabulary", spellVocabulary.value);
       });
-      console.log("answers: ", answers.value);
+    }
 
-      titleData.value = data.title;
+    if (data.coins >= 2000) {
+      isRewardEligible.value = false;
+    }
+    nid.value = history.state.nid;
+    synonymsOptions.value = data.synonyms;
 
-      // console.log("titleData: ", titleData.value);
+    console.log("synonymsOptions: ", synonymsOptions.value);
+    speakWord(synonymsOptions.value[0]["英文"]);
 
-      const keywords = [
-        "中考",
-        "初中",
-        "七年级",
-        "八年级",
-        "九年级",
-        "小升初",
-        "六年级",
-      ];
-      if (keywords.some((keyword) => titleData.value.includes(keyword))) {
-        numberShowAnswer.value = 1;
-        numberTransparent.value = 1;
-        numberPrev.value = 1;
+    answers.value = data.answers;
+    synonymsOptions.value.forEach((item) => {
+      if (item.is_spell) {
+        const answerItem = answers.value.find(
+          (answer) => answer.序号 === item.序号
+        );
+        if (answerItem) {
+          answerItem.正确答案 = answerItem.英文;
+        }
       }
+    });
+    console.log("answers: ", answers.value);
 
-      username.value = data.username;
+    titleData.value = data.title;
 
-      submittoken.value = new Date().getTime();
-      // console.log("submittoken: ", submittoken.value);
+    // console.log("titleData: ", titleData.value);
 
-      const trueCount_is_spell =
-        synonymsOptions.value.filter((item) => item.is_spell === true).length ||
-        0;
-      standardTimeInterval.value =
-        (totalSlides.value - 1) * (autoplay2.value / 1000) +
-        0.2 * totalSlides.value +
-        trueCount_is_spell * 17000 +
-        3;
-      // console.log("standardTimeInterval: ", standardTimeInterval.value);
+    const keywords = [
+      "中考",
+      "初中",
+      "七年级",
+      "八年级",
+      "九年级",
+      "小升初",
+      "六年级",
+    ];
+    if (keywords.some((keyword) => titleData.value.includes(keyword))) {
+      numberShowAnswer.value = 1;
+      numberTransparent.value = 1;
+      numberPrev.value = 1;
+    }
 
-      flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+    username.value = data.username;
 
-      // 获取用户金币
-      const getUserCoins = async () => {
-        let params = new URLSearchParams();
-        params.append("method", "getUserCoins");
-        params.append("username", username.value);
-        const response = await axios.post("words/", params);
-        return response.data;
-      };
+    submittoken.value = new Date().getTime();
+    // console.log("submittoken: ", submittoken.value);
 
-      const res = await getUserCoins();
-      usercoins.value = res["data_coins"][0]['coins'];
-      // console.log("usercoins: ", usercoins.value);
+    const trueCount_is_spell =
+      synonymsOptions.value.filter((item) => item.is_spell === true).length ||
+      0;
+    standardTimeInterval.value =
+      (totalSlides.value - 1) * (autoplay2.value / 1000) +
+      0.2 * totalSlides.value +
+      trueCount_is_spell * 17000 +
+      3;
+    // console.log("standardTimeInterval: ", standardTimeInterval.value);
 
-      usercoinsStart.value = 0;
-      usercoinsEnd.value = usercoins.value;
+    flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
 
-      isLoading.value = false;
+    // 获取用户金币
+    const getUserCoins = async () => {
+      let params = new URLSearchParams();
+      params.append("method", "getUserCoins");
+      params.append("username", username.value);
+      const response = await axios.post("words/", params);
+      return response.data;
+    };
 
-      // 启动滚动文字动画
-      await nextTick(); // 确保 DOM 更新完毕后再启动动画
-      rollingTextRef.value.start();
+    const res = await getUserCoins();
+    usercoins.value = res["data_coins"][0]["coins"];
+    // console.log("usercoins: ", usercoins.value);
 
-      // 在动画启动后隐藏覆盖层
-      setTimeout(() => {
-        showOverlay.value = false;
-      }, 1500);
+    usercoinsStart.value = 0;
+    usercoinsEnd.value = usercoins.value;
 
+    isLoading.value = false;
+
+    // 启动滚动文字动画
+    await nextTick(); // 确保 DOM 更新完毕后再启动动画
+    rollingTextRef.value.start();
+
+    // 在动画启动后隐藏覆盖层
+    setTimeout(() => {
+      showOverlay.value = false;
+    }, 1500);
   };
 
   // 调用初始化函数

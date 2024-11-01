@@ -938,7 +938,8 @@ async function createSpellVocabulary(lock_spell, selectedVocabulary) {
 }
 
 const confirmSelectVocabulary = () => {
-  // console.log(synonymsSelected.value.length);
+  console.log('synonymsSelected', synonymsSelected.value);
+  console.log('selectSpellVocabulary', selectSpellVocabulary.value);
   // if (synonymsSelected.value.length == 0) {
   //   showSelectSpellVocabulary.value = false;
   //   return;
@@ -946,7 +947,7 @@ const confirmSelectVocabulary = () => {
   const selectedVocabulary = synonymsSelected.value.map((selected) => {
     // 找到序号对应的对象
     const item = selectSpellVocabulary.value.find(
-      (vocab) => vocab.序号 === parseInt(selected)
+      (vocab) => parseInt(vocab.序号, 10) === parseInt(selected)
     );
     // 返回只包含中文和英文的对象
     return { 中文: item.中文, 英文: item.英文 };
@@ -1912,4 +1913,19 @@ const reloadPage = () => {
   /* 添加你的样式，例如： */
   line-height: 1; /* 调整行高，确保内容适合新的单元格高度 */
 }
+
+
+.grid-item-text {
+  font-size: 16px; /* Default font size */
+  line-height: 1.2; /* Adjust line height as needed */
+  overflow: hidden; /* Hide overflow */
+  white-space: nowrap; /* Prevent text wrapping */
+  text-overflow: ellipsis; /* Show ellipsis for overflow text */
+}
+
+.grid-item-text {
+  /* Media query to reduce font size for items that exceed one line */
+  font-size: 12px; /* Adjust this size as needed */
+}
+
 </style>

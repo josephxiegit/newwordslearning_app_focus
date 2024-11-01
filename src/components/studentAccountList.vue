@@ -1208,6 +1208,18 @@ const goToNextPage = (
   }
 };
 
+const speakWord = (english, answer) => {
+  let utterance;
+  if (!/[a-zA-Z]/.test(english)) {
+    utterance = new SpeechSynthesisUtterance(answer);
+  } else {
+    utterance = new SpeechSynthesisUtterance(english);
+  }
+
+  utterance.lang = "en-US";
+  window.speechSynthesis.speak(utterance);
+};
+
 // 跳转下一面
 const showChooseMode = ref(false);
 const difficultyCoefficient = ref(30);
@@ -2045,15 +2057,29 @@ function showToggleTheme() {
 
 // 临考模式
 const selectedItems = ref([]);
+const dataPreExam = ref([]);
+const basicPreExam = ref([]);
+const account_id_list = ref([]);
 const valueDropdown = ref(0);
+const preExamShow = ref(false);
 const optionDropdown = ref([
   { text: "普通模式", value: 0 },
   { text: "临考模式", value: 1 },
 ]);
+const switchText = ref("普通模式");
+const checkedSwitch = ref(true);
+const showSwitchToast = ref(false);
+
 const cellValue = ref(true);
 const isMultiSelectMode = ref(false);
 const toggleMultiSelectMode = () => {
-  cellValue.value = !cellValue.value;
+  // cellValue.value = !cellValue.value;
+  if (!checkedSwitch.value) {
+    showSwitchToast.value = true;
+    switchText.value = "多组复习"
+  } else {
+    switchText.value = "普通模式"
+  }
   isMultiSelectMode.value = !isMultiSelectMode.value;
   if (!isMultiSelectMode.value) {
     // 清除所有选择
@@ -2070,40 +2096,68 @@ const selectItem = (index) => {
 };
 const gotoPreExam = () => {
   // console.log(originalData.value);
-  if(selectedItems.value.length == 1) {
+  if (selectedItems.value.length < 2) {
     showFailToast("至少选择俩项");
     return;
   }
-  const titles = selectedItems.value.map(id => {
+  if (selectedItems.value.length > 5) {
+    showFailToast("至多选择5项");
+    return;
+  }
+  const titles = selectedItems.value.map((id) => {
     return originalData.value[id].title;
   });
-  const titlesHtml = titles.map(item => `<div style="text-align: left;">${item}</div>`).join('');
+  const titlesHtml = titles
+    .map((item) => `<div style="text-align: left;">${item}</div>`)
+    .join("");
   showConfirmDialog({
-    title: '确定将以下生成考前复习',
+    title: "确定将以下生成考前复习",
     message: titlesHtml,
-    theme: 'round-button',
-    allowHtml: true
-  })
-  .then(async () => {
-    // let account_id_list = selectedItems.value.map(id => originalData.value[id].nid);
-    // const params = new URLSearchParams();
-    // params.append("method", "getPreExam");
-    // params.append("account_id_list", JSON.stringify(account_id_list));
-    // isLoading.value = true;
-    // const dataPreExam = await axios.post("words/", params);
-    // console.log('dataPreExam: ', dataPreExam.data);
-    // isLoading.value = false;
-    showToast("敬请期待")
-  })
+    theme: "round-button",
+    allowHtml: true,
+  }).then(async () => {
+    account_id_list.value = selectedItems.value.map(
+      (id) => originalData.value[id].nid
+    );
+    const params = new URLSearchParams();
+    params.append("method", "getPreExam");
+    params.append("account_id_list", JSON.stringify(account_id_list.value));
+    isLoading.value = true;
+    try {
+      const res = await axios.post("words/", params);
+      dataPreExam.value = res.data.dataPreExam;
+      console.log("dataPreExam: ", dataPreExam.value);
+      isLoading.value = false;
+      preExamShow.value = true;
+    } catch (error) {
+        console.error("请求错误:", error);
+        // 如果捕捉到错误，执行相应的函数
+        showToast({
+          message: "生成错误，请尝试更改选择顺序",
+          duration: 10000,
+          closeOnClick: true,
+          closeOnClickOverlay: true
+        })
+        isLoading.value = false;
+        return
+    }
 
 
 
-
-  // console.log('account_id_list:', account_id_list);
-  
-}
-
-
+  });
+};
+const startPreExam = () => {
+  // console.log("dataPreExam: ", dataPreExam.value);
+  router.push({
+    path: "/studentAccountPreExam",
+    state: {
+      data: JSON.stringify(dataPreExam.value),
+      username: username.value,
+      account_id_list: JSON.stringify(account_id_list.value),
+      basicPreExam: basicPreExam.value,
+    },
+  });
+};
 
 onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -2189,7 +2243,9 @@ onMounted(async () => {
   // 加载数据
   originalData.value = [];
   let res = new Promise((resolve, reject) => {
+    // console.log(history.state)
     let res = JSON.parse(history.state.data);
+    basicPreExam.value = history.state.data;
     // console.log('res: ', res);
     if (res.hasOwnProperty("username")) {
       // console.log(111);
@@ -2264,12 +2320,15 @@ onMounted(async () => {
             });
           }
           addThemeBears().then((res) => {
-            console.log("res", res);
+            // console.log("res", res);
             flagTheme.value = 2;
             localStorage.setItem("theme_name", "熊出没");
             localStorage.setItem("giveBears", true);
             showToggleTheme();
           });
+          // console.log("bears available")
+        } else {
+          // console.log("not available")
         }
       });
     }
@@ -2288,19 +2347,6 @@ onMounted(async () => {
         <template #title>
           <div>任务列表</div>
         </template>
-
-        <!-- <template #right>
-          <div
-            @click="toggleMultiSelectMode"
-            style="margin-right: 1rem; color: #1a89fa; font-size: 14px"
-          >
-            <div v-if="isMultiSelectMode">取消</div>
-            <div v-else>临考模式</div>
-            
-          </div>
-          <div style="color: #1a89fa; font-size: 14px">{{ username }}</div>
-        </template> -->
-
       </van-nav-bar>
     </div>
 
@@ -2374,13 +2420,50 @@ onMounted(async () => {
       </div>
     </div>
 
-    <van-dropdown-menu>
+    <!-- <van-dropdown-menu>
       <van-dropdown-item
         v-model="valueDropdown"
         :options="optionDropdown"
         @change="toggleMultiSelectMode(valueSort)"
       />
-    </van-dropdown-menu>
+    </van-dropdown-menu> -->
+    <!-- 模式选择 -->
+    <div style="display: flex;width: 100%;">
+      <div style="font-size: 12px; margin: 0.2rem 0 0 0.8rem">
+        {{ switchText }}
+      </div>
+      <van-switch
+        style="margin-left: 0.5rem"
+        size="18px"
+        v-model="checkedSwitch"
+        inactive-color="red"
+        @change="toggleMultiSelectMode"
+      />
+      <van-notice-bar
+        style="
+        --van-notice-bar-icon-min-width: 16px; 
+        --van-notice-bar-padding: 0 0; /* 调整内边距，减少图标与文本的间距 */
+        flex: 1;height:20px; margin-left: 0.5rem;margin-right: 0.5rem;margin-top: 0.2rem;"
+        left-icon="volume-o"
+        scrollable
+        text="1. 积极参与期中赠 🐻 活动  2. 多组复习功能上线，如遇问题联系老师"
+
+      />
+    </div>
+    <van-toast
+      v-model:show="showSwitchToast"
+      style="padding: 1rem"
+      :closeOnClick="true"
+      :duration="10000"
+      :closeOnClickOverlay="true"
+    >
+      <template #message>
+        <div>
+          <p>1. 先选中单词组</p>
+          <p>2. 点击左上角 确定选择</p>
+        </div>
+      </template>
+    </van-toast>
 
     <van-tabs
       v-model:active="activeTabs"
@@ -2592,7 +2675,7 @@ onMounted(async () => {
 
                 <template #right-icon>
                   <van-checkbox
-                    v-if="isMultiSelectMode"
+                    v-if="isMultiSelectMode & (item.rate >= 3)"
                     :checked="selectedItems.includes(index)"
                     @click.stop="selectItem(index)"
                   />
@@ -2756,7 +2839,9 @@ onMounted(async () => {
                   is-link
                   center
                   clickable
-                  @click="isMultiSelectMode ? selectItem(index) : gotoItem(index)"
+                  @click="
+                    isMultiSelectMode ? selectItem(index) : gotoItem(index)
+                  "
                   class="custom-cell"
                 >
                   <template #icon>
@@ -2966,7 +3051,7 @@ onMounted(async () => {
 
                   <template #right-icon>
                     <van-checkbox
-                      v-if="isMultiSelectMode"
+                      v-if="isMultiSelectMode & (item.rate >= 3)"
                       :checked="selectedItems.includes(index)"
                       @click.stop="selectItem(index)"
                     />
@@ -3106,7 +3191,11 @@ onMounted(async () => {
       <van-cell-group inset style="margin-top: 0.5rem; margin-left: -0.2rem">
         <van-cell-group>
           <div v-for="(item, index) in answerSheetList" :key="index">
-            <van-cell :title="`${index + 1}. ${item.英文}`" :value="item.中文">
+            <van-cell
+              :title="`${index + 1}. ${item.英文}`"
+              :value="item.中文"
+              @click="speakWord(item.英文, item.正确答案)"
+            >
               <!-- 检查 spellWordsList 是否包含当前 item 的英文 -->
               <van-tag
                 mark
@@ -3120,6 +3209,10 @@ onMounted(async () => {
                 拼
               </van-tag>
               {{ item.中文 }}
+              <img
+                src="../assets/speaker.png"
+                style="width: 12px; height: auto"
+              />
             </van-cell>
           </div>
         </van-cell-group>
@@ -3382,6 +3475,64 @@ onMounted(async () => {
       </div>
     </van-dialog>
 
+    <!-- 临考模式 -->
+    <van-popup
+      position="bottom"
+      :style="{ height: '80%' }"
+      v-model:show="preExamShow"
+      style="padding: 1rem"
+      closeable
+    >
+      <div
+        style="
+          font-weight: 700;
+          font-size: 25px;
+          color: black;
+          margin-bottom: 0.5rem;
+        "
+      >
+        多组复习
+        <div
+          style="font-size: 12px; color: red; margin: 0.1rem 0 -0.2rem -0.1rem"
+        >
+          👇 下拉到底部开启旅途
+        </div>
+      </div>
+
+      <van-cell-group
+        v-for="(item, index) in dataPreExam"
+        :key="index"
+        style="margin-left: -1rem"
+      >
+        <van-cell
+          :title="`${index + 1}. ${item.英文}`"
+          :value="item.正确答案"
+          :label="item.type"
+          @click="speakWord(item.英文, item.正确答案)"
+          clickable
+        >
+          <template #value>
+            <div>
+              {{ item.正确答案 }}
+              <img
+                src="../assets/speaker.png"
+                style="width: 12px; height: auto; margin-left: 0.2rem"
+              />
+            </div>
+          </template>
+        </van-cell>
+      </van-cell-group>
+
+      <van-button
+        style="margin-bottom: 0.5rem; margin-right: 0.1rem"
+        block
+        type="success"
+        plain
+        @click="startPreExam"
+        >开启旅程</van-button
+      >
+    </van-popup>
+
     <!-- 庆祝三星 -->
     <div v-if="showStars" class="stars">
       <div class="star">🐻</div>
@@ -3435,6 +3586,8 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 0;
 }
+
+
 
 .nav-bar-container {
   position: sticky;

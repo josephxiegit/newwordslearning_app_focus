@@ -12,6 +12,7 @@ import StudentAccountItem from './components/studentAccountItem.vue';
 import StudentAccountSwipe from './components/studentAccountSwipe.vue';
 import StudentAccountTest from './components/studentAccountTest.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
+import StudentAccountPreExam from './components/studentAccountPreExam.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
@@ -94,6 +95,15 @@ const routes = [
         path: '/studentAccountList',
         name: 'studentAccountList',
         component: StudentAccountList,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/studentAccountPreExam',
+        name: 'studentAccountPreExam',
+        component: StudentAccountPreExam,
         meta: {
             index: 1,
             preventBack: true
@@ -204,6 +214,7 @@ router.beforeEach((to, from, next) => {
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
+            (from.path === '/studentAccountPreExam' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
             (from.path === '/studentAccountItem' && to.meta.preventBack)) {
@@ -245,8 +256,8 @@ const flagTheme = ref(themeMapping[theme_name] || 1);
 import {
     Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps,Divider, ActionSheet,
     Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row, ConfigProvider, BackTop, DropdownMenu, DropdownItem,
-    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem, NoticeBar,
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -262,6 +273,8 @@ app.config.globalProperties.$bonnieBearsSrc = Global.BONNIE_BEARS_SRC;
 // 使用Vant组件
 app.use(Button)
     .use(Checkbox)
+    .use(NoticeBar)
+    .use(Popover)
     .use(ActionSheet)
     .use(DropdownMenu)
     .use(DropdownItem)

@@ -160,6 +160,22 @@ const showUncertainResult = () => {
   handleUncertainClose();
 };
 
+// 单词发音
+const speakWord = (english, answer) => {
+  let utterance;
+
+  if (!/[a-zA-Z]/.test(english)) {
+  
+    utterance = new SpeechSynthesisUtterance(answer);
+    utterance.lang = "en-US";
+  } else {
+    console.log(2222)
+    utterance = new SpeechSynthesisUtterance(english);
+    utterance.lang = "en-US";
+  }
+  window.speechSynthesis.speak(utterance);
+
+}
 // 记录答案时间
 const createTimeAnswer = ref("");
 const createTimeUncertain = ref("");
@@ -583,7 +599,16 @@ onMounted(async () => {
             }"
           >
             <template #title>
-              <div>{{ item.序号 + ". " + item.英文 }}</div>
+              <div @click="speakWord(item.英文, item.正确答案)">
+                {{ item.序号 + ". " + item.英文 }}
+                <img
+                  src="../assets/speaker.png"
+                  style="
+                    width: 12px;
+                    height: auto;
+                  "
+                />
+              </div>
             </template>
           </van-cell>
           <van-cell-group>

@@ -62,51 +62,64 @@ function processData(res) {
         numberprev,
         numbershowanswer,
         numbertransparent,
+        alias,
       } = item;
       const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
-
-      // console.log("log", log);
-      // console.log("______________________________");
-
-      // let dataString = log.replace(/(\W)'|'(\W)/g, '$1"$2');
-      // dataString = dataString.replace(
-      //   /([{,]\s*)'([^']+?)'(\s*[:])/g,
-      //   '$1"$2"$3'
-      // );
-      // dataString = dataString
-      //   .replace(/\bFalse\b/g, "false")
-      //   .replace(/\bTrue\b/g, "true");
-      // dataString = dataString.replace(/\bNone\b/g, "null");
 
       // 替换所有的'变为".然后把s" 变为s' 。
       let dataString = log
         .replace(/'/g, '"')
-        .replace(/s" /g, "s\' ")
-        .replace(/"s /g, "\'s ")
-        .replace(/"t /g, "\'t ")
+        .replace(/s" /g, "s' ")
+        .replace(/"s /g, "'s ")
+        .replace(/"t /g, "'t ")
         .replace(/"m /g, "'m ")
-        .replace(/can"t/g, "\can't")
-        .replace(/mustn"t/g, "\mustn't")
-        .replace(/won"t/g, "won't")
+        .replace(/can"t/g, "can't")
+        .replace(/mustn"t/g, "mustn't")
+        .replace(/won"t/g, "won't");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
       dataString = dataString
         .replace(/\bFalse\b/g, "false")
         .replace(/\bTrue\b/g, "true")
         .replace(/\bNone\b/g, "null");
-      // console.log("dataString: ", dataString);
-      const parsedLog = JSON.parse(dataString);
+        
+      let parsedLog;
+      try {
+        parsedLog = JSON.parse(dataString); // 尝试解析 JSON
+      } catch (error) {
+        console.error("JSON parsing error:", error); // 捕获并记录错误
+        return null; // 返回 null 以便后续过滤
+      }
 
+      const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
+      if (!hasFlagField) {
+        parsedLog.forEach((logItem) => {
+          const correctAnswer = logItem.正确答案;
+          const userSelection = logItem.用户选择;
 
-      // dataString = JSON.stringify(dataString)
-      // let parsedLog = eval("("+dataString+")")
+          // 将字符串转换为数组并去除空格
+          const correctAnswerList = correctAnswer
+            .split("；")
+            .map((answer) => answer.trim());
+
+          // 排序两个列表
+          correctAnswerList.sort();
+          userSelection.sort();
+
+          // 比较两个列表并设置 flag
+          logItem.flag =
+            correctAnswerList.length === userSelection.length &&
+            correctAnswerList.join(",") === userSelection.join(",")
+              ? "true"
+              : "false";
+        });
+      }
 
       const falseCount = parsedLog.reduce((count, logItem) => {
         return (
           count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
         );
       }, 0);
-
       parsedLog.falseCount = falseCount; // 添加 falseCount 到 parsedLog 中
 
       return {
@@ -120,6 +133,7 @@ function processData(res) {
         numberprev,
         numbershowanswer,
         numbertransparent,
+        alias,
       };
     })
     .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
@@ -194,6 +208,13 @@ const filteredStudent = () => {
 };
 const generateTitle = (item) => {
   const titleFirstPart = item.title.split(".")[0]; // 只保留第一部分
+  // if (Array.isArray(item.alias)) {
+  //   const strAlias = item.alias
+  //     .map((item) => item.title.replace(/\.xlsm$/, ""))
+  //     .join("\n"); // 使用换行符
+  //   return `${titleFirstPart} | \n${strAlias}`; // 在字符串中加入换行符
+  // }
+
   if (item.swipe === "游戏") {
     return `${titleFirstPart} | ${item.swipe} ${item.numberprev}${item.numbershowanswer}${item.numbertransparent}`;
   }
@@ -202,6 +223,7 @@ const generateTitle = (item) => {
 // 日志详情
 const showDetail = ref(false);
 const detailName = ref("");
+const detailAlias = ref("");
 const detailDate = ref("");
 const detailXlsmName = ref("");
 const detailRate = ref("");
@@ -254,6 +276,8 @@ const toggleDetail = (index) => {
   const detail = filteredFiles.value[index];
   detailMode.value = detail["swipe"];
   detailName.value = detail["username"];
+  detailAlias.value = detail["alias"];
+
   detailDate.value = detail["create_time"];
   detailXlsmName.value = detail["title"];
   detailNid.value = detail["nid"];
@@ -513,6 +537,19 @@ const reloadPage = () => {
           is-link
           @click="toggleDetail(index)"
         >
+          <template #title>
+            <div v-if="item.title == '多组复习'">
+              <div
+                v-for="(item_alias, index_alias) in item.alias"
+                :key="index_alias"
+              >
+                <div style="font-size: smaller; margin-top: 0.2rem">
+                  {{ item_alias["title"].replace(/\.xlsm$/, "") }}
+                </div>
+              </div>
+            </div>
+            <div v-else>{{ generateTitle(item) }}</div>
+          </template>
           <template #value>
             <div>
               <div style="color: black">

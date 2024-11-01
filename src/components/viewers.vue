@@ -2017,6 +2017,7 @@ const reloadPage = () => {
   --van-dropdown-menu-shadow: 0 0 0 0;
   width: 20%;
   margin-bottom: -0.5rem;
+  margin-top: 0.1rem;
   margin-left: 0rem;
 }
 </style>
