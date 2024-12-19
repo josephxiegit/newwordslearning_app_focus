@@ -2,7 +2,7 @@
   <div v-if="visible" class="wolf-back-overlay">
     <div class="wolf-back">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
-      <div class="text_give">标签栏点击期中庆典,获得皮肤</div>
+      <div class="text_give">标签栏点击期末庆典,获得技能</div>
       <img :src="srcTheme" alt="Wolf Back">
       
       <!-- 关闭按钮 -->

@@ -43,7 +43,7 @@ function refreshUserList() {
     .then((ret) => {
       studentData.value = [...ret];
       filterStudentData.value = [...ret];
-      // console.log("filterStudentData", filterStudentData.value);
+      console.log("filterStudentData", filterStudentData.value);
     })
     .then(() => {
       showStudent.value = true;
@@ -435,8 +435,13 @@ const showViewers = (item, index) => {
   selectedLocationIndex.value = [valueLocation.value];
   selectedGradeIndex.value = [valueGrade.value];
 
+  // 被动技能
+  selectedPassiveMagicIndex.value = item["passive_magic"]? ['true']: ['false'];
+  valuePassiveMagic.value = selectedPassiveMagicIndex.value[0];
+
   userPassword.value = item["password"];
 
+  // 在校状态
   valueStatus.value = item["status"].toString();
   selectedStatusIndex.value = [valueStatus.value.toString()];
 
@@ -518,6 +523,7 @@ const viewersRevised = () => {
     params.append("grade", valueGrade.value);
     params.append("password", userPassword.value);
     params.append("status", valueStatus.value);
+    params.append("passive_magic", valuePassiveMagic.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -564,6 +570,19 @@ const columnsStatus = [
 const onConfirmStatus = ({ selectedValues }) => {
   showStatusPicker.value = false;
   valueStatus.value = selectedValues[0];
+};
+
+// 被动技能
+const valuePassiveMagic = ref("");
+const selectedPassiveMagicIndex = ref("");
+const showPassiveMagicPicker = ref(false);
+const columnsPassiveMagic = [
+  { text: "true", value: "true" },
+  { text: "false", value: "false" },
+];
+const onConfirmPassiveMagic = ({ selectedValues }) => {
+  showPassiveMagicPicker.value = false;
+  valuePassiveMagic.value = selectedValues[0];
 };
 
 // 增加新生
@@ -1876,7 +1895,7 @@ const viewersConfirm = () => {
       v-model:show="showReviseViewers"
       round
       position="bottom"
-      :style="{ height: '80%' }"
+      :style="{ height: '90%' }"
       closeable
     >
       <van-checkbox-group v-model="checkedRevisedViewers">
@@ -1950,8 +1969,26 @@ const viewersConfirm = () => {
           <van-picker
             :columns="columnsStatus"
             v-model="selectedStatusIndex"
-            @cancel="showGradePicker = false"
+            @cancel="showStatusPicker = false"
             @confirm="onConfirmStatus"
+          />
+        </van-popup>
+
+        <!-- 被动技能 -->
+        <van-field
+          v-model="valuePassiveMagic"
+          is-link
+          readonly
+          label="被动技能"
+          placeholder="选择状态"
+          @click="showPassiveMagicPicker = true"
+        />
+        <van-popup v-model:show="showPassiveMagicPicker" round position="bottom">
+          <van-picker
+            :columns="columnsPassiveMagic"
+            v-model="selectedPassiveMagicIndex"
+            @cancel="showPassiveMagicPicker = false"
+            @confirm="onConfirmPassiveMagic"
           />
         </van-popup>
 
@@ -1997,7 +2034,11 @@ const viewersConfirm = () => {
             </template>
           </van-cell>
         </van-cell-group>
+      
+
+        
       </van-checkbox-group>
+
 
       <van-button
         type="warning"

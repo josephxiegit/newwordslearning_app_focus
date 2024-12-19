@@ -232,7 +232,7 @@ const clickSubmitUser = async (action, done) => {
         const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
         function isPhrase(text) {
-          return /\s|,|\/|\.|…/.test(text);
+          return /\s|,|\/|\.|…|-|_/.test(text);
         }
 
         compareResult.forEach((item) => {
@@ -422,18 +422,12 @@ const clickSubmitUser = async (action, done) => {
         });
       }
 
+      // 开始加载
+      // 创建一个超时的 Promise
+      const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
+      );
       isLoading.value = true;
-      const redirectTimeout = setTimeout(() => {
-        isLoading.value = false; // 先停止加载状态
-
-        showDialog({
-          title: "网络延迟",
-          message: "请重新登陆，上次答题将会正常提交",
-          theme: "round-button",
-        }).then(() => {
-          router.push("/homepage");
-        });
-      }, 20000);
 
       // console.log('compareResult', compareResult);
       if (compareResult.length == 0) {
@@ -442,7 +436,6 @@ const clickSubmitUser = async (action, done) => {
         return;
       } else {
         function redirect() {
-          clearTimeout(redirectTimeout);
           router.push({
             path: "/studentAccountAnswer",
             state: {
@@ -463,46 +456,77 @@ const clickSubmitUser = async (action, done) => {
           });
         }
         // 如果 updateAccountlog 成功，继续执行其他操作
-        const accountDataResult = await updateAccountData();
-        console.log("accountDataResult: ", accountDataResult);
-        if (accountDataResult === "不能提交相同内容") {
+        const updateAccountPromise = updateAccountData();
+        // console.log("accountDataResult: ", accountDataResult);
+
+        let accountDataResult;
+        try {
+          accountDataResult = await Promise.race([
+            updateAccountPromise,
+            timeoutPromise,
+          ]);
+
+          if (accountDataResult === "不能提交相同内容") {
+            isLoading.value = false;
+            showDialog({
+              title: "恭喜！提交成功！",
+              message: "跳转答案页",
+              theme: "round-button",
+            }).then(() => {
+              redirect();
+            });
+            return;
+          }
+        } catch (error) {
+          // 如果超时，弹出超时提醒
+          if (error.message === "请求超时") {
+            isLoading.value = false; // 停止加载
+            console.log(22222)
+            showDialog({
+              title: "超时",
+              message: "请求超时，请稍后再试。",
+              theme: "round-button",
+            }).then(() => {
+              return;
+              // 让用户重新点击提交
+              // 可以根据需要做其他处理，例如恢复按钮状态
+            });
+          } else {
+            // 其他错误
+            console.log("发生错误:", error.message);
+          }
+          return; // 不跳转
+        } finally {
+          let UncertainResult;
+          console.log("uncertainVocabulary:", uncertainVocabulary.value);
+          // console.log(accountDataResult.new_log_nid);
+          try {
+            if (uncertainVocabulary.value.size != 0) {
+              await updateUncertain(accountDataResult.new_log_nid);
+            }
+          } catch (error) {
+            console.log("更新不确定词汇时发生错误:", error);
+          } // console.log('UncertainResult', UncertainResult);
+
+          console.log("spellVocabulary:", spellVocabulary.value);
+
+          // 如果所有操作都成功，处理结果
           isLoading.value = false;
-          showDialog({
-            title: "错误",
-            message: "数据已提交，点击跳转答案页",
-            theme: "round-button",
-          }).then(() => {
+          // console.log(accountDataResult);
+          // console.log(rate);
+
+          // 清楚store
+          sessionStorage.removeItem("showAnswerMagic");
+          sessionStorage.removeItem("showMagic");
+          sessionStorage.removeItem("flagHelp");
+          // 执行页面跳转等其他操作
+          if (accountDataResult && accountDataResult !== "不能提交相同内容") {
+            console.log(11111)
             redirect();
-          });
-          return;
+          }
         }
-
-        let UncertainResult;
-        console.log("uncertainVocabulary:", uncertainVocabulary.value);
-        // console.log(accountDataResult.new_log_nid);
-        if (uncertainVocabulary.value.size != 0) {
-          await updateUncertain(accountDataResult.new_log_nid);
-        }
-        // console.log('UncertainResult', UncertainResult);
-
-        console.log("spellVocabulary:", spellVocabulary.value);
-
-        // 如果所有操作都成功，处理结果
-        isLoading.value = false;
-        console.log(accountDataResult);
-        // console.log(rate);
-
-        // 清楚store
-        sessionStorage.removeItem("showAnswerMagic");
-        sessionStorage.removeItem("showMagic");
-        sessionStorage.removeItem("flagHelp");
-        // 执行页面跳转等其他操作
-        redirect();
       }
     }
-  } else {
-    // 如果用户点击取消或遮罩层，直接关闭对话框
-    showDialogSubmit.value = false;
   }
 };
 
@@ -1027,17 +1051,19 @@ const helpOutside = () => {
 };
 // 单词发音
 const speakWord = (word) => {
-  // 发音
-  let utterance;
-  utterance = new SpeechSynthesisUtterance(word);
-  if (!/[a-zA-Z]/.test(word)) {
-    utterance.lang = "zh-CN";
-  } else {
-    utterance.lang = "en-US";
+  try {
+    let utterance;
+    utterance = new SpeechSynthesisUtterance(word);
+    if (!/[a-zA-Z]/.test(word)) {
+      utterance.lang = "zh-CN";
+    } else {
+      utterance.lang = "en-US";
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    showToast("此浏览器不支持发音，请更换chrome或edge");
   }
-  window.speechSynthesis.speak(utterance);
-  
-}
+};
 
 // 动画鼓励
 const encouragementRef = ref(null);
@@ -1348,7 +1374,10 @@ onMounted(async () => {
           <!-- 显示英文单词和序号，加粗显示 -->
           <van-cell clickable class="bold-title border-cell">
             <template #title>
-              <div style="display: flex; align-items: center" @click="speakWord(item.英文)">
+              <div
+                style="display: flex; align-items: center"
+                @click="speakWord(item.英文)"
+              >
                 <div
                   style="
                     line-height: 1;
@@ -1360,7 +1389,12 @@ onMounted(async () => {
                   {{ item.序号 + ". " + item.英文 }}
                   <img
                     src="../assets/speaker.png"
-                    style="width: 12px; height: auto; margin-left: 0.5rem;margin-top: 0.1rem"
+                    style="
+                      width: 12px;
+                      height: auto;
+                      margin-left: 0.5rem;
+                      margin-top: 0.1rem;
+                    "
                   />
                 </div>
                 <div

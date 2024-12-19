@@ -4,6 +4,7 @@ import "vant/lib/index.css"; // 确保引入样式
 import userinfor1 from "../assets/userinfor1.png";
 import attemptPurchase from "../assets/attemptPurchase.png";
 import profileUsershop from "../assets/Boonie Bears/profile_usershop.png";
+import profileUsershopPassiveMagic from "../assets/usershop_passive_magic.png";
 import viewPurchase from "../assets/viewPurchase.png";
 import { useRouter } from "vue-router";
 import loading from "./loading.vue";
@@ -105,6 +106,7 @@ const clickOrderList = () => {
 
 // 购买列表
 const isLoading = ref(false);
+const priceBears = ref(20000);
 const priceStar = ref(4500);
 const priceAttempt = ref(800);
 const priceView = ref(800);
@@ -151,7 +153,7 @@ const confirmPurchase = (index) => {
         console.log("res: ", response.data);
 
         const userCoinsResponse = await getUserCoins();
-        usercoins.value = userCoinsResponse["data_coins"][0]['coins'];
+        usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
 
         originalData.value = [];
         loadingOriginalData.value = false;
@@ -191,7 +193,7 @@ const confirmPurchase = (index) => {
         // console.log("res: ", response.data);
         if (response.data == "ok") {
           const userCoinsResponse = await getUserCoins();
-          usercoins.value = userCoinsResponse["data_coins"][0]['coins'];
+          usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
           originalData.value = [];
           loadingOriginalData.value = false;
           finishedOriginalData.value = false;
@@ -237,7 +239,7 @@ const confirmPurchase = (index) => {
         // console.log("res: ", response.data);
         if (response.data == "ok") {
           const userCoinsResponse = await getUserCoins();
-          usercoins.value = userCoinsResponse["data_coins"][0]['coins'];
+          usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
           originalData.value = [];
           loadingOriginalData.value = false;
           finishedOriginalData.value = false;
@@ -397,35 +399,78 @@ const onSelectTheme = (item) => {
     });
   }
 
-  reviseUserTheme().then((res) => {
-    // console.log("res", res);
-    flagTheme.value = res.theme_nid;
-    localStorage.setItem("theme_name", res.theme_name);
+  reviseUserTheme()
+    .then((res) => {
+      // console.log("res", res);
+      flagTheme.value = res.theme_nid;
+      localStorage.setItem("theme_name", res.theme_name);
 
-    valueTheme.value = res.theme_name;
-    actionsTheme.value = actionsTheme.value.map((item) => {
-      if (item.name === valueTheme.value) {
-        // 如果匹配，将 color 和 icon 添加到该项中
-        return { ...item, color: "#1989fa", icon: "checked" };
-      } else {
-        // 如果不匹配，去掉 color 和 icon 属性
-        const { color, icon, ...rest } = item; // 去掉 color 和 icon
-        return rest;
-      }
+      valueTheme.value = res.theme_name;
+      actionsTheme.value = actionsTheme.value.map((item) => {
+        if (item.name === valueTheme.value) {
+          // 如果匹配，将 color 和 icon 添加到该项中
+          return { ...item, color: "#1989fa", icon: "checked" };
+        } else {
+          // 如果不匹配，去掉 color 和 icon 属性
+          const { color, icon, ...rest } = item; // 去掉 color 和 icon
+          return rest;
+        }
+      });
+    })
+    .then(() => {
+      loadingOrderList.value = false;
+      showToggleTheme();
     });
-  }).then(() => {
-    loadingOrderList.value = false;
-    showToggleTheme();
-  })
 };
 const purchaseBears = () => {
-  showFailToast('尚未开放');
-  // if(usercoins.value < 20000) {
-  //   showFailToast("金币不足");
-  //   return;
-  // }
-}
+  if (userOwnThemes.value.includes("熊出没")) {
+    showToast("已拥有，无法购买");
+    return;
+  }
 
+  showConfirmDialog({
+    title: "皮肤购买",
+    message: `确认花费${priceBears.value}金币购买熊出没吗？`,
+  }).then(async () => {
+    if (usercoins.value < 20000) {
+      showFailToast("金币不足，无法购买");
+      return;
+    }
+    isLoading.value = true;
+    const params = new URLSearchParams({
+          method: "purchaseBears",
+          priceBears: priceBears.value,
+          username: username.value,
+        });
+    const response = await axios.post("words/", params);
+    console.log("res: ", response.data);
+
+    const userCoinsResponse = await getUserCoins();
+    usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
+    
+    valueTheme.value = "熊出没"
+    flagTheme.value = 2;
+    localStorage.setItem("theme_name", "熊出没");
+    actionsTheme.value = actionsTheme.value.map((item) => {
+        if (item.name === valueTheme.value) {
+          // 如果匹配，将 color 和 icon 添加到该项中
+          return { ...item, color: "#1989fa", icon: "checked" };
+        } else {
+          // 如果不匹配，去掉 color 和 icon 属性
+          const { color, icon, ...rest } = item; // 去掉 color 和 icon
+          return rest;
+        }
+      });
+    isLoading.value = false;
+    showToggleTheme();
+    // showSuccessToast("购买成功");
+  });
+};
+
+const userOwnThemes = ref([]);
+
+// 被动魔法技能
+const showPassiveMagic = ref(false);
 
 onMounted(async () => {
   // 加载金币
@@ -435,9 +480,10 @@ onMounted(async () => {
   res.then((res) => {
     // console.log("res: ", res);
     usercoins.value = res["data_coins"][0]["coins"];
-    // console.log("user已经拥有的主题：", res["theme_name_list"]);
 
-    const userOwnThemes = res["theme_name_list"];
+    console.log("user已经拥有的主题：", res["theme_name_list"]);
+
+    userOwnThemes.value = res["theme_name_list"];
     // const userOwnThemes = ["熊出没"];
     valueTheme.value = localStorage.getItem("theme_name");
     // console.log("user选中的主题：", valueTheme.value);
@@ -445,7 +491,7 @@ onMounted(async () => {
     actionsTheme.value = allThemes.map((theme) => {
       return {
         name: theme.name,
-        disabled: !userOwnThemes.includes(theme.name),
+        disabled: !userOwnThemes.value.includes(theme.name),
       };
     });
     actionsTheme.value = actionsTheme.value.map((item) => {
@@ -586,14 +632,61 @@ onMounted(async () => {
         style="width: 100%; height: auto; margin-right: 0.5rem"
       />
       <template #title>
-        <div style="margin-top: -0.5rem; font-size: larger">限定皮肤</div>
-        <div
+        <div style="margin-bottom: 1rem; font-size: larger">限定皮肤</div>
+        <!-- <div
           style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
         >
           期中考试后开放购买
+        </div> -->
+      </template>
+    </van-dialog>
+
+    <!-- 被动技能魔法 -->
+    <van-card desc="不灭意志" title="技能售卖" class="custom-cell">
+      <template #thumb>
+        <img
+          :src="profileUsershopPassiveMagic"
+          class="custom-thumb-image"
+          alt="thumbnail"
+        />
+      </template>
+      <template #price>
+        <div class="price-container">
+          <span class="price-text">价格：25000 金币</span>
+        </div>
+      </template>
+      <template #footer>
+        <div class="button-purchase">
+          <van-button
+            size="mini"
+            type="primary"
+            class="buy-button"
+            @click="showPassiveMagic=true"
+            >购买</van-button
+          >
+        </div>
+      </template>
+    </van-card>
+    <van-dialog
+      v-model:show="showPassiveMagic"
+      title="限定技能"
+      show-cancel-button
+      @confirm=""
+    >
+      <img
+        src="../assets/usershop_passive_magic2.png"
+        style="width: 100%; height: auto; margin-right: 0.5rem"
+      />
+      <template #title>
+        <div style="margin-bottom: rem; font-size: larger">不灭意志</div>
+        <div
+          style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+        >
+          期末考试后开放购买
         </div>
       </template>
     </van-dialog>
+
 
     <van-card desc="尝试减少一次" title="消除尝试" class="custom-cell">
       <template #thumb>

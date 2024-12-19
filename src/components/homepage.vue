@@ -619,12 +619,13 @@ onUnmounted(() => {
 
     <!-- 地狱模式 -->
     <van-floating-bubble axis="xy" magnetic="x" icon="chat" @click="showHell" />
-
+    <!-- closeable -->
     <van-popup
       v-model:show="showAccountPop"
       position="bottom"
       :style="{ height: '100%' }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
+      
     >
       <div
         style="

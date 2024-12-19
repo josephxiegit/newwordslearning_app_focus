@@ -7,7 +7,7 @@ import {
   computed,
   nextTick,
   onBeforeUnmount,
-  inject
+  inject,
 } from "vue";
 import {
   showFailToast,
@@ -16,7 +16,6 @@ import {
   showLoadingToast,
   showToast,
   Divider,
-  
 } from "vant";
 
 import { useRouter } from "vue-router";
@@ -55,27 +54,35 @@ const showGridMeaning = (index) => {
 };
 const speakWord = (english, answer) => {
   // 发音
-  let utterance;
-  utterance = new SpeechSynthesisUtterance(english);
-  if (!/[a-zA-Z]/.test(english)) {
-    utterance.lang = "zh-CN";
-  } else {
-    utterance.lang = "en-US";
+  try {
+    let utterance;
+    utterance = new SpeechSynthesisUtterance(english);
+    if (!/[a-zA-Z]/.test(english)) {
+      utterance.lang = "zh-CN";
+    } else {
+      utterance.lang = "en-US";
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.error("Error speaking word:", error);
   }
-  window.speechSynthesis.speak(utterance);
 };
 
 const speakWordEnglish = (english, answer) => {
-  let utterance;
+  try {
+    let utterance;
 
-  if (!/[a-zA-Z]/.test(english)) {
-    utterance = new SpeechSynthesisUtterance(answer);
-    utterance.lang = "zh-CN";
-  } else {
-    utterance = new SpeechSynthesisUtterance(english);
-    utterance.lang = "en-US";
+    if (!/[a-zA-Z]/.test(english)) {
+      utterance = new SpeechSynthesisUtterance(answer);
+      utterance.lang = "zh-CN";
+    } else {
+      utterance = new SpeechSynthesisUtterance(english);
+      utterance.lang = "en-US";
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.error("Error speaking word:", error);
   }
-  window.speechSynthesis.speak(utterance);
 };
 
 const isTextOverflow = (text) => {
@@ -195,23 +202,22 @@ const clickSubmitUser = async (action, done) => {
     synonymsSelected.value,
     synonymsOptions.value
   );
-  console.log("synonymsSelectedChinese", synonymsSelectedChinese);
+  // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
   // 将中文用户选择和选项答案合并
   const synonymAndSelections = mergeSynonymAndSelections(
     synonymsSelectedChinese
   );
   console.log("synonymAndSelections", synonymAndSelections);
-  function redirect() {
-    router.push({
-      path: "/studentAccountList",
-      state: {
-        username: username.value,
-        data: basicPreExam.value,
-      },
-    });
-  }
+  console.log("username", username.value);
+  console.log("basicPreExam", basicPreExam.value);
 
-  redirect();
+  router.push({
+    path: "/studentAccountList",
+    state: {
+      username: username.value,
+      data: basicPreExam.value,
+    },
+  });
 };
 
 // 点击选项
@@ -390,7 +396,7 @@ const startCountdown = () => {
     } else {
       clearInterval(interval); // 清除定时器
       isDisabledMeaningClose.value = false; // 启用按钮
-      buttonTextMeaningClose.value = '关闭'; // 更新按钮文本
+      buttonTextMeaningClose.value = "关闭"; // 更新按钮文本
     }
   }, 1000); // 每秒更新一次
 };
@@ -420,7 +426,7 @@ const goToNext = async () => {
       buttonText.value = "下一个";
       buttonTextType.value = "warning";
       isCheckboxDisabled.value = true;
-
+      // 判断对错
       // console.log(
       //   "用户选择",
       //   resultDataTempt.value[currentSlideIndex]["用户选择"]
@@ -431,12 +437,22 @@ const goToNext = async () => {
       const correctAnswer = synonymsOptions.value[currentSlideIndex]["答案"];
 
       const correctArray = correctAnswer
-        .split("；")
+        .split(/；|,/)
         .map((item) => item.trim())
         .sort();
-      const userArray = userSelection.sort();
+      // console.log("correctArray", correctArray);
+      // const userArray = userSelection.sort();
+      const userArray = userSelection
+        .join(",")
+        .split(/；|,/)
+        .map((item) => item.trim())
+        .sort();
+      // console.log("userArray", userArray);
+      // const areEqual =
+      //   JSON.stringify(userArray) === JSON.stringify(correctArray);
       const areEqual =
-        JSON.stringify(userArray) === JSON.stringify(correctArray);
+        correctArray.length === userArray.length &&
+        correctArray.every((item) => userArray.includes(item));
       if (areEqual) {
         flagChoose.value = true;
         textColor.value = "green";
@@ -464,8 +480,10 @@ const goToNext = async () => {
         answerShow.value = false;
         buttonText.value = "显示答案";
         console.log("resultDataTempt: ", resultDataTempt.value);
+        speakWord(synonymsOptions.value[currentIndex.value + 1].英文, synonymsOptions.value[currentIndex.value + 1].正确答案)
       } else {
         // 到达最后一个轮播图，执行提交函数
+        updateAccountLog();
         popNavshow.value = true;
       }
     }
@@ -494,7 +512,7 @@ const getVocabularyMeaning = () => {
     });
   }
   setTimeout(() => {
-      isLoading.value = true;
+    isLoading.value = true;
   }, 800);
   getWordMeaning()
     .then((res) => {
@@ -568,7 +586,7 @@ function getSingeOrMultiChoice(currentIndex) {
     return "多选";
   }
   // 获取当前项的中文字段
-  const chineseText = synonymsOptions.value[currentIndex]["正确答案"];
+  const chineseText = synonymsOptions.value[currentIndex]["答案"];
   // console.log('chineseText: ', chineseText);
 
   // 根据分号分割后的长度判断是单选还是多选
@@ -609,30 +627,62 @@ onBeforeUnmount(async () => {
   clearInterval(interval);
   // 在页面离开时执行的逻辑
   isLoading.value = true;
-  await updateAccountLog();
+  // await updateAccountLog();
   isLoading.value = false;
   window.removeEventListener("beforeunload", handleBeforeUnload);
-  console.log("监测到离开");
+  // console.log("监测到离开");
 });
 const handleBeforeUnload = async (event) => {
   // 在页面刷新时执行的逻辑
   console.log("监测到刷新");
   isLoading.value = true;
-  await updateAccountLog();
+  // await updateAccountLog();
   isLoading.value = false;
   event.returnValue = ""; // 旧浏览器支持
 };
 onMounted(async () => {
   if (flagTheme.value == 1) {
-      srcTheme.value = chineseMeaningSrcGoatAndWolf;
-    }
-    if (flagTheme.value == 2) {
-      srcTheme.value = chineseMeaningSrcBears;
-    }
+    srcTheme.value = chineseMeaningSrcGoatAndWolf;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = chineseMeaningSrcBears;
+  }
   window.addEventListener("beforeunload", handleBeforeUnload);
   const initData = async () => {
     // 初始化数据
     synonymsOptions.value = JSON.parse(history.state.data);
+    console.log('synonymsOptions: ', synonymsOptions.value);
+
+    synonymsOptions.value.forEach((item) => {
+      // Check if the answer is '以上都不对'
+      if (item["答案"] === "以上都不对") {
+        // Split the correct answer into terms for comparison
+        const correctAnswerArray = item["正确答案"]
+          .split(/；|,/)
+          .map((term) => term.trim())
+          .sort();
+        // console.log('correctAnswerArray', correctAnswerArray);
+
+        for (let chineseText of item["中文"]) {
+          let splitChineseText =
+            chineseText.includes(",") || chineseText.includes(";")
+              ? chineseText
+                  .split(/；|,/)
+                  .map((term) => term.trim())
+                  .sort()
+              : [chineseText.trim()];
+          // console.log('splitChineseText', splitChineseText);
+          const isMatch =
+            splitChineseText.length === correctAnswerArray.length &&
+            splitChineseText.every((term) => correctAnswerArray.includes(term));
+
+          if (isMatch) {
+            // console.log("item", item);
+            item["答案"] = item["用户选择"].join(",");
+          }
+        }
+      }
+    });
 
     basicPreExam.value = history.state.basicPreExam;
     totalSlides.value = synonymsOptions.value.length;
@@ -654,8 +704,11 @@ onMounted(async () => {
       };
     });
 
-    // console.log("synonymsOptions: ", synonymsOptions.value);
+    // synonymsOptions.value = resultDataTempt.value;
+    console.log("synonymsOptions: ", synonymsOptions.value);
     console.log("resultDataTempt: ", resultDataTempt.value);
+    speakWord(synonymsOptions.value[0].英文, synonymsOptions.value[0].正确答案)
+    flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
   };
 
   // 调用初始化函数
@@ -968,7 +1021,16 @@ onMounted(async () => {
       >
         {{ meaningTitle }}
       </div>
-      <div style="margin: -0.5rem 0 0.5rem -0.5rem;color: #FA6B83;font-weight: 700;font-size: 18px;"><van-icon name="good-job" /> {{ meaning_answer }}</div>
+      <div
+        style="
+          margin: -0.5rem 0 0.5rem -0.5rem;
+          color: #fa6b83;
+          font-weight: 700;
+          font-size: 18px;
+        "
+      >
+        <van-icon name="good-job" /> {{ meaning_answer }}
+      </div>
       <div v-if="meaningData['教材'] && meaningData['教材'].length > 0">
         <div v-for="(item, index) in meaningData['教材']" :key="index">
           <div style="display: flex; font-weight: 700">
@@ -993,10 +1055,13 @@ onMounted(async () => {
       <div style="white-space: pre-wrap; font-size: 14px">
         {{ meaningData["高考"]["中文"] }}
       </div>
-      <van-button block :disabled="isDisabledMeaningClose" 
-      type="primary"
+      <van-button
+        block
+        :disabled="isDisabledMeaningClose"
+        type="primary"
         @click="closeMeaning"
-        style="margin-top: 1rem">
+        style="margin-top: 1rem"
+      >
         {{ buttonTextMeaningClose }}
       </van-button>
     </van-popup>

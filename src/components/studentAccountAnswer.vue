@@ -162,20 +162,21 @@ const showUncertainResult = () => {
 
 // 单词发音
 const speakWord = (english, answer) => {
-  let utterance;
+  try {
+    let utterance;
 
-  if (!/[a-zA-Z]/.test(english)) {
-  
-    utterance = new SpeechSynthesisUtterance(answer);
-    utterance.lang = "en-US";
-  } else {
-    console.log(2222)
-    utterance = new SpeechSynthesisUtterance(english);
-    utterance.lang = "en-US";
+    if (!/[a-zA-Z]/.test(english)) {
+      utterance = new SpeechSynthesisUtterance(answer);
+      utterance.lang = "en-US";
+    } else {
+      utterance = new SpeechSynthesisUtterance(english);
+      utterance.lang = "en-US";
+    }
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    showToast("此浏览器不支持发音，请更换chrome或edge");
   }
-  window.speechSynthesis.speak(utterance);
-
-}
+};
 // 记录答案时间
 const createTimeAnswer = ref("");
 const createTimeUncertain = ref("");
@@ -283,7 +284,7 @@ onMounted(async () => {
     uncertainResult.value = JSON.parse(history.state.uncertainResult);
     spellVocabulary.value = JSON.parse(history.state.spellVocabulary);
     lock_spell.value = history.state.lock_spell;
-    // console.log("spellVocabulary: ", spellVocabulary.value);
+    console.log("spellVocabulary: ", spellVocabulary.value);
     // console.log("lock_spell: ", lock_spell.value);
 
     uncertainResult.value.sort((a, b) => {
@@ -567,7 +568,7 @@ onMounted(async () => {
       >
         <van-cell
           :label="
-            item.正确答案 === '无'
+            item.正确答案 === '无'|| !item.正确答案
               ? `答案：${item.答案}`
               : `答案：${item.正确答案}`
           "
@@ -603,10 +604,7 @@ onMounted(async () => {
                 {{ item.序号 + ". " + item.英文 }}
                 <img
                   src="../assets/speaker.png"
-                  style="
-                    width: 12px;
-                    height: auto;
-                  "
+                  style="width: 12px; height: auto"
                 />
               </div>
             </template>

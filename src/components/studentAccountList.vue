@@ -12,13 +12,13 @@ import {
   inject,
 } from "vue";
 import "vant/lib/index.css"; // 确保引入样式
-import cover3500Image from "../assets/3500_cover.png";
+import cover3500Image from "../assets/3500_cover_2025.png";
 import angryWolf from "./angryWolf.vue";
 import missyou from "./missyou.vue";
 import threeStar from "./threeStar.vue";
 import { useRouter } from "vue-router";
 import loading from "./loading.vue";
-import toggleTheme from "./toggleTheme.vue";
+import getPassive from "./getPassive.vue";
 import bearWarmup from "./bearWarmup.vue";
 import {
   showFailToast,
@@ -32,8 +32,11 @@ import {
 } from "vant";
 // 主题路径
 import chooseModelSrcGoatAndWolf from "../assets/choose.webp";
+import chooseModelSrcGoatAndWolfReview from "../assets/review.png";
 import chooseModelSrcBears from "../assets/Boonie Bears/choose.gif";
+import chooseModelSrcBearsReview from "../assets/Boonie Bears/review.gif";
 const flagTheme = inject("flagTheme");
+const passive_magic = inject("passive_magic");
 const srcTheme = ref("");
 
 const isLoading = ref(false);
@@ -1209,15 +1212,19 @@ const goToNextPage = (
 };
 
 const speakWord = (english, answer) => {
-  let utterance;
-  if (!/[a-zA-Z]/.test(english)) {
-    utterance = new SpeechSynthesisUtterance(answer);
-  } else {
-    utterance = new SpeechSynthesisUtterance(english);
-  }
+  try {
+    let utterance;
+    if (!/[a-zA-Z]/.test(english)) {
+      utterance = new SpeechSynthesisUtterance(answer);
+    } else {
+      utterance = new SpeechSynthesisUtterance(english);
+    }
 
-  utterance.lang = "en-US";
-  window.speechSynthesis.speak(utterance);
+    utterance.lang = "en-US";
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    showToast("此浏览器不支持发音，请更换chrome或edge");
+  }
 };
 
 // 跳转下一面
@@ -1319,14 +1326,54 @@ watch(showChooseMode, (newValue) => {
     difficultyCoefficient.value = 30;
   }
 });
+// 复习模式
+const showReviewMode = ref(false);
+const reviewShow = ref(false);
+const dataReview = ref([]);
+const handleReviewMode = () => {
+  reviewShow.value = true;
+  dataReview.value = originalData.value[indexAnswer.value]["synonyms"];
+  console.log(originalData.value[indexAnswer.value]);
+  let resultData = [];
+  for(let i = 0; i < dataReview.value.length; i++) {
+    let obj = {}
+    obj["is_spell"] = false;
+    obj["type"] = true;
+    obj["中文"] = dataReview.value[i]["中文"];
+    obj["序号"] = dataReview.value[i]["序号"];
+    obj["正确答案"] = originalData.value[indexAnswer.value]["answers"][i]["中文"];
+    obj["用户选择"] = ['无'];
+    obj["答案"] = obj["正确答案"];
+    obj["英文"] = dataReview.value[i]["英文"];
+    resultData.push(obj);
+  }
+  console.log('resultData', resultData);
+};
 
 const gotoItem = (index) => {
   indexAnswer.value = index;
   // 预热熊出没
-  if (originalData.value[index]["alias"] == "期中庆典") {
+  if (originalData.value[index]["alias"].includes("庆典")) {
     showbearWarmup();
   }
-
+  // 复习模式
+  if (originalData.value[index]["is_review_required"]) {
+    if (flagTheme.value == 1) {
+      srcTheme.value = chooseModelSrcGoatAndWolfReview;
+    }
+    if (flagTheme.value == 2) {
+      srcTheme.value = chooseModelSrcBearsReview;
+    }
+    showReviewMode.value = true;
+    return;
+  } else {
+    if (flagTheme.value == 1) {
+      srcTheme.value = chooseModelSrcGoatAndWolf;
+    }
+    if (flagTheme.value == 2) {
+      srcTheme.value = chooseModelSrcBears;
+    }
+  }
   // 是否限制普通模式
   if (originalData.value[index]["type"] == 1) {
     isRegularModeEnabled.value = false;
@@ -1744,6 +1791,7 @@ const finishedOriginalData = ref(false);
 const pageIndexOriginalData = ref(0);
 const username = ref("");
 const progressPercentage = ref("0");
+
 const formattedRate = (rate) => {
   // 检查是否为整数
   if (Number.isInteger(rate)) {
@@ -2045,12 +2093,12 @@ const processedTitle = (title) => {
 // swipe徽章
 const flagSwipe = ref(1);
 const usercoins = ref(0);
-const toggleThemeRef = ref(null);
-function showToggleTheme() {
-  if (toggleThemeRef.value.visible) {
-    toggleThemeRef.value.hide();
+const getPassiveRef = ref(null);
+function showPassiveMagic() {
+  if (getPassiveRef.value.visible) {
+    getPassiveRef.value.hide();
   } else {
-    toggleThemeRef.value.show();
+    getPassiveRef.value.show();
   }
   animationVisible.value = !animationVisible.value;
 }
@@ -2076,9 +2124,9 @@ const toggleMultiSelectMode = () => {
   // cellValue.value = !cellValue.value;
   if (!checkedSwitch.value) {
     showSwitchToast.value = true;
-    switchText.value = "多组复习"
+    switchText.value = "多组复习";
   } else {
-    switchText.value = "普通模式"
+    switchText.value = "普通模式";
   }
   isMultiSelectMode.value = !isMultiSelectMode.value;
   if (!isMultiSelectMode.value) {
@@ -2125,25 +2173,33 @@ const gotoPreExam = () => {
     isLoading.value = true;
     try {
       const res = await axios.post("words/", params);
+      console.log('res: ', res);
       dataPreExam.value = res.data.dataPreExam;
+
+      dataPreExam.value = dataPreExam.value.map((item) => {
+        if (item["正确答案"] === "无") {
+          return {
+            ...item,
+            正确答案: item["答案"],
+          };
+        }
+        return item;
+      });
       console.log("dataPreExam: ", dataPreExam.value);
       isLoading.value = false;
       preExamShow.value = true;
     } catch (error) {
-        console.error("请求错误:", error);
-        // 如果捕捉到错误，执行相应的函数
-        showToast({
-          message: "生成错误，请尝试更改选择顺序",
-          duration: 10000,
-          closeOnClick: true,
-          closeOnClickOverlay: true
-        })
-        isLoading.value = false;
-        return
+      console.error("请求错误:", error);
+      // 如果捕捉到错误，执行相应的函数
+      showToast({
+        message: "生成错误，请尝试更改选择顺序",
+        duration: 10000,
+        closeOnClick: true,
+        closeOnClickOverlay: true,
+      });
+      isLoading.value = false;
+      return;
     }
-
-
-
   });
 };
 const startPreExam = () => {
@@ -2180,23 +2236,26 @@ onMounted(async () => {
     (history.state.data && JSON.parse(history.state.data).username) ||
     history.state.username;
 
-  async function getUserTheme() {
+  async function getUserThemeAndPassiveMagic() {
     let params = new URLSearchParams();
-    params.append("method", "getUserTheme");
+    params.append("method", "getUserThemeAndPassiveMagic");
     params.append("user", user);
 
     return await axios.post("words/", params).then((ret) => {
-      return ret.data.theme;
+      return ret.data;
     });
   }
-  getUserTheme().then((res) => {
-    // console.log("userTheme", res);
+  getUserThemeAndPassiveMagic().then((res) => {
+    // console.log("res", res);
     if (res.theme == 1) {
       localStorage.setItem("theme_name", "喜羊羊与灰太狼");
     }
     if (res.theme == 2) {
       localStorage.setItem("theme_name", "熊出没");
     }
+
+    passive_magic.value = res.passive_magic;
+    console.log("passive_magic", passive_magic.value);
 
     flagTheme.value = res.theme;
     // console.log("flagTheme.value", flagTheme.value);
@@ -2289,6 +2348,7 @@ onMounted(async () => {
       });
     }
     // console.log('username', username.value);
+    // 期末庆典
     getUserCoins().then((res) => {
       usercoins.value = res["data_coins"][0]["coins"];
       console.log("usercoins: ", usercoins.value);
@@ -2296,8 +2356,10 @@ onMounted(async () => {
     return "ok";
   });
   // flagRate.value = 3;
+  // showPassiveMagic();
   res = res.then(() => {
-    if (flagRate.value >= 3 && !localStorage.getItem("giveBears")) {
+    localStorage.removeItem("giveBears");
+    if (flagRate.value >= 3 && !localStorage.getItem("givePassiveMagic")) {
       // 判断赠送 Bears
       async function checkExecutionBears() {
         let params = new URLSearchParams();
@@ -2321,10 +2383,9 @@ onMounted(async () => {
           }
           addThemeBears().then((res) => {
             // console.log("res", res);
-            flagTheme.value = 2;
-            localStorage.setItem("theme_name", "熊出没");
-            localStorage.setItem("giveBears", true);
-            showToggleTheme();
+            // localStorage.setItem("theme_name", "熊出没");
+            localStorage.setItem("givePassiveMagic", true);
+            showPassiveMagic();
           });
           // console.log("bears available")
         } else {
@@ -2428,7 +2489,7 @@ onMounted(async () => {
       />
     </van-dropdown-menu> -->
     <!-- 模式选择 -->
-    <div style="display: flex;width: 100%;">
+    <div style="display: flex; width: 100%">
       <div style="font-size: 12px; margin: 0.2rem 0 0 0.8rem">
         {{ switchText }}
       </div>
@@ -2441,20 +2502,26 @@ onMounted(async () => {
       />
       <van-notice-bar
         style="
-        --van-notice-bar-icon-min-width: 16px; 
-        --van-notice-bar-padding: 0 0; /* 调整内边距，减少图标与文本的间距 */
-        flex: 1;height:20px; margin-left: 0.5rem;margin-right: 0.5rem;margin-top: 0.2rem;"
+          --van-notice-bar-icon-min-width: 16px;
+          --van-notice-bar-padding: 0 0; /* 调整内边距，减少图标与文本的间距 */
+          flex: 1;
+          height: 20px;
+          margin-left: 0.5rem;
+          margin-right: 0.5rem;
+          margin-top: 0.2rem;
+        "
         left-icon="volume-o"
         scrollable
-        text="1. 积极参与期中赠 🐻 活动  2. 多组复习功能上线，如遇问题联系老师"
-
+        :delay="1"
+        :speed="80"
+        text="更新了“提交”逻辑，改善体验。抓紧时间完成期末庆典。"
       />
     </div>
     <van-toast
       v-model:show="showSwitchToast"
       style="padding: 1rem"
       :closeOnClick="true"
-      :duration="10000"
+      :duration="3000"
       :closeOnClickOverlay="true"
     >
       <template #message>
@@ -2490,7 +2557,7 @@ onMounted(async () => {
                 class="custom-cell"
               >
                 <template #icon>
-                  <div v-if="item.alias == '期中庆典'">
+                  <div v-if="item.alias.includes('庆典')">
                     <img
                       v-if="item.rate < 3"
                       src="../assets/Boonie Bears/item_list.png"
@@ -2506,29 +2573,40 @@ onMounted(async () => {
                     />
                   </div>
                   <div v-else>
-                    <img
-                      v-if="item.rate < 3"
-                      src="../assets/item_list.png"
-                      style="width: 27px; height: auto; margin-right: 0.5rem"
-                      class="image-middle"
-                      alt="Item List"
-                    />
-                    <img
-                      v-else
-                      src="../assets/item_list_complete.png"
-                      style="width: 27px; height: auto; margin-right: 0.5rem"
-                      class="image-middle"
-                      alt="Item List Complete"
-                    />
+                    <div v-if="item.is_review_required">
+                      <img
+                        src="../assets/item_list_complete_reviewed.png"
+                        style="width: 27px; height: auto; margin-right: 0.5rem"
+                        class="image-middle"
+                        alt="Item List"
+                      />
+                    </div>
+                    <div v-else>
+                      <img
+                        v-if="item.rate < 3"
+                        src="../assets/item_list.png"
+                        style="width: 27px; height: auto; margin-right: 0.5rem"
+                        class="image-middle"
+                        alt="Item List"
+                      />
+                      <img
+                        v-else
+                        src="../assets/item_list_complete.png"
+                        style="width: 27px; height: auto; margin-right: 0.5rem"
+                        class="image-middle"
+                        alt="Item List Complete"
+                      />
+                    </div>
                   </div>
                 </template>
+
                 <template #title>
                   <div
                     v-if="item.swipe == 0"
                     style="display: flex; align-items: flex-start; width: 160%"
                   >
                     <img
-                      v-show="item.alias == '期中庆典'"
+                      v-show="item.alias.includes('庆典')"
                       src="../assets/Boonie Bears/edge.png"
                       style="
                         width: 25px;
@@ -2540,7 +2618,7 @@ onMounted(async () => {
                     />
 
                     <div style="margin-bottom: 7px; font-weight: 700">
-                      {{ processedTitle(item.title) }}
+                      <div>{{ processedTitle(item.title) }}</div>
                     </div>
                     <van-badge
                       content="Game"
@@ -2554,7 +2632,7 @@ onMounted(async () => {
                     style="display: flex; align-items: flex-start; width: 160%"
                   >
                     <img
-                      v-show="item.alias == '期中庆典'"
+                      v-show="item.alias.includes('庆典')"
                       src="../assets/Boonie Bears/edge.png"
                       style="
                         width: 25px;
@@ -2564,15 +2642,52 @@ onMounted(async () => {
                         margin-right: 0.7rem;
                       "
                     />
-                    <div style="margin-bottom: 7px; font-weight: 700">
+                    <div
+                      v-if="item.is_review_required"
+                      style="
+                        margin-bottom: 7px;
+                        font-weight: 700;
+                        color: lightgray;
+                      "
+                    >
                       {{ processedTitle(item.title) }}
                     </div>
-                    <van-badge content="Game" style="margin-left: -20px" />
+                    <div v-else style="margin-bottom: 7px; font-weight: 700">
+                      {{ processedTitle(item.title) }}
+                    </div>
+                    <van-badge
+                      v-if="item.is_review_required"
+                      color="#D8A7B1"
+                      content="Game"
+                      style="margin-left: -20px"
+                    />
+                    <van-badge
+                      v-else
+                      content="Game"
+                      style="margin-left: -20px"
+                    />
                   </div>
                 </template>
 
                 <template #value>
-                  <div style="font-size: 12px">
+                  <div
+                    v-if="item.is_review_required"
+                    style="font-size: 12px; color: lightgray"
+                  >
+                    <div style="display: flex; justify-content: flex-end">
+                      尝试了
+                      <div style="font-weight: 700; color: bisque">
+                        {{ item.attempt }}
+                      </div>
+                      次
+                    </div>
+
+                    <div style="margin-top: 0.5rem">
+                      {{ item.answers.length }}词
+                    </div>
+                  </div>
+
+                  <div v-else style="font-size: 12px">
                     <div style="display: flex; justify-content: flex-end">
                       尝试了
                       <div style="font-weight: 700; color: red">
@@ -2626,6 +2741,19 @@ onMounted(async () => {
                 <template #label>
                   <div style="display: flex">
                     <van-rate
+                      v-if="item.is_review_required"
+                      v-model="item.rate"
+                      :size="20"
+                      color="#DBC8AF"
+                      void-icon="like"
+                      icon="like"
+                      void-color="#eee"
+                      :count="3"
+                      readonly
+                      allow-half
+                    />
+                    <van-rate
+                      v-else
                       v-model="item.rate"
                       :size="20"
                       color="#ffd21e"
@@ -2637,14 +2765,37 @@ onMounted(async () => {
                       allow-half
                     />
                     <div
+                      style="
+                        margin-top: 3%;
+                        margin-left: 0.2rem;
+                        color: lightgray;
+                      "
+                      v-if="showRatePlus[index] && item.is_review_required"
+                    >
+                      + {{ formattedRate(item.rate) }}
+                    </div>
+                    <div
                       style="margin-top: 3%; margin-left: 0.2rem"
-                      v-if="showRatePlus[index]"
+                      v-if="showRatePlus[index] && !item.is_review_required"
                     >
                       + {{ formattedRate(item.rate) }}
                     </div>
                   </div>
 
                   <div
+                    v-if="item.is_review_required"
+                    style="
+                      margin-left: 4px;
+                      margin-top: 7px;
+                      width: 120%;
+                      font-size: 12px;
+                      color: lightgray;
+                    "
+                  >
+                    {{ item.create_time }}
+                  </div>
+                  <div
+                    v-else
                     style="
                       margin-left: 4px;
                       margin-top: 7px;
@@ -2655,21 +2806,32 @@ onMounted(async () => {
                     {{ item.create_time }}
                   </div>
                   <div style="margin-top: 1rem">
-                    <van-progress
-                      v-if="item.alias == '期中庆典'"
-                      color="#f2826a"
-                      :percentage="item.progressPercentage"
-                      stroke-width="2"
-                      :show-pivot="true"
-                      :inactive="item.progressPercentage === 100"
-                    />
-                    <van-progress
-                      v-else
-                      :percentage="item.progressPercentage"
-                      stroke-width="2"
-                      :show-pivot="true"
-                      :inactive="item.progressPercentage === 100"
-                    />
+                    <div v-if="item.is_review_required">
+                      <van-progress
+                        color="lightblue"
+                        :percentage="item.progressPercentage"
+                        stroke-width="2"
+                        :show-pivot="true"
+                        :inactive="item.progressPercentage === 100"
+                      />
+                    </div>
+                    <div v-else>
+                      <van-progress
+                        v-if="item.alias.includes('庆典')"
+                        color="#F4C244"
+                        :percentage="item.progressPercentage"
+                        stroke-width="2"
+                        :show-pivot="true"
+                        :inactive="item.progressPercentage === 100"
+                      />
+                      <van-progress
+                        v-else
+                        :percentage="item.progressPercentage"
+                        stroke-width="2"
+                        :show-pivot="true"
+                        :inactive="item.progressPercentage === 100"
+                      />
+                    </div>
                   </div>
                 </template>
 
@@ -2804,30 +2966,31 @@ onMounted(async () => {
               >
                 <template #icon>
                   <img
-                    src="../assets/Boonie Bears/ad.gif"
-                    style="width: 100px; height: auto; margin-right: 0.5rem"
+                    src="../assets/Boonie Bears/ad.png"
+                    style="width: 100px; height: auto; margin-right: 0.5rem; margin-bottom: 0.5rem;"
                     alt="Item List"
                   />
                 </template>
                 <template #title>
                   <div
                     style="
-                      margin-bottom: 1.2rem;
+                      margin-bottom: 2.9rem;
                       font-weight: 700;
-                      color: deeppink;
+                      color: #F4C241;
+                      width: 135%
                     "
                   >
-                    限定皮肤 - 熊出没
+                    限定技能-不灭意志
                   </div>
                 </template>
                 <template #label>
                   <div style="width: 135%; font-size: smaller">
-                    期中考试前完成本组试题
+                    期末考试前完成本组试题
                   </div>
                   <div
                     style="width: 80%; margin-top: 0.2rem; font-size: smaller"
                   >
-                    免费获得限定皮肤
+                    免费获得
                   </div>
                 </template>
               </van-cell>
@@ -2845,7 +3008,7 @@ onMounted(async () => {
                   class="custom-cell"
                 >
                   <template #icon>
-                    <div v-if="item.alias == '期中庆典'">
+                    <div v-if="item.alias.includes('庆典')">
                       <img
                         v-if="item.rate < 3"
                         src="../assets/Boonie Bears/item_list.png"
@@ -2861,34 +3024,64 @@ onMounted(async () => {
                       />
                     </div>
                     <div v-else>
-                      <img
-                        v-if="
-                          item.rate < 3 && (item.type == 0 || item.type == 1)
-                        "
-                        src="../assets/item_list.png"
-                        style="width: 27px; height: auto; margin-right: 0.5rem"
-                        alt="Item List"
-                      />
-                      <img
-                        v-if="
-                          item.rate >= 3 && (item.type == 0 || item.type == 1)
-                        "
-                        src="../assets/item_list_complete.png"
-                        style="width: 27px; height: auto; margin-right: 0.5rem"
-                        alt="Item List Complete"
-                      />
-                      <img
-                        v-if="item.type == 3"
-                        src="../assets/item_list_complete.png"
-                        style="width: 27px; height: auto; margin-right: 0.5rem"
-                        alt="Item List Complete"
-                      />
-                      <img
-                        v-if="item.type == 2"
-                        src="../assets/item_list.png"
-                        style="width: 27px; height: auto; margin-right: 0.5rem"
-                        alt="Item List"
-                      />
+                      <div v-if="item.is_review_required">
+                        <img
+                          src="../assets/item_list_complete_reviewed.png"
+                          style="
+                            width: 27px;
+                            height: auto;
+                            margin-right: 0.5rem;
+                          "
+                          class="image-middle"
+                          alt="Item List"
+                        />
+                      </div>
+                      <div v-else>
+                        <img
+                          v-if="
+                            item.rate < 3 && (item.type == 0 || item.type == 1)
+                          "
+                          src="../assets/item_list.png"
+                          style="
+                            width: 27px;
+                            height: auto;
+                            margin-right: 0.5rem;
+                          "
+                          alt="Item List"
+                        />
+                        <img
+                          v-if="
+                            item.rate >= 3 && (item.type == 0 || item.type == 1)
+                          "
+                          src="../assets/item_list_complete.png"
+                          style="
+                            width: 27px;
+                            height: auto;
+                            margin-right: 0.5rem;
+                          "
+                          alt="Item List Complete"
+                        />
+                        <img
+                          v-if="item.type == 3"
+                          src="../assets/item_list_complete.png"
+                          style="
+                            width: 27px;
+                            height: auto;
+                            margin-right: 0.5rem;
+                          "
+                          alt="Item List Complete"
+                        />
+                        <img
+                          v-if="item.type == 2"
+                          src="../assets/item_list.png"
+                          style="
+                            width: 27px;
+                            height: auto;
+                            margin-right: 0.5rem;
+                          "
+                          alt="Item List"
+                        />
+                      </div>
                     </div>
                   </template>
 
@@ -2902,7 +3095,7 @@ onMounted(async () => {
                       "
                     >
                       <img
-                        v-show="item.alias == '期中庆典'"
+                        v-show="item.alias.includes('庆典')"
                         src="../assets/Boonie Bears/edge.png"
                         style="
                           width: 25px;
@@ -2931,7 +3124,7 @@ onMounted(async () => {
                       "
                     >
                       <img
-                        v-show="item.alias == '期中庆典'"
+                        v-show="item.alias.includes('庆典')"
                         src="../assets/Boonie Bears/edge.png"
                         style="
                           width: 25px;
@@ -2941,15 +3134,51 @@ onMounted(async () => {
                           margin-right: 0.7rem;
                         "
                       />
-                      <div style="margin-bottom: 7px; font-weight: 700">
+                      <div
+                        v-if="item.is_review_required"
+                        style="
+                          margin-bottom: 7px;
+                          font-weight: 700;
+                          color: lightgray;
+                        "
+                      >
                         {{ processedTitle(item.title) }}
                       </div>
-                      <van-badge content="Game" style="margin-left: -20px" />
+                      <div v-else style="margin-bottom: 7px; font-weight: 700">
+                        {{ processedTitle(item.title) }}
+                      </div>
+                      <van-badge
+                        v-if="item.is_review_required"
+                        color="#D8A7B1"
+                        content="Game"
+                        style="margin-left: -20px"
+                      />
+                      <van-badge
+                        v-else
+                        content="Game"
+                        style="margin-left: -20px"
+                      />
                     </div>
                   </template>
 
                   <template #value>
-                    <div style="font-size: 12px">
+                    <div
+                      v-if="item.is_review_required"
+                      style="font-size: 12px; color: lightgray"
+                    >
+                      <div style="display: flex; justify-content: flex-end">
+                        尝试了
+                        <div style="font-weight: 700; color: bisque">
+                          {{ item.attempt }}
+                        </div>
+                        次
+                      </div>
+
+                      <div style="margin-top: 0.5rem">
+                        {{ item.answers.length }}词
+                      </div>
+                    </div>
+                    <div v-else style="font-size: 12px">
                       <div style="display: flex; justify-content: flex-end">
                         尝试了
                         <div style="font-weight: 700; color: red">
@@ -3003,6 +3232,19 @@ onMounted(async () => {
                   <template #label>
                     <div style="display: flex">
                       <van-rate
+                        v-if="item.is_review_required"
+                        v-model="item.rate"
+                        :size="20"
+                        color="#DBC8AF"
+                        void-icon="like"
+                        icon="like"
+                        void-color="#eee"
+                        :count="3"
+                        readonly
+                        allow-half
+                      />
+                      <van-rate
+                        v-else
                         v-model="item.rate"
                         :size="20"
                         color="#ffd21e"
@@ -3014,13 +3256,36 @@ onMounted(async () => {
                         allow-half
                       />
                       <div
+                        style="
+                          margin-top: 3%;
+                          margin-left: 0.2rem;
+                          color: lightgray;
+                        "
+                        v-if="showRatePlus[index] && item.is_review_required"
+                      >
+                        + {{ formattedRate(item.rate) }}
+                      </div>
+                      <div
                         style="margin-top: 3%; margin-left: 0.2rem"
-                        v-if="showRatePlus[index]"
+                        v-if="showRatePlus[index] && !item.is_review_required"
                       >
                         + {{ formattedRate(item.rate) }}
                       </div>
                     </div>
                     <div
+                      v-if="item.is_review_required"
+                      style="
+                        margin-left: 4px;
+                        margin-top: 7px;
+                        width: 140%;
+                        font-size: 12px;
+                        color: lightgray;
+                      "
+                    >
+                      <div>{{ item.create_time }}</div>
+                    </div>
+                    <div
+                      v-else
                       style="
                         margin-left: 4px;
                         margin-top: 7px;
@@ -3031,21 +3296,32 @@ onMounted(async () => {
                       <div>{{ item.create_time }}</div>
                     </div>
                     <div style="margin-top: 1rem">
-                      <van-progress
-                        v-if="item.alias == '期中庆典'"
-                        color="#f2826a"
-                        :percentage="item.progressPercentage"
-                        stroke-width="2"
-                        :show-pivot="true"
-                        :inactive="item.progressPercentage === 100"
-                      />
-                      <van-progress
-                        v-else
-                        :percentage="item.progressPercentage"
-                        stroke-width="2"
-                        :show-pivot="true"
-                        :inactive="item.progressPercentage === 100"
-                      />
+                      <div v-if="item.is_review_required">
+                        <van-progress
+                          color="lightblue"
+                          :percentage="item.progressPercentage"
+                          stroke-width="2"
+                          :show-pivot="true"
+                          :inactive="item.progressPercentage === 100"
+                        />
+                      </div>
+                      <div v-else>
+                        <van-progress
+                          v-if="item.alias.includes('庆典')"
+                          color="#F4C244"
+                          :percentage="item.progressPercentage"
+                          stroke-width="2"
+                          :show-pivot="true"
+                          :inactive="item.progressPercentage === 100"
+                        />
+                        <van-progress
+                          v-else
+                          :percentage="item.progressPercentage"
+                          stroke-width="2"
+                          :show-pivot="true"
+                          :inactive="item.progressPercentage === 100"
+                        />
+                      </div>
                     </div>
                   </template>
 
@@ -3430,6 +3706,51 @@ onMounted(async () => {
       </div>
     </van-dialog>
 
+    <!-- 复习模式选择 -->
+    <van-dialog
+      v-model:show="showReviewMode"
+      title="模式选择"
+      confirmButtonText="复习模式"
+      @confirm="handleReviewMode"
+    >
+      <template #title>
+        <div>
+          <div style="margin-bottom: 1rem; margin-top: -0.8rem">
+            再次唤醒我吧！
+            <van-progress
+              style="margin-top: 1rem"
+              :pivot-text="`选项难度 ${difficultyCoefficient}`"
+              :color="progressColor"
+              :percentage="difficultyCoefficient"
+            />
+          </div>
+          <van-icon
+            name="cross"
+            @click="showReviewMode = false"
+            style="position: absolute; top: 10px; right: 10px"
+          />
+        </div>
+      </template>
+      <div
+        style="
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100%;
+        "
+      >
+        <img
+          :src="srcTheme"
+          style="
+            max-width: 100%;
+            max-height: 100%;
+            height: auto;
+            display: block;
+          "
+        />
+      </div>
+    </van-dialog>
+
     <!-- 考试模式选择 -->
     <van-dialog
       v-model:show="showChooseTestMode"
@@ -3533,6 +3854,64 @@ onMounted(async () => {
       >
     </van-popup>
 
+    <!-- 复习模式 -->
+    <van-popup
+      position="bottom"
+      :style="{ height: '80%' }"
+      v-model:show="reviewShow"
+      style="padding: 1rem"
+      closeable
+    >
+      <div
+        style="
+          font-weight: 700;
+          font-size: 25px;
+          color: black;
+          margin-bottom: 0.5rem;
+        "
+      >
+        唤醒复习
+        <div
+          style="font-size: 12px; color: red; margin: 0.1rem 0 -0.2rem -0.1rem"
+        >
+          👇 下拉到底部开启唤醒之旅
+        </div>
+      </div>
+
+      <van-cell-group
+        v-for="(item, index) in dataReview"
+        :key="index"
+        style="margin-left: -1rem"
+      >
+        <van-cell
+          :title="`${index + 1}. ${item.英文}`"
+          :value="item.正确答案"
+          :label="item.type"
+          @click="speakWord(item.英文, item.正确答案)"
+          clickable
+        >
+          <template #value>
+            <div>
+              {{ item.正确答案 }}
+              <img
+                src="../assets/speaker.png"
+                style="width: 12px; height: auto; margin-left: 0.2rem"
+              />
+            </div>
+          </template>
+        </van-cell>
+      </van-cell-group>
+
+      <van-button
+        style="margin-bottom: 0.5rem; margin-right: 0.1rem"
+        block
+        type="success"
+        plain
+        @click="startPreExam"
+        >开启旅程</van-button
+      >
+    </van-popup>
+
     <!-- 庆祝三星 -->
     <div v-if="showStars" class="stars">
       <div class="star">🐻</div>
@@ -3547,10 +3926,10 @@ onMounted(async () => {
     <missyou ref="missyouRef" :days="missDays" />
     <threeStar ref="threeStarRef" />
     <loading v-if="isLoading" />
-    <toggleTheme
-      ref="toggleThemeRef"
-      v-if="showToggleTheme"
-      :textGive="'可在商城自由切换主题'"
+    <getPassive
+      ref="getPassiveRef"
+      v-if="showPassiveMagic"
+      :textGive="'不灭的意志'"
     />
   </div>
 </template>
@@ -3586,8 +3965,6 @@ onMounted(async () => {
   margin: 0 auto;
   padding: 0;
 }
-
-
 
 .nav-bar-container {
   position: sticky;

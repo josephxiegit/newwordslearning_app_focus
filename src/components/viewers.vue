@@ -645,6 +645,7 @@ const locationitems = ref([
   { icon: "wap-home-o", text: "小树林" },
   { icon: "wap-home-o", text: "张鑫" },
   { icon: "wap-home-o", text: "上门" },
+  { icon: "wap-home-o", text: "南楼" },
 ]);
 function getNewSidesNames() {
   const filterTitle = tabsName.value[activeTabs.value - 1];
@@ -816,8 +817,8 @@ const reloadPage = () => {
       v-show="showGridLocation"
       direction="horizontal"
       clickable
-      icon-size="14"
-      :column-num="4"
+      icon-size="10"
+      :column-num="5"
     >
       <van-grid-item
         v-for="(item, index) in locationitems"
@@ -859,7 +860,9 @@ const reloadPage = () => {
               :key="index_side"
               :title="sidename"
             />
+            <div style="height: 50px;"></div>
           </van-sidebar>
+          
           <div class="list-container">
             <van-list
               v-model="loadingOriginalData"
@@ -1152,6 +1155,7 @@ const reloadPage = () => {
                 :key="index_side"
                 :title="sidename"
               />
+              <div style="height: 50px;"></div>
             </van-sidebar>
             <div class="list-container">
               <van-list

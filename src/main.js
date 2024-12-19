@@ -214,7 +214,7 @@ router.beforeEach((to, from, next) => {
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
-            (from.path === '/studentAccountPreExam' && to.path === '/studentAccountList') ||
+            // (from.path === '/studentAccountPreExam' && to.path === '/studentAccountList') && (!to.state || !to.state.username || !to.state.data)||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
             (from.path === '/studentAccountItem' && to.meta.preventBack)) {
@@ -251,6 +251,7 @@ const themeMapping = {
     "熊出没": 2,
   };
 const flagTheme = ref(themeMapping[theme_name] || 1);
+const passive_magic = ref(0);
 
 
 import {
@@ -267,6 +268,7 @@ import 'vant/lib/index.css';
 const app = createApp(App);
 app.provide('globalState', globalState);
 app.provide('flagTheme', flagTheme);
+app.provide('passive_magic', passive_magic);
 // 主题路径
 app.config.globalProperties.$bonnieBearsSrc = Global.BONNIE_BEARS_SRC;
 

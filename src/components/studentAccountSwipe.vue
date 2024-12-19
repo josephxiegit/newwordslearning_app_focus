@@ -7,6 +7,7 @@ import {
   computed,
   nextTick,
   onBeforeUnmount,
+  inject,
 } from "vue";
 import {
   showFailToast,
@@ -20,10 +21,13 @@ import { useIntervalFn } from "@vueuse/core";
 import { useRouter } from "vue-router";
 import swipeHelp from "./swipeHelp.vue";
 import submitloading from "./submitloading.vue";
+import passiveMagic from "./passiveMagic.vue";
+import passiveMagic2 from "./passiveMagic2.vue";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const isLoading = ref(false);
+const passive_magic = inject("passive_magic");
 
 const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
@@ -206,6 +210,9 @@ const clickSubmitUser = async (action, done) => {
 
   // 处理迟疑库
   function handleUncertain(uncertainVocabulary, compareResult) {
+    // console.log("uncertainVocabulary: ", uncertainVocabulary);
+    // console.log("compareResult: ", compareResult);
+
     // 转换 uncertainVocabulary 为可以快速查找的 Map 结构
     let uncertainVocabularyMap = new Map(
       [...uncertainVocabulary].map((item) => [item.英文, item])
@@ -257,7 +264,7 @@ const clickSubmitUser = async (action, done) => {
       const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
       function isPhrase(text) {
-        return /\s|,|\/|\.|…/.test(text);
+        return /\s|,|\/|\.|…|-|_/.test(text);
       }
 
       compareResult.forEach((item) => {
@@ -331,7 +338,7 @@ const clickSubmitUser = async (action, done) => {
     spellVocabulary.value = spellVocabulary.value;
   }
 
-  console.log("spellVocabulary", spellVocabulary.value);
+  // console.log("spellVocabulary", spellVocabulary.value);
 
   // 计算金币
   function calculateAccuracy(compareResult) {
@@ -428,21 +435,8 @@ const clickSubmitUser = async (action, done) => {
   const newCoins = totalCoins.value;
   // console.log("newCoins: ", newCoins);
 
-  isLoading.value = true;
-  const redirectTimeout = setTimeout(() => {
-    isLoading.value = false; // 先停止加载状态
-
-    showDialog({
-      title: "网络延迟",
-      message: "请重新登陆，上次答题将会正常提交",
-      theme: "round-button",
-    }).then(() => {
-      router.push("/homepage");
-    });
-  }, 20000);
-
   function redirect() {
-    clearTimeout(redirectTimeout);
+    // clearTimeout(redirectTimeout);
     router.push({
       path: "/studentAccountAnswer",
       state: {
@@ -460,44 +454,114 @@ const clickSubmitUser = async (action, done) => {
       },
     });
   }
+
+  // let accountDataResult;
+  // if (compareResult.length == 0) {
+  //   showFailToast("提交数据不能为空");
+  //   isLoading.value = false;
+  //   return;
+  // } else {
+  //   // 如果 updateAccountlog 成功，继续执行其他操作
+  //   accountDataResult = await updateAccountData();
+  //   if (accountDataResult === "不能提交相同内容") {
+  //     isLoading.value = false;
+  //     showDialog({
+  //       title: "错误",
+  //       message: "数据已提交，跳转答案页",
+  //       theme: "round-button",
+  //     }).then(() => {
+  //       redirect();
+  //     });
+
+  //     return;
+  //   }
+
+  //   let UncertainResult;
+  //   if (uncertainVocabulary.value.size != 0) {
+  //     UncertainResult = await updateUncertain(accountDataResult.new_log_nid);
+  //   }
+
+  //   // 如果所有操作都成功，处理结果
+  //   isLoading.value = false;
+
+  //   // 清楚store
+  //   sessionStorage.removeItem("numberShowAnswer");
+  //   sessionStorage.removeItem("numberTransparent");
+  //   sessionStorage.removeItem("numberPrev");
+  //   changeOverlayColor("rgba(128, 128, 128, 0.6)");
+  //   redirect();
+  // }
+
+  // 开始加载
+  isLoading.value = true;
+  // 创建一个超时的 Promise
+  const timeoutPromise = new Promise(
+    (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
+  );
+
+  // 创建一个更新账户数据的 Promise
+  const updateAccountPromise = updateAccountData();
+
+  // 使用 Promise.race 来竞速两个 Promise：正常的请求和超时的 Promise
   let accountDataResult;
-  if (compareResult.length == 0) {
-    showFailToast("提交数据不能为空");
-    isLoading.value = false;
-    return;
-  } else {
-    // 如果 updateAccountlog 成功，继续执行其他操作
-    accountDataResult = await updateAccountData();
-    // console.log("accountDataResult: ", accountDataResult);
+  try {
+    accountDataResult = await Promise.race([
+      updateAccountPromise,
+      timeoutPromise,
+    ]);
+
     if (accountDataResult === "不能提交相同内容") {
+      // 如果账户数据已提交，显示对话框并跳转
       isLoading.value = false;
       showDialog({
-        title: "错误",
-        message: "数据已提交，点击跳转答案页",
+        title: "恭喜！提交成功！",
+        message: "跳转答案页",
         theme: "round-button",
       }).then(() => {
         redirect();
       });
-
       return;
     }
-
+  } catch (error) {
+    // 如果超时，弹出超时提醒
+    if (error.message === "请求超时") {
+      isLoading.value = false; // 停止加载
+      showDialog({
+        title: "超时",
+        message: "请求超时，请稍后再试。",
+        theme: "round-button",
+      }).then(() => {
+        return;
+        // 让用户重新点击提交
+        // 可以根据需要做其他处理，例如恢复按钮状态
+      });
+    } else {
+      // 其他错误
+      console.log("发生错误:", error.message);
+    }
+    return; // 不跳转
+  } finally {
+    // 尝试更新不确定词汇（如果有的话）
     let UncertainResult;
-    if (uncertainVocabulary.value.size != 0) {
-      UncertainResult = await updateUncertain(accountDataResult.new_log_nid);
+    try {
+      if (uncertainVocabulary.value.size !== 0) {
+        UncertainResult = await updateUncertain(accountDataResult?.new_log_nid);
+      }
+    } catch (error) {
+      console.log("更新不确定词汇时发生错误:", error);
     }
 
-    // 如果所有操作都成功，处理结果
+    // 停止加载，清除 session
     isLoading.value = false;
-
-    // 清楚store
     sessionStorage.removeItem("numberShowAnswer");
     sessionStorage.removeItem("numberTransparent");
     sessionStorage.removeItem("numberPrev");
     changeOverlayColor("rgba(128, 128, 128, 0.6)");
-    redirect();
 
-    isLoading.value = false;
+    // 跳转（只有在没有超时的情况下才执行）
+    if (accountDataResult && accountDataResult !== "不能提交相同内容") {
+      redirect();
+    }
   }
 };
 
@@ -517,6 +581,7 @@ function addUncertain(index, content) {
   const exists = Array.from(uncertainVocabulary.value).find((vocab) => {
     return vocab.英文 === uncertainItem;
   });
+  console.log("exists: ", exists);
 
   if (exists) {
     const types = exists.type.split(","); // 将 type 字符串分割为数组
@@ -749,15 +814,37 @@ function isSelected(index, index2) {
 }
 function speakWord(word) {
   // 发音
-  const utterance = new SpeechSynthesisUtterance(word);
-  // utterance.lang = 'en-US';
-  utterance.lang = "zh-CN";
+  let utterance = new SpeechSynthesisUtterance(word);
+  if (!/[a-zA-Z]/.test(word)) {
+    utterance.lang = "zh-CN";
+  } else {
+    utterance.lang = "en-US";
+  }
+  // utterance.lang = "zh-CN";
   setTimeout(() => {
     window.speechSynthesis.speak(utterance);
   }, 800);
 }
 
 const submitFlag = ref(false);
+function isSelectionTrue(currentSlideIndex) {
+  const userSelection = resultDataTempt.value[currentSlideIndex]["用户选择"];
+  const correctAnswer = mergedData.value[currentSlideIndex]["答案"];
+  const correctArray = correctAnswer
+    .split(/；|,/)
+    .map((item) => item.trim())
+    .sort();
+  const userArray = userSelection
+    .join(",")
+    .split(/；|,/)
+    .map((item) => item.trim())
+    .sort();
+  const areEqual =
+    correctArray.length === userArray.length &&
+    correctArray.every((item) => userArray.includes(item));
+  // console.log("areEqual: ", areEqual);
+  return areEqual;
+}
 const goToNext = () => {
   // 获取当前轮播图的索引
   const currentSlideIndex = currentIndex.value;
@@ -775,6 +862,23 @@ const goToNext = () => {
     showFailToast("不能为空");
     return; // 如果没有选中项，直接返回，不进行后续操作
   }
+  // 判断对错
+  const areEqual = isSelectionTrue(currentSlideIndex);
+  if (!areEqual && flagPassiveMagic.value) {
+    const randomChance = Math.random();
+    if (randomChance < 0.7) {
+      showAnimationPassiveMagic();
+      pause();
+      setTimeout(() => {
+        currentRate.value = 100;
+        timerRate.value = 100;
+        resume();
+      }, 3400);
+      flagPassiveMagic.value = false;
+      return;
+    }
+  }
+
   if (!isButtonDisabled.value) {
     const now = new Date().getTime();
     if (firstClickTime.value === null) {
@@ -785,11 +889,6 @@ const goToNext = () => {
       const interval =
         (now - (lastClickTime.value || firstClickTime.value)) / 1000;
       totalTimeInterval.value += interval;
-      // console.log(
-      //   "Time interval between clicks:",
-      //   totalTimeInterval.value,
-      //   "s"
-      // );
     }
     // 更新最后一次点击的时间戳
     lastClickTime.value = now;
@@ -807,10 +906,13 @@ const goToNext = () => {
       console.log("totalTimeInterval: ", totalTimeInterval.value);
       console.log("standardTimeInterval: ", standardTimeInterval.value);
       if (submitFlag) {
+        console.log(111)
+        pause();
         clickSubmitUser();
       } else {
         if (totalTimeInterval.value <= standardTimeInterval.value) {
           submitFlag.value = true;
+          console.log(222)
           clickSubmitUser();
         } else {
           showFailToast("监测到作弊行为，请重新作答");
@@ -1216,6 +1318,27 @@ const gotoPreHelp = (flag) => {
 // 动画场外支援
 const swipeHelpRef = ref(null);
 
+// 被动技能
+const passiveMagicRef = ref(null);
+const passiveMagic2Ref = ref(null);
+const flagPassiveMagic = ref(false);
+function showAnimationPassiveMagic() {
+  // 加入迟疑库
+  if (!synonymsOptions.value[currentIndex.value].is_spell) {
+    // console.log("currentIndex.value: ", currentIndex.value);
+    addUncertain(currentIndex.value, "被动魔法");
+  }
+
+  passiveMagicRef.value.show();
+  setTimeout(() => {
+    passiveMagicRef.value.hide();
+    passiveMagic2Ref.value.show();
+    setTimeout(() => {
+      passiveMagic2Ref.value.hide();
+    }, 1500);
+  }, 1800);
+}
+
 // 计时器
 const timerRate = ref(0);
 const autoplay2 = ref(8000);
@@ -1283,6 +1406,23 @@ const resetTimer = () => {
   totalTimeInterval.value += interval;
   // console.log("Time interval between clicks:", totalTimeInterval.value, "s");
   setTimeout(() => {
+    // 判断对错
+    const areEqual = isSelectionTrue(currentIndex.value);
+    if (!areEqual && flagPassiveMagic.value) {
+      const randomChance = Math.random();
+      if (randomChance < 0.7) {
+        showAnimationPassiveMagic();
+        pause();
+        setTimeout(() => {
+          currentRate.value = 100;
+          timerRate.value = 100;
+          resume();
+        }, 3400);
+        flagPassiveMagic.value = false;
+        return;
+      }
+    }
+
     if (currentIndex.value < totalSlides.value - 1) {
       swipeRef.value.next();
       setTimeout(() => {
@@ -1303,6 +1443,7 @@ const resetTimer = () => {
       // console.log("totalTimeInterval: ", totalTimeInterval.value);
       // console.log("standardTimeInterval: ", standardTimeInterval.value);
       if (totalTimeInterval.value <= standardTimeInterval.value) {
+        console.log(333)
         clickSubmitUser();
       } else {
         showFailToast("监测到作弊行为，请重新作答");
@@ -1363,8 +1504,11 @@ const handleSwipeChange = (index) => {
     autoplay2.value = autoplayInit.value;
   }
   // console.log(autoplay2.value);
-  speakWord(synonymsOptions.value[index]["英文"]);
-
+  try {
+    speakWord(synonymsOptions.value[index]["英文"]);
+  } catch (error) {
+    console.error("Error speaking word:", error);
+  }
   showAnswerIsSpell.value = "";
   // selectedItems.value = [];
   currentIndex.value = index;
@@ -1409,6 +1553,11 @@ onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onMounted(async () => {
+  // 被动技能
+  flagPassiveMagic.value = passive_magic.value;
+  // flagPassiveMagic.value = true;
+  console.log("flagPassiveMagic", flagPassiveMagic.value);
+
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
   // 监测恶意刷新
@@ -1451,7 +1600,7 @@ onMounted(async () => {
 
   const initData = async () => {
     // 初始化数据
-    console.log("history.state: ", history.state);
+    // console.log("history.state: ", history.state);
     const data = JSON.parse(history.state.data);
     console.log("data: ", data);
 
@@ -1493,8 +1642,11 @@ onMounted(async () => {
     synonymsOptions.value = data.synonyms;
 
     console.log("synonymsOptions: ", synonymsOptions.value);
-    speakWord(synonymsOptions.value[0]["英文"]);
-
+    try {
+      speakWord(synonymsOptions.value[0]["英文"]);
+    } catch (error) {
+      showToast("此浏览器不支持发音，请更换chrome或edge");
+    }
     answers.value = data.answers;
     synonymsOptions.value.forEach((item) => {
       if (item.is_spell) {
@@ -1831,6 +1983,8 @@ onMounted(async () => {
     </van-row>
 
     <submitloading v-if="isLoading" />
+    <passive-magic ref="passiveMagicRef" />
+    <passive-magic-2 ref="passiveMagic2Ref" />
   </div>
 </template>
 

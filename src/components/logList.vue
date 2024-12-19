@@ -94,7 +94,7 @@ function processData(res) {
       const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
       if (!hasFlagField) {
         parsedLog.forEach((logItem) => {
-          const correctAnswer = logItem.正确答案;
+          const correctAnswer = logItem.答案;
           const userSelection = logItem.用户选择;
 
           // 将字符串转换为数组并去除空格
@@ -120,7 +120,7 @@ function processData(res) {
           count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
         );
       }, 0);
-      parsedLog.falseCount = falseCount; // 添加 falseCount 到 parsedLog 中
+      parsedLog.falseCount = falseCount;
 
       return {
         title,
