@@ -75,6 +75,7 @@ function processData(res) {
         .replace(/"m /g, "'m ")
         .replace(/can"t/g, "can't")
         .replace(/mustn"t/g, "mustn't")
+        .replace(/needn"t/g, "needn't")
         .replace(/won"t/g, "won't");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
@@ -84,12 +85,12 @@ function processData(res) {
         .replace(/\bNone\b/g, "null");
         
       let parsedLog;
-      try {
-        parsedLog = JSON.parse(dataString); // 尝试解析 JSON
-      } catch (error) {
-        console.error("JSON parsing error:", error); // 捕获并记录错误
-        return null; // 返回 null 以便后续过滤
-      }
+      // try {
+        parsedLog = JSON.parse(dataString);
+      // } catch (error) {
+      //   console.error("JSON parsing error:", error); 
+      //   return null; 
+      // }
 
       const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
       if (!hasFlagField) {

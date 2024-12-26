@@ -428,6 +428,7 @@ const clickSubmitUser = async (action, done) => {
         (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
       );
       isLoading.value = true;
+      startAnimation();
 
       // console.log('compareResult', compareResult);
       if (compareResult.length == 0) {
@@ -481,7 +482,8 @@ const clickSubmitUser = async (action, done) => {
           // 如果超时，弹出超时提醒
           if (error.message === "请求超时") {
             isLoading.value = false; // 停止加载
-            console.log(22222)
+            stopAnimation();
+            console.log(22222);
             showDialog({
               title: "超时",
               message: "请求超时，请稍后再试。",
@@ -521,7 +523,7 @@ const clickSubmitUser = async (action, done) => {
           sessionStorage.removeItem("flagHelp");
           // 执行页面跳转等其他操作
           if (accountDataResult && accountDataResult !== "不能提交相同内容") {
-            console.log(11111)
+            console.log(11111);
             redirect();
           }
         }
@@ -947,6 +949,38 @@ const toggleCheckChinese = (index, index2) => {
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
+
+// 提交进度条
+const percentage = ref(100); // 初始值为 100%
+const showProgress = ref(false);
+let intervalId = null; // 保存定时器的 ID
+const stopAnimation = () => {
+    clearInterval(intervalId); // 清除定时器
+    intervalId = null; // 避免重复调用
+    showProgress.value = false; // 隐藏进度条
+    percentage.value = 0; // 重置进度条为 0
+};
+const startAnimation = () => {
+  if (intervalId) {
+    clearInterval(intervalId); // 清除之前的定时器，防止重复动画
+  }
+
+  showProgress.value = true; // 显示进度条
+  percentage.value = 100; // 初始化进度条为 100%
+
+  const duration = 6000; // 动画总时长 6 秒
+  const step = 100 / (duration / 50); // 每 50ms 减少的百分比
+
+  intervalId = setInterval(() => {
+    if (percentage.value > 0) {
+      percentage.value = Math.max(0, percentage.value - step); // 确保 percentage 不低于 0
+    } else {
+      percentage.value = 0;
+      clearInterval(intervalId); // 清除定时器
+      showProgress.value = false; // 动画结束后隐藏进度条
+    }
+  }, 50);
+};
 
 // 场外支援
 const flagHelp = ref(true);
@@ -1454,6 +1488,14 @@ onMounted(async () => {
         </div>
       </van-cell-group>
     </van-checkbox-group>
+    <!-- 进度条 -->
+    <div class="progress" v-if="showProgress">
+      <van-progress
+        pivot-text="努力提交..."
+        color="#f2826a"
+        :percentage="percentage"
+      />
+    </div>
     <div class="bottom-placeholder"></div>
     <encouragement ref="encouragementRef" />
     <helpforgood ref="helpforgoodRef" />
@@ -1555,5 +1597,13 @@ onMounted(async () => {
   color: #208bfa;
   cursor: pointer;
   user-select: none;
+}
+
+.progress {
+  position: fixed; /* 固定定位，确保进度条在屏幕的特定位置 */
+  left: 50%; /* 水平居中 */
+  bottom: 25%; /* 距离屏幕底部 25% */
+  transform: translateX(-50%); /* 修正水平居中时的偏移 */
+  width: 80%; /* 设置进度条的宽度，根据需要调整 */
 }
 </style>

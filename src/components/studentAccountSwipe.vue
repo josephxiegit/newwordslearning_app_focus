@@ -498,7 +498,7 @@ const clickSubmitUser = async (action, done) => {
   const timeoutPromise = new Promise(
     (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
   );
-
+  startAnimation();
   // 创建一个更新账户数据的 Promise
   const updateAccountPromise = updateAccountData();
 
@@ -526,6 +526,7 @@ const clickSubmitUser = async (action, done) => {
     // 如果超时，弹出超时提醒
     if (error.message === "请求超时") {
       isLoading.value = false; // 停止加载
+      stopAnimation();
       showDialog({
         title: "超时",
         message: "请求超时，请稍后再试。",
@@ -920,6 +921,38 @@ const goToNext = () => {
       }
     }
   }
+};
+
+// 提交进度条
+const percentage = ref(100); // 初始值为 100%
+const showProgress = ref(false);
+let intervalId = null; // 保存定时器的 ID
+const stopAnimation = () => {
+    clearInterval(intervalId); // 清除定时器
+    intervalId = null; // 避免重复调用
+    showProgress.value = false; // 隐藏进度条
+    percentage.value = 0; // 重置进度条为 0
+};
+const startAnimation = () => {
+  if (intervalId) {
+    clearInterval(intervalId); // 清除之前的定时器，防止重复动画
+  }
+
+  showProgress.value = true; // 显示进度条
+  percentage.value = 100; // 初始化进度条为 100%
+
+  const duration = 6000; // 动画总时长 6 秒
+  const step = 100 / (duration / 50); // 每 50ms 减少的百分比
+
+  intervalId = setInterval(() => {
+    if (percentage.value > 0) {
+      percentage.value = Math.max(0, percentage.value - step); // 确保 percentage 不低于 0
+    } else {
+      percentage.value = 0;
+      clearInterval(intervalId); // 清除定时器
+      showProgress.value = false; // 动画结束后隐藏进度条
+    }
+  }, 50);
 };
 
 // 场外支援；暂停功能
@@ -1981,7 +2014,14 @@ onMounted(async () => {
         </van-row>
       </van-col>
     </van-row>
-
+    <!-- 进度条 -->
+    <div class="progress" v-if="showProgress">
+      <van-progress
+        pivot-text="努力提交..."
+        color="#f2826a"
+        :percentage="percentage"
+      />
+    </div>
     <submitloading v-if="isLoading" />
     <passive-magic ref="passiveMagicRef" />
     <passive-magic-2 ref="passiveMagic2Ref" />
@@ -2183,5 +2223,13 @@ html {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+.progress {
+  position: fixed; /* 固定定位，确保进度条在屏幕的特定位置 */
+  left: 50%; /* 水平居中 */
+  bottom: 25%; /* 距离屏幕底部 25% */
+  transform: translateX(-50%); /* 修正水平居中时的偏移 */
+  width: 80%; /* 设置进度条的宽度，根据需要调整 */
 }
 </style>

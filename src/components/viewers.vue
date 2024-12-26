@@ -139,6 +139,7 @@ const searchpurchase = (item, index) => {
 // 查询日志
 const showAccountLog = ref(false);
 const answerLogList = ref([]);
+const reviewLogList = ref([]);
 const totalHelp = ref(0);
 const isLateNight = ref(false);
 function formatDate_log(isoString) {
@@ -188,17 +189,39 @@ const searchLog = (item, index) => {
             .replace(/"t /g, "'t ")
             .replace(/"m /g, "'m ")
             .replace(/can"t/g, "can't")
-            .replace(/mustn"t/g, "mustn't");
+            .replace(/mustn"t/g, "mustn't")
+            .replace(/needn"t/g, "needn't");
 
           dataString = dataString
             .replace(/\bFalse\b/g, "false")
             .replace(/\bTrue\b/g, "true");
 
           item.log = JSON.parse(dataString);
+          // console.log("item: ", item);
 
-          const trueCount = item.log.filter(
-            (entry) => entry.flag === "true"
-          ).length;
+          let trueCount;
+          if (item.swipe == "复习") {
+            trueCount = 0;
+            for (let i = 0; i < item.log.length; i++) {
+              const correctAnswer = item.log[i]["正确答案"];
+              const correctArray = correctAnswer
+                .split(/；|,/)
+                .map((item) => item.trim())
+                .sort();
+
+              const userSelection = item.log[i]["用户选择"];
+              const areEqual =
+                correctArray.length === userSelection.length &&
+                correctArray.every((item) => userSelection.includes(item));
+              if (areEqual) {
+                trueCount += 1;
+              }
+            }
+          } else {
+            trueCount = item.log.filter(
+              (entry) => entry.flag === "true"
+            ).length;
+          }
 
           item.true_length = trueCount;
         });
@@ -226,7 +249,8 @@ const searchLog = (item, index) => {
         });
         // console.log("isLateNight:", isLateNight.value);
 
-        answerLogList.value = res;
+        answerLogList.value = res.filter((item) => item.swipe !== "复习");
+        reviewLogList.value = res.filter((item) => item.swipe == "复习");
       }
       resolve();
     });
@@ -332,53 +356,10 @@ const toggleDetail = (item, index) => {
 };
 
 // 编辑数据
-const showReviseData = ref(false);
 const itemEdit = ref("");
-const valueAlias = ref("");
-const valueTitle = ref("");
-const valueStar = ref(0);
-const valueAttempt = ref(0);
-const valueType = ref(0);
-const valueView = ref(0);
-const valueSwipe = ref(0);
-const valueMerge = ref(1);
-const valueReversed = ref(0);
-const valueNoneOfAbove = ref(0);
-const valueCoins = ref(2000);
-const valueContents = ref("");
-const valueNid = ref("");
-const valueIsSpell = ref(3);
 
 const showSelectSpellVocabulary = ref(false);
 const selectSpellVocabulary = ref([]);
-async function reviseUserData() {
-  let params = new URLSearchParams();
-  params.append("method", "reviseUserData");
-  params.append("title", valueTitle.value);
-  params.append("nid", valueNid.value);
-  params.append("alias", valueAlias.value);
-  params.append("attempt", valueAttempt.value);
-  params.append("view", valueView.value);
-  params.append("rate", valueStar.value);
-  params.append("swipe", valueSwipe.value);
-  params.append("type", valueType.value);
-  params.append("merge_option", valueMerge.value);
-  params.append("reversd_number", valueReversed.value);
-  params.append("none_of_above", valueNoneOfAbove.value);
-  params.append("is_spell_number", valueIsSpell.value);
-  return await axios.post("words/", params).then((ret) => {
-    return ret.data;
-  });
-}
-async function getSpellVocabulary() {
-  let params = new URLSearchParams();
-  params.append("method", "getSpellVocabulary");
-  params.append("username", itemEdit.value.username);
-  params.append("account_data_id", itemEdit.value.nid);
-  return await axios.post("words/", params).then((ret) => {
-    return ret.data.spell_vocabulary_records;
-  });
-}
 
 const checkboxRefs2 = ref({});
 const synonymsSelected = ref([]);
@@ -560,34 +541,8 @@ const onClickTab = ({ title }) => {
   loadingOriginalData.value = false;
   finishedOriginalData.value = false;
   pageIndexOriginalData.value = 0;
-  getNewSidesNames();
-  // console.log(sidesName.value);
-  if (title == "全部") {
-    sidesName.value = usersData.value.map((item) => item.username);
-  } else {
-    sidesName.value = usersData.value
-      .filter((item) => item.grade_name === title)
-      .map((item) => item.username);
-  }
-  // console.log(sidesName.value);
-
-  if (filterLocation.value != "") {
-    const filterTitle = tabsName.value[activeTabs.value - 1];
-    // console.log("filterTitle: ", filterTitle);
-    if (filterTitle) {
-      sidesName.value = backupSides.value.filter((name) => {
-        return usersData.value.some((user) => {
-          return (
-            user.username === name &&
-            user.location_name === filterLocation.value &&
-            user.grade_name === filterTitle
-          );
-        });
-      });
-    }
-  }
-
-  sidesName.value.unshift("全部");
+  sidesName.value = getNewSidesNames();
+  // console.log("sidesName", sidesName.value);
 };
 
 // 点击具体项
@@ -613,10 +568,10 @@ const backupSides = ref([]);
 
 const onChangeSidebar = async (index) => {
   let title;
-  if (sidesName.value[index] == "全部") {
+  if (sidesName.value[index]["username"] == "全部") {
     filterName.value = "";
   } else {
-    filterName.value = sidesName.value[index];
+    filterName.value = sidesName.value[index]["username"];
   }
   let newtabsName;
   if (!tabsName.value.includes("全部")) {
@@ -648,28 +603,59 @@ const locationitems = ref([
   { icon: "wap-home-o", text: "南楼" },
 ]);
 function getNewSidesNames() {
-  const filterTitle = tabsName.value[activeTabs.value - 1];
-  // console.log("filterTitle: ", filterTitle);
-
-  let filteredSidesName = backupSides.value.filter((name) => {
-    return usersData.value.some((user) => {
-      // 先检查 filterTitle 是否存在
-      if (filterTitle) {
-        return (
-          user.username === name &&
-          user.location_name === filterLocation.value &&
-          user.grade_name === filterTitle
-        ); // 添加 grade_name 的检查
-      } else {
-        // 如果 filterTitle 不存在，则只检查 username 和 location_name
-        return (
-          user.username === name && user.location_name === filterLocation.value
-        );
-      }
+  const filterTitle = tabsName.value[activeTabs.value - 1] || "全部";
+  // console.log("filtergrade: ", filterTitle);
+  // console.log("filterLocation: ", filterLocation.value);
+  let filteredSidesName = [];
+  if (filterTitle === "全部") {
+    filteredSidesName = backupSides.value.filter((nameObj) => {
+      return usersData.value.some((user) => {
+        if (filterTitle && filterLocation.value !== "") {
+          // 点击年级时，同时检查 grade_name 和 location_name
+          return (
+            user.username === nameObj.username &&
+            user.location_name === filterLocation.value
+          );
+        } else if (filterTitle && filterLocation.value === "") {
+          // 点击年级时，但是没有地点筛选
+          return user.username === nameObj.username;
+        } else {
+          // 点击地点时，只检查 location_name
+          return (
+            user.username === nameObj.username &&
+            user.location_name === filterLocation.value
+          );
+        }
+      });
     });
-  });
+  } else {
+    filteredSidesName = backupSides.value.filter((nameObj) => {
+      return usersData.value.some((user) => {
+        if (filterTitle && filterLocation.value !== "") {
+          // 点击年级时，同时检查 grade_name 和 location_name
+          return (
+            user.username === nameObj.username &&
+            user.location_name === filterLocation.value &&
+            user.grade_name === filterTitle
+          );
+        } else if (filterTitle && filterLocation.value === "") {
+          // 点击年级时，但是没有地点筛选
+          return (
+            user.username === nameObj.username &&
+            user.grade_name === filterTitle
+          );
+        } else {
+          // 点击地点时，只检查 location_name
+          return (
+            user.username === nameObj.username &&
+            user.location_name === filterLocation.value
+          );
+        }
+      });
+    });
+  }
 
-  filteredSidesName.unshift("全部");
+  filteredSidesName.unshift({ username: "全部", total_reviews: 0 });
   return filteredSidesName;
 }
 
@@ -685,22 +671,23 @@ const toggleLocationSelection = (index) => {
     sidesName.value = backupSides.value;
     const filterTab = listTabs[activeTabs.value];
 
-    if (filterTab == "全部") {
-      sidesName.value = usersData.value.map((item) => item.username);
-      sidesName.value.unshift("全部");
-    } else {
+    if (filterTab != "全部") {
       sidesName.value = usersData.value
         .filter((item) => item.grade_name === filterTab)
-        .map((item) => item.username);
-      sidesName.value.unshift("全部");
+        .map((item) => {
+          // 根据 username 在 sidesName.value 中找到对应的项
+          return sidesName.value.find(
+            (side) => side.username === item.username
+          );
+        });
+      sidesName.value.unshift({ username: "全部", total_reviews: 0 });
     }
-
-    // console.log('sidesName cancel location: ', sidesName.value);
   } else {
     // 选择地点
     selectedIndexLocation.value = index;
     filterLocation.value =
       locationitems.value[selectedIndexLocation.value].text;
+
     sidesName.value = getNewSidesNames();
   }
   activeSidebar.value = 0;
@@ -744,12 +731,20 @@ const onclickOptionSort = (valueSort) => {
     });
   }
 };
+// 复习
+const getSidesNameReviews = async (sidesName) => {
+  const params = new URLSearchParams();
+  params.append("method", "getSidesNameReviews");
+  params.append("usernames", sidesName);
+  const response = await axios.post("words/", params);
+  return response.data.data;
+};
 
 const viewername = ref("");
 const usersData = ref("");
 onMounted(async () => {
   const data = JSON.parse(history.state.data);
-  console.log("data: ", data);
+  // console.log("data: ", data);
   viewername.value = data.viewer_data[0].viewer_name;
   if (viewername.value === "josephxie") showGridLocation.value = true;
   // console.log("viewername: ", viewername.value);
@@ -757,11 +752,14 @@ onMounted(async () => {
   // console.log("tabsName: ", tabsName.value);
 
   usersData.value = data.users;
+  // console.log('usersData.value: ', usersData.value)
+  let users = data.users.map((item) => item.username);
+  users.unshift("全部");
+  sidesName.value = await getSidesNameReviews(users);
+  // console.log('sidesName: ', sidesName.value);
 
-  sidesName.value = data.users.map((item) => item.username);
-  console.log("usersData: ", usersData.value);
-  sidesName.value.unshift("全部");
   backupSides.value = [...sidesName.value];
+  // backupSides.value = [...sidesName.value];
 });
 
 // 刷新页面
@@ -830,6 +828,7 @@ const reloadPage = () => {
         class="custom-grid-item"
       />
     </van-grid>
+
     <!-- Dropdown -->
     <van-dropdown-menu>
       <van-dropdown-item
@@ -838,7 +837,6 @@ const reloadPage = () => {
         @change="onclickOptionSort(valueSort)"
       />
     </van-dropdown-menu>
-
     <van-tabs
       class="tabs-container"
       v-model:active="activeTabs"
@@ -858,11 +856,14 @@ const reloadPage = () => {
               style="font-size: smaller"
               v-for="(sidename, index_side) in sidesName"
               :key="index_side"
-              :title="sidename"
-            />
-            <div style="height: 50px;"></div>
+              :title="sidename.username"
+              :badge="
+                sidename.total_reviews > 0 ? sidename.total_reviews : null
+              "
+            >
+            </van-sidebar-item>
+            <div style="height: 45px"></div>
           </van-sidebar>
-          
           <div class="list-container">
             <van-list
               v-model="loadingOriginalData"
@@ -926,7 +927,13 @@ const reloadPage = () => {
                             <div style="font-size: smaller; color: lightgray">
                               最后一次背诵时间：
                             </div>
-                            <div style="margin-top: 0.3rem">
+                            <div
+                              v-if="item.is_review_required > 0"
+                              style="margin-top: 0.3rem; color: lightgray"
+                            >
+                              {{ item.create_time }}
+                            </div>
+                            <div v-else style="margin-top: 0.3rem">
                               {{ item.create_time }}
                             </div>
                           </div>
@@ -1153,9 +1160,12 @@ const reloadPage = () => {
                 style="font-size: smaller"
                 v-for="(sidename, index_side) in sidesName"
                 :key="index_side"
-                :title="sidename"
+                :title="sidename.username"
+                :badge="
+                  sidename.total_reviews > 0 ? sidename.total_reviews : null
+                "
               />
-              <div style="height: 50px;"></div>
+              <div style="height: 45px"></div>
             </van-sidebar>
             <div class="list-container">
               <van-list
@@ -1220,7 +1230,13 @@ const reloadPage = () => {
                               <div style="font-size: smaller; color: lightgray">
                                 最后一次背诵时间：
                               </div>
-                              <div style="margin-top: 0.3rem">
+                              <div
+                                v-if="item.is_review_required > 0"
+                                style="margin-top: 0.3rem; color: lightgray"
+                              >
+                                {{ item.create_time }}
+                              </div>
+                              <div v-else style="margin-top: 0.3rem">
                                 {{ item.create_time }}
                               </div>
                             </div>
@@ -1500,6 +1516,42 @@ const reloadPage = () => {
             >
               <span>本次背诵购买了{{ type }}{{ count }}次</span>
             </div>
+          </div>
+          <van-divider />
+        </div>
+
+        <!-- 复习记录 -->
+        <div v-if="reviewLogList.length > 0">
+          <div
+            style="
+              font-weight: 700;
+              margin: 1rem 0 0.5rem 1rem;
+              color: green;
+              font-size: ;
+            "
+          >
+            复习次数记录:
+          </div>
+          <div v-for="(item, index) in reviewLogList" :key="index">
+            <van-cell
+              :label="`正确率：${item.true_length} / ${item.log.length}`"
+              is-link
+              @click="toggleDetail(item, index)"
+            >
+              <template #title>
+                <div style="font-size: smaller; font-weight: 700">
+                  <div>背诵时间:</div>
+                  <div style="margin-top: 0.3rem">
+                    {{ formatDate_log(item.create_time) }}
+                  </div>
+                </div>
+              </template>
+              <template #value>
+                <div style="margin-top: 0rem; font-size: smaller">
+                  <div>{{ item.swipe }}</div>
+                </div>
+              </template>
+            </van-cell>
           </div>
           <van-divider />
         </div>

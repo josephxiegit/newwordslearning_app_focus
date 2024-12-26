@@ -62,11 +62,14 @@ function processDatetime(res) {
       is_spell_number,
       spell_words,
       lock_spell,
-      is_pinned
+      is_pinned,
+      is_review_required,
+      review_time,
     } = item;
 
     const formattedCreateTime = formatDateString(create_time);
     const formattedViewTime = formatDateString(view_time);
+    const formattedReviewTime = formatDateString(review_time);
 
     let lock_spell_format;
     if (lock_spell === null) {
@@ -117,7 +120,9 @@ function processDatetime(res) {
       spell_words,
       lock_spell: lock_spell_format,
       spell_words_length: spell_words_length,
-      is_pinned
+      is_pinned,
+      is_review_required,
+      review_time: formattedReviewTime,
     };
   });
 }
@@ -292,6 +297,7 @@ const searchLog = (item, index) => {
           .replace(/"m /g, "'m ")
           .replace(/can"t/g, "can't")
           .replace(/mustn"t/g, "mustn't")
+          .replace(/needn"t/g, "needn't")
           .replace(/won"t/g, "won't");
 
         dataString = dataString
@@ -506,7 +512,9 @@ function processData(res) {
       is_spell_number,
       lock_spell,
       spell_words,
-      is_pinned
+      is_pinned,
+      is_review_required,
+      review_time,
     } = item;
     // let dataAnswers = answers.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
     // dataAnswers = dataAnswers.replace(
@@ -558,7 +566,9 @@ function processData(res) {
       is_spell_number,
       lock_spell: lock_spell_format,
       spell_words,
-      is_pinned
+      is_pinned,
+      is_review_required,
+      review_time,
     };
   });
 }
@@ -700,6 +710,8 @@ const valueContents = ref("");
 const valueIsPinned = ref("");
 const valueNid = ref("");
 const valueIsSpell = ref(3);
+const valueIsReviewRequired = ref(0);
+const valueReviewTime = ref("");
 const editData = (index) => {
   itemEdit.value = filterXlsmData.value[index];
   console.log("itemEdit: ", itemEdit.value);
@@ -707,6 +719,8 @@ const editData = (index) => {
   showReviseData.value = true;
   valueIsPinned.value = itemEdit.value.is_pinned ? 1 : 0;
   valueAlias.value = itemEdit.value.alias;
+  valueIsReviewRequired.value = itemEdit.value.is_review_required;
+  valueReviewTime.value = itemEdit.value.review_time;
   valueTitle.value = itemEdit.value.title;
   valueStar.value = itemEdit.value.rate;
   valueSwipe.value = itemEdit.value.swipe;
@@ -729,6 +743,7 @@ const editData = (index) => {
       .replace(/"m /g, "'m ")
       .replace(/can"t/g, "can't")
       .replace(/mustn"t/g, "mustn't")
+      .replace(/needn"t/g, "needn't")
       .replace(/won"t/g, "won't")
       .replace(/\bFalse\b/g, "false")
       .replace(/\bTrue\b/g, "true");
@@ -783,16 +798,17 @@ const showSpellVocabulary = async () => {
     // selectSpellWords = JSON.parse(res[0].data_words);
     let dataString = res[0].data_words.replace(/(\W)'|'(\W)/g, '$1"$2');
     selectSpellWords = JSON.parse(
-      dataString.replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
-      .replace(/'/g, '"')
-      .replace(/s" /g, "s' ")
-      .replace(/"s /g, "'s ")
-      .replace(/"t /g, "'t ")
-      .replace(/can"t/g, "can't")
-      .replace(/mustn"t/g, "mustn't")
-      .replace(/won"t/g, "won't")
-      .replace(/\bFalse\b/g, "false")
-      .replace(/\bTrue\b/g, "true")
+      dataString
+        .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
+        .replace(/'/g, '"')
+        .replace(/s" /g, "s' ")
+        .replace(/"s /g, "'s ")
+        .replace(/"t /g, "'t ")
+        .replace(/can"t/g, "can't")
+        .replace(/mustn"t/g, "mustn't")
+        .replace(/won"t/g, "won't")
+        .replace(/\bFalse\b/g, "false")
+        .replace(/\bTrue\b/g, "true")
     );
     console.log("selectSpellWords: ", selectSpellWords);
     // 四执行
@@ -844,6 +860,7 @@ async function reviseUserData() {
   params.append("reversd_number", valueReversed.value);
   params.append("none_of_above", valueNoneOfAbove.value);
   params.append("is_pinned", valueIsPinned.value);
+  params.append("is_review_required", valueIsReviewRequired.value);
   params.append("is_spell_number", valueIsSpell.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
@@ -938,8 +955,8 @@ async function createSpellVocabulary(lock_spell, selectedVocabulary) {
 }
 
 const confirmSelectVocabulary = () => {
-  console.log('synonymsSelected', synonymsSelected.value);
-  console.log('selectSpellVocabulary', selectSpellVocabulary.value);
+  console.log("synonymsSelected", synonymsSelected.value);
+  console.log("selectSpellVocabulary", selectSpellVocabulary.value);
   // if (synonymsSelected.value.length == 0) {
   //   showSelectSpellVocabulary.value = false;
   //   return;
@@ -1451,10 +1468,26 @@ const reloadPage = () => {
         >
           <template #title>
             <div style="display: flex; flex-direction: column">
-              <van-tag color="#ffe1e1" text-color="#ad0000" plain
-                >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon color="blue"  style="font-weight:700" v-if="item.is_pinned && item.rate < 3" name="link-o" />
-                </van-tag
-              >
+              <div v-if="item.is_review_required > 0">
+                <van-tag color="white" text-color="lightgray" plain
+                  >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon
+                    color="blue"
+                    style="font-weight: 700"
+                    v-if="item.is_pinned && item.rate < 3"
+                    name="link-o"
+                  />
+                </van-tag>
+              </div>
+              <div v-else>
+                <van-tag color="#ffe1e1" text-color="#ad0000" plain
+                  >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon
+                    color="blue"
+                    style="font-weight: 700"
+                    v-if="item.is_pinned && item.rate < 3"
+                    name="link-o"
+                  />
+                </van-tag>
+              </div>
               <van-tag
                 v-if="item.lock_spell == true"
                 type="primary"
@@ -1560,10 +1593,8 @@ const reloadPage = () => {
                 <div style="margin-left: -2rem">0次</div>
               </div>
               <div v-else>
-                  
-                  <div style="margin-left: -2rem">{{ item.view }}次</div>
+                <div style="margin-left: -2rem">{{ item.view }}次</div>
               </div>
-
             </div>
           </template>
           <template #right-icon>
@@ -1702,6 +1733,14 @@ const reloadPage = () => {
           label="置顶"
           placeholder="请输入0或1"
         />
+        <van-field
+          v-model="valueIsReviewRequired"
+          label="复习"
+          placeholder="-1(不复习)0(等待复习)1(开始复习)其他"
+        />
+        <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
+          复习时间: {{ valueReviewTime }}
+        </div>
         <van-field
           v-model="valueIsSpell"
           label="拼写"
@@ -1914,7 +1953,6 @@ const reloadPage = () => {
   line-height: 1; /* 调整行高，确保内容适合新的单元格高度 */
 }
 
-
 .grid-item-text {
   font-size: 16px; /* Default font size */
   line-height: 1.2; /* Adjust line height as needed */
@@ -1927,5 +1965,4 @@ const reloadPage = () => {
   /* Media query to reduce font size for items that exceed one line */
   font-size: 12px; /* Adjust this size as needed */
 }
-
 </style>

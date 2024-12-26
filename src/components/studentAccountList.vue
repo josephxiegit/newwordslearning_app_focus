@@ -35,6 +35,8 @@ import chooseModelSrcGoatAndWolf from "../assets/choose.webp";
 import chooseModelSrcGoatAndWolfReview from "../assets/review.png";
 import chooseModelSrcBears from "../assets/Boonie Bears/choose.gif";
 import chooseModelSrcBearsReview from "../assets/Boonie Bears/review.gif";
+import reviewCompleteSrcGoatAndWolf from "../assets/review_complete.png";
+import reviewCompleteSrcBears from "../assets/Boonie Bears/review_complete.png";
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
 const srcTheme = ref("");
@@ -1329,29 +1331,163 @@ watch(showChooseMode, (newValue) => {
 // 复习模式
 const showReviewMode = ref(false);
 const reviewShow = ref(false);
+const flagReview = ref(false);
 const dataReview = ref([]);
+const dataReview2 = ref([]);
+const srcReview = ref("");
+const flagReviewList = ref(true);
+const nidReview = ref("");
 const handleReviewMode = () => {
   reviewShow.value = true;
-  dataReview.value = originalData.value[indexAnswer.value]["synonyms"];
-  console.log(originalData.value[indexAnswer.value]);
+  console.log("flagReviewList", flagReviewList.value);
+  if (flagReviewList.value) {
+    console.log("正常列表");
+    dataReview.value = originalData.value[indexAnswer.value]["synonyms"];
+    nidReview.value = originalData.value[indexAnswer.value]["nid"];
+  } else {
+    console.log("弹出列表");
+  }
+
   let resultData = [];
-  for(let i = 0; i < dataReview.value.length; i++) {
-    let obj = {}
+  console.log("dataReview:", dataReview.value);
+  for (let i = 0; i < dataReview.value.length; i++) {
+    let obj = {};
     obj["is_spell"] = false;
     obj["type"] = true;
     obj["中文"] = dataReview.value[i]["中文"];
     obj["序号"] = dataReview.value[i]["序号"];
-    obj["正确答案"] = originalData.value[indexAnswer.value]["answers"][i]["中文"];
-    obj["用户选择"] = ['无'];
+    if (flagReviewList.value) {
+      obj["正确答案"] =
+        originalData.value[indexAnswer.value]["answers"][i]["中文"];
+    } else {
+      obj["正确答案"] =
+        reviewList.value[indexAnswer.value]["answers"][i]["中文"];
+    }
+    obj["用户选择"] = ["无"];
     obj["答案"] = obj["正确答案"];
     obj["英文"] = dataReview.value[i]["英文"];
     resultData.push(obj);
   }
-  console.log('resultData', resultData);
+  console.log("resultData", resultData);
+  console.log("nidReview", nidReview.value);
+  dataPreExam.value = resultData;
+  dataReview2.value = resultData;
+};
+const startReview = () => {
+  // console.log("dataPreExam: ", dataPreExam.value);
+
+  router.push({
+    path: "/studentAccountPreExam",
+    state: {
+      data: JSON.stringify(dataPreExam.value),
+      username: username.value,
+      account_id_list: nidReview.value,
+      basicPreExam: basicPreExam.value,
+    },
+  });
+};
+const gotoReview = (index) => {
+  indexAnswer.value = index;
+  dataReview.value = reviewList.value[index]["synonyms"];
+  nidReview.value = reviewList.value[index]["nid"];
+  console.log(nidReview.value);
+  flagReviewList.value = false;
+  console.log("flagReviewList", flagReviewList.value);
+  if (flagTheme.value == 1) {
+    srcTheme.value = chooseModelSrcGoatAndWolfReview;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = chooseModelSrcBearsReview;
+  }
+  showReviewMode.value = true;
+};
+
+const reviewList = ref([]);
+const showReviewList = ref(false);
+const loadingReviewData = ref(false);
+const finishedReviewData = ref(false);
+const pageIndexReviewData = ref(0);
+const reviewListLength = ref(0);
+const onLoadReviewData = async (title = "全部") => {
+  if (loadingReviewData.value || finishedReviewData.value) {
+    return;
+  }
+  loadingReviewData.value = true;
+  isLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    params.append("method", "getUserReviewPage");
+    params.append("user", username.value);
+    params.append("page", pageIndexReviewData.value + 1);
+    params.append("page_size", 20);
+
+    const response = await axios.post("words/", params);
+    let moreData = response.data.data;
+    console.log("reviewListData: ", moreData);
+    moreData = moreData.map((item) => {
+      const progress = Math.min(Math.floor((item.coins / 2000) * 100), 100);
+      return { ...item, progressPercentage: progress };
+    });
+
+    if (moreData.length) {
+      moreData.sort(
+        (a, b) => new Date(b.create_time) - new Date(a.create_time)
+      );
+      moreData.forEach((item) => {
+        const answers = JSON.parse(item.answers);
+        const synonyms = JSON.parse(item.synonyms);
+        // 解析日期并格式化
+        const date = new Date(item.create_time);
+        const viewDate = new Date(item.view_time);
+        const formatter = new Intl.DateTimeFormat("zh-CN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false,
+        });
+        const formattedCreateTime = formatter.format(date);
+        const formattedViewTime = formatter.format(viewDate);
+        const newItem = {
+          ...item,
+          answers: answers,
+          synonyms: synonyms,
+          create_time: formattedCreateTime,
+          view_time: formattedViewTime,
+        };
+        reviewList.value.push(newItem);
+      });
+      if (reviewList.value.length > 0) {
+        flagReview.value = true;
+        reviewListLength.value = reviewList.value.length;
+      } else {
+        reviewListLength.value = 0;
+      }
+
+      if (reviewList.value.length == 0) {
+        if (flagTheme.value == 1) {
+          srcReview.value = reviewCompleteSrcGoatAndWolf;
+        }
+        if (flagTheme.value == 2) {
+          srcReview.value = reviewCompleteSrcBears;
+        }
+      }
+      pageIndexReviewData.value++;
+    }
+    finishedReviewData.value = !response.data.has_more;
+  } catch (error) {
+    console.error("Failed to fetch data:", error);
+  }
+  loadingReviewData.value = false;
+  isLoading.value = false;
+  console.log("reviewList", reviewList.value);
+  return reviewList.value;
 };
 
 const gotoItem = (index) => {
   indexAnswer.value = index;
+  flagReviewList.value = true;
   // 预热熊出没
   if (originalData.value[index]["alias"].includes("庆典")) {
     showbearWarmup();
@@ -2173,7 +2309,7 @@ const gotoPreExam = () => {
     isLoading.value = true;
     try {
       const res = await axios.post("words/", params);
-      console.log('res: ', res);
+      console.log("res: ", res);
       dataPreExam.value = res.data.dataPreExam;
 
       dataPreExam.value = dataPreExam.value.map((item) => {
@@ -2394,6 +2530,36 @@ onMounted(async () => {
       });
     }
   });
+  res = res.then(() => {
+    // 判断是否需要复习
+    async function getFlagReview() {
+      const params = new URLSearchParams();
+      params.append("method", "getUserReviewPage");
+      params.append("user", username.value);
+      params.append("page", pageIndexReviewData.value + 1);
+      params.append("page_size", 20);
+
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data.data;
+      });
+    }
+
+    getFlagReview().then((response) => {
+      console.log("response: ", response);
+      if (response.length > 0) {
+        flagReview.value = true;
+        reviewListLength.value = response.length;
+      } else {
+        flagReview.value = false;
+        if (flagTheme.value == 1) {
+          srcReview.value = reviewCompleteSrcGoatAndWolf;
+        }
+        if (flagTheme.value == 2) {
+          srcReview.value = reviewCompleteSrcBears;
+        }
+      }
+    });
+  });
 });
 </script>
 
@@ -2425,7 +2591,7 @@ onMounted(async () => {
     </van-tabbar>
 
     <div class="custom-container">
-      <div style="margin-left: 1rem; margin-top: 1rem">
+      <div style="margin-left: 1rem; margin-top: 0.2rem">
         <!-- 共获得星星 -->
         <div style="display: flex">
           <div style="margin-top: 0.3rem">共获得</div>
@@ -2446,9 +2612,8 @@ onMounted(async () => {
         </div>
 
         <!-- 共完成任务 -->
-        <div style="display: flex; margin-top: 2rem">
+        <div style="display: flex; margin-top: 0.9rem">
           <div style="margin-top: 0.2rem">共完成</div>
-
           <img
             src="../assets/item_list_complete.png"
             style="
@@ -2462,6 +2627,41 @@ onMounted(async () => {
           <div style="margin-top: 0.2rem">
             &nbsp;&nbsp;✖️ {{ completeNumber }}
           </div>
+        </div>
+
+        <!-- 待复习 -->
+        <div
+          v-if="flagReview"
+          style="display: flex; margin-top: 0.9rem"
+          class="flashing-icon"
+        >
+          <van-badge :content="reviewListLength" style="margin-left: 0.1rem">
+            <div class="child">
+              <van-button
+                block
+                plain
+                round
+                size="small"
+                color="gray"
+                @click="showReviewList = true"
+              >
+                ⚡️ 待复习
+              </van-button>
+            </div>
+          </van-badge>
+        </div>
+        <div v-else>
+          <img
+            :src="srcReview"
+            style="
+              width: auto;
+              height: 50px;
+              margin-right: rem;
+              margin-left: -0.5rem;
+              margin-top: 0.1rem;
+              margin-bottom: -0.6rem;
+            "
+          />
         </div>
       </div>
 
@@ -2514,7 +2714,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="更新了“提交”逻辑，改善体验。抓紧时间完成期末庆典。"
+        text="改善提交体验，逐步重新上架复习功能"
       />
     </div>
     <van-toast
@@ -2573,7 +2773,7 @@ onMounted(async () => {
                     />
                   </div>
                   <div v-else>
-                    <div v-if="item.is_review_required">
+                    <div v-if="item.is_review_required > 0">
                       <img
                         src="../assets/item_list_complete_reviewed.png"
                         style="width: 27px; height: auto; margin-right: 0.5rem"
@@ -2643,7 +2843,7 @@ onMounted(async () => {
                       "
                     />
                     <div
-                      v-if="item.is_review_required"
+                      v-if="item.is_review_required > 0"
                       style="
                         margin-bottom: 7px;
                         font-weight: 700;
@@ -2656,7 +2856,7 @@ onMounted(async () => {
                       {{ processedTitle(item.title) }}
                     </div>
                     <van-badge
-                      v-if="item.is_review_required"
+                      v-if="item.is_review_required > 0"
                       color="#D8A7B1"
                       content="Game"
                       style="margin-left: -20px"
@@ -2671,7 +2871,7 @@ onMounted(async () => {
 
                 <template #value>
                   <div
-                    v-if="item.is_review_required"
+                    v-if="item.is_review_required > 0"
                     style="font-size: 12px; color: lightgray"
                   >
                     <div style="display: flex; justify-content: flex-end">
@@ -2741,7 +2941,7 @@ onMounted(async () => {
                 <template #label>
                   <div style="display: flex">
                     <van-rate
-                      v-if="item.is_review_required"
+                      v-if="item.is_review_required > 0"
                       v-model="item.rate"
                       :size="20"
                       color="#DBC8AF"
@@ -2770,20 +2970,20 @@ onMounted(async () => {
                         margin-left: 0.2rem;
                         color: lightgray;
                       "
-                      v-if="showRatePlus[index] && item.is_review_required"
+                      v-if="showRatePlus[index] && item.is_review_required > 0"
                     >
                       + {{ formattedRate(item.rate) }}
                     </div>
                     <div
                       style="margin-top: 3%; margin-left: 0.2rem"
-                      v-if="showRatePlus[index] && !item.is_review_required"
+                      v-if="showRatePlus[index] && !item.is_review_required > 0"
                     >
                       + {{ formattedRate(item.rate) }}
                     </div>
                   </div>
 
                   <div
-                    v-if="item.is_review_required"
+                    v-if="item.is_review_required > 0"
                     style="
                       margin-left: 4px;
                       margin-top: 7px;
@@ -2806,7 +3006,7 @@ onMounted(async () => {
                     {{ item.create_time }}
                   </div>
                   <div style="margin-top: 1rem">
-                    <div v-if="item.is_review_required">
+                    <div v-if="item.is_review_required > 0">
                       <van-progress
                         color="lightblue"
                         :percentage="item.progressPercentage"
@@ -2967,7 +3167,12 @@ onMounted(async () => {
                 <template #icon>
                   <img
                     src="../assets/Boonie Bears/ad.png"
-                    style="width: 100px; height: auto; margin-right: 0.5rem; margin-bottom: 0.5rem;"
+                    style="
+                      width: 100px;
+                      height: auto;
+                      margin-right: 0.5rem;
+                      margin-bottom: 0.5rem;
+                    "
                     alt="Item List"
                   />
                 </template>
@@ -2976,8 +3181,8 @@ onMounted(async () => {
                     style="
                       margin-bottom: 2.9rem;
                       font-weight: 700;
-                      color: #F4C241;
-                      width: 135%
+                      color: #f4c241;
+                      width: 135%;
                     "
                   >
                     限定技能-不灭意志
@@ -3024,7 +3229,7 @@ onMounted(async () => {
                       />
                     </div>
                     <div v-else>
-                      <div v-if="item.is_review_required">
+                      <div v-if="item.is_review_required > 0">
                         <img
                           src="../assets/item_list_complete_reviewed.png"
                           style="
@@ -3135,7 +3340,7 @@ onMounted(async () => {
                         "
                       />
                       <div
-                        v-if="item.is_review_required"
+                        v-if="item.is_review_required > 0"
                         style="
                           margin-bottom: 7px;
                           font-weight: 700;
@@ -3148,7 +3353,7 @@ onMounted(async () => {
                         {{ processedTitle(item.title) }}
                       </div>
                       <van-badge
-                        v-if="item.is_review_required"
+                        v-if="item.is_review_required > 0"
                         color="#D8A7B1"
                         content="Game"
                         style="margin-left: -20px"
@@ -3163,7 +3368,7 @@ onMounted(async () => {
 
                   <template #value>
                     <div
-                      v-if="item.is_review_required"
+                      v-if="item.is_review_required > 0"
                       style="font-size: 12px; color: lightgray"
                     >
                       <div style="display: flex; justify-content: flex-end">
@@ -3232,7 +3437,7 @@ onMounted(async () => {
                   <template #label>
                     <div style="display: flex">
                       <van-rate
-                        v-if="item.is_review_required"
+                        v-if="item.is_review_required > 0"
                         v-model="item.rate"
                         :size="20"
                         color="#DBC8AF"
@@ -3261,19 +3466,23 @@ onMounted(async () => {
                           margin-left: 0.2rem;
                           color: lightgray;
                         "
-                        v-if="showRatePlus[index] && item.is_review_required"
+                        v-if="
+                          showRatePlus[index] && item.is_review_required > 0
+                        "
                       >
                         + {{ formattedRate(item.rate) }}
                       </div>
                       <div
                         style="margin-top: 3%; margin-left: 0.2rem"
-                        v-if="showRatePlus[index] && !item.is_review_required"
+                        v-if="
+                          showRatePlus[index] && !item.is_review_required > 0
+                        "
                       >
                         + {{ formattedRate(item.rate) }}
                       </div>
                     </div>
                     <div
-                      v-if="item.is_review_required"
+                      v-if="item.is_review_required > 0"
                       style="
                         margin-left: 4px;
                         margin-top: 7px;
@@ -3296,7 +3505,7 @@ onMounted(async () => {
                       <div>{{ item.create_time }}</div>
                     </div>
                     <div style="margin-top: 1rem">
-                      <div v-if="item.is_review_required">
+                      <div v-if="item.is_review_required > 0">
                         <van-progress
                           color="lightblue"
                           :percentage="item.progressPercentage"
@@ -3879,14 +4088,14 @@ onMounted(async () => {
       </div>
 
       <van-cell-group
-        v-for="(item, index) in dataReview"
+        v-for="(item, index) in dataReview2"
         :key="index"
         style="margin-left: -1rem"
       >
         <van-cell
           :title="`${index + 1}. ${item.英文}`"
           :value="item.正确答案"
-          :label="item.type"
+          :label="item.type.toString()"
           @click="speakWord(item.英文, item.正确答案)"
           clickable
         >
@@ -3907,9 +4116,176 @@ onMounted(async () => {
         block
         type="success"
         plain
-        @click="startPreExam"
+        @click="startReview"
         >开启旅程</van-button
       >
+    </van-popup>
+
+    <!-- 复习列表 -->
+    <van-popup
+      closeable
+      round=""
+      v-model:show="showReviewList"
+      position="bottom"
+      :style="{ height: '90%' }"
+    >
+      <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+        待复习列表
+      </div>
+
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          margin-right: 1rem;
+          font-weight: 700;
+        "
+      ></div>
+
+      <van-list
+        v-model="loadingReviewData"
+        :finished="finishedReviewData"
+        finished-text="没有更多了"
+        @load="onLoadReviewData"
+      >
+        <div v-for="(item, index) in reviewList" :key="index">
+          <van-cell is-link center clickable @click="gotoReview(index)">
+            <template #icon>
+              <img
+                src="../assets/item_list_complete_reviewed.png"
+                style="width: 27px; height: auto; margin-right: 0.5rem"
+                alt="Item List Complete"
+              />
+            </template>
+            <template #title>
+              <div
+                v-if="item.swipe == 0"
+                style="display: flex; align-items: flex-start; width: 160%"
+              >
+                <div
+                  style="margin-bottom: 7px; font-weight: 700; color: lightgray"
+                >
+                  {{ processedTitle(item.title) }}
+                </div>
+                <van-badge
+                  content="Game"
+                  color="lightgray"
+                  style="margin-left: -20px"
+                />
+              </div>
+
+              <div
+                v-else
+                style="display: flex; align-items: flex-start; width: 160%"
+              >
+                <div
+                  style="margin-bottom: 7px; font-weight: 700; color: lightgray"
+                >
+                  {{ processedTitle(item.title) }}
+                </div>
+                <van-badge
+                  content="Game"
+                  color="lightgray"
+                  style="margin-left: -20px"
+                />
+              </div>
+            </template>
+
+            <template #value>
+              <div style="font-size: 12px; color: lightgray">
+                <div style="display: flex; justify-content: flex-end">
+                  尝试了
+                  <div style="font-weight: 700; color: red">
+                    {{ item.attempt }}
+                  </div>
+                  次
+                </div>
+
+                <div style="margin-top: 0.5rem">
+                  {{ item.answers.length }}词
+                </div>
+              </div>
+
+              <div v-if="item.view == 0">
+                <van-button
+                  style="color: gray; border: none"
+                  size="mini"
+                  class="button-container2"
+                >
+                  <span class="button-content">
+                    <img
+                      src="../assets/close_eye.png"
+                      alt="Icon"
+                      class="button-icon"
+                    />
+                  </span>
+                </van-button>
+              </div>
+
+              <div v-else>
+                <van-button
+                  style="color: red; font-weight: 700; border: none"
+                  size="small"
+                  class="button-container2"
+                >
+                  <span class="button-content">
+                    <img
+                      src="../assets/eye.png"
+                      alt="Icon"
+                      class="button-icon"
+                      style="margin-right: 0.1rem"
+                    />
+                    * {{ item.view }}
+                  </span>
+                </van-button>
+              </div>
+            </template>
+
+            <template #label>
+              <div style="display: flex">
+                <van-rate
+                  v-model="item.rate"
+                  :size="20"
+                  color="#DBC8AF"
+                  void-icon="like"
+                  icon="like"
+                  void-color="#eee"
+                  :count="3"
+                  readonly
+                  allow-half
+                />
+                <div
+                  style="margin-top: 3%; margin-left: 0.2rem"
+                  v-if="showRatePlus[index]"
+                >
+                  + {{ formattedRate(item.rate) }}
+                </div>
+              </div>
+
+              <div
+                style="
+                  margin-left: 4px;
+                  margin-top: 7px;
+                  width: 120%;
+                  font-size: 12px;
+                  color: lightgray;
+                "
+              >
+                {{ item.create_time }}
+              </div>
+              <div style="margin-top: 1rem">
+                <van-progress
+                  color="lightblue"
+                  :percentage="item.progressPercentage"
+                  stroke-width="2"
+                  :show-pivot="true"
+                  :inactive="item.progressPercentage === 100"
+                />
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-list>
     </van-popup>
 
     <!-- 庆祝三星 -->
