@@ -15,6 +15,7 @@ import {
   showDialog,
   Toast,
   closeToast,
+  showLoadingToast,
   showSuccessToast,
 } from "vant";
 import { useRoute } from "vue-router";
@@ -107,6 +108,7 @@ const clickOrderList = () => {
 // 购买列表
 const isLoading = ref(false);
 const priceBears = ref(20000);
+const pricePassiveMagic = ref(25000);
 const priceStar = ref(4500);
 const priceAttempt = ref(800);
 const priceView = ref(800);
@@ -114,7 +116,9 @@ const showPurchaseList = ref(false);
 const showSkinBoonieBear = ref(false);
 const methodPurchase = ref(null);
 const getPurchaseList = (method) => {
-  if (method == "皮肤购买") {
+  if (method == "不灭意志") {
+    showPassiveMagic.value = true;
+  } else if (method == "皮肤购买") {
     showSkinBoonieBear.value = true;
   } else {
     showPurchaseList.value = true;
@@ -362,6 +366,7 @@ async function getUserCoins() {
 }
 const username = ref(route.query.param);
 const usercoins = ref("");
+const userdiamonds = ref("");
 
 // 主题选择
 const showTheme = ref(false);
@@ -438,29 +443,29 @@ const purchaseBears = () => {
     }
     isLoading.value = true;
     const params = new URLSearchParams({
-          method: "purchaseBears",
-          priceBears: priceBears.value,
-          username: username.value,
-        });
+      method: "purchaseBears",
+      priceBears: priceBears.value,
+      username: username.value,
+    });
     const response = await axios.post("words/", params);
     console.log("res: ", response.data);
 
     const userCoinsResponse = await getUserCoins();
     usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
-    
-    valueTheme.value = "熊出没"
+
+    valueTheme.value = "熊出没";
     flagTheme.value = 2;
     localStorage.setItem("theme_name", "熊出没");
     actionsTheme.value = actionsTheme.value.map((item) => {
-        if (item.name === valueTheme.value) {
-          // 如果匹配，将 color 和 icon 添加到该项中
-          return { ...item, color: "#1989fa", icon: "checked" };
-        } else {
-          // 如果不匹配，去掉 color 和 icon 属性
-          const { color, icon, ...rest } = item; // 去掉 color 和 icon
-          return rest;
-        }
-      });
+      if (item.name === valueTheme.value) {
+        // 如果匹配，将 color 和 icon 添加到该项中
+        return { ...item, color: "#1989fa", icon: "checked" };
+      } else {
+        // 如果不匹配，去掉 color 和 icon 属性
+        const { color, icon, ...rest } = item; // 去掉 color 和 icon
+        return rest;
+      }
+    });
     isLoading.value = false;
     showToggleTheme();
     // showSuccessToast("购买成功");
@@ -471,6 +476,71 @@ const userOwnThemes = ref([]);
 
 // 被动魔法技能
 const showPassiveMagic = ref(false);
+const userPassiveMagic = ref("");
+const purchasePassive = () => {
+  if (userPassiveMagic.value) {
+    showToast("已拥有，无须购买");
+    return;
+  }
+
+  showConfirmDialog({
+    title: "技能购买",
+    message: `确认花费${pricePassiveMagic.value}金币购买不灭的意志吗？`,
+  }).then(async () => {
+    if (usercoins.value < 25000) {
+      showFailToast("金币不足，无法购买");
+      return;
+    }
+    isLoading.value = true;
+    const params = new URLSearchParams({
+      method: "purchasePassiveMagic",
+      pricePassiveMagic: pricePassiveMagic.value,
+      username: username.value,
+    });
+    const response = await axios.post("words/", params);
+    console.log("res: ", response.data);
+    const userCoinsResponse = await getUserCoins();
+    usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
+    isLoading.value = false;
+  });
+};
+
+// 钻石换金币
+const showExchange = ref(false);
+const valueDiamonds = ref("1");
+const valueCoins = computed(() => {
+  return Number(valueDiamonds.value) * 70;
+});
+const exchangeDiamonds = () => {
+  showExchange.value = true;
+};
+const confirmExchange = () => {
+  showConfirmDialog({
+    theme: "round-button",
+    title: "交易无法撤销",
+    message: `钻石 💎 ${valueDiamonds.value} 交易成金币 💰 ${valueCoins.value} 吗？`,
+  }).then(async () => {
+    let toast1 = showLoadingToast({
+      message: "交易中...",
+      forbidClick: true,
+    });
+    const params = new URLSearchParams({
+      method: "exchangeDiamonds",
+      username: username.value,
+      diamonds: valueDiamonds.value,
+    });
+
+    const response = await axios.post("words/", params);
+    const userCoinsResponse = await getUserCoins();
+    usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
+    userdiamonds.value = userCoinsResponse["data_coins"][0]["diamonds"];
+    
+    toast1.close();
+    showSuccessToast('交易完成');
+    showExchange.value = false;
+
+  });
+};
 
 onMounted(async () => {
   // 加载金币
@@ -478,10 +548,13 @@ onMounted(async () => {
     resolve(getUserCoins());
   });
   res.then((res) => {
-    // console.log("res: ", res);
+    console.log("res: ", res);
     usercoins.value = res["data_coins"][0]["coins"];
+    userdiamonds.value = res["data_coins"][0]["diamonds"];
+    userPassiveMagic.value = res["passive_magic"];
 
     console.log("user已经拥有的主题：", res["theme_name_list"]);
+    console.log("user被动技能：", userPassiveMagic.value);
 
     userOwnThemes.value = res["theme_name_list"];
     // const userOwnThemes = ["熊出没"];
@@ -538,14 +611,34 @@ onMounted(async () => {
 
           <div
             style="
-              font-size: 24px;
+              font-size: 20px;
               font-weight: 700;
               color: red;
-              margin-top: 10px;
-              margin-bottom: 20px;
+              margin-top: 5px;
+              margin-bottom: 0px;
             "
           >
-            {{ usercoins }} 金币
+            💰 {{ usercoins }} 金币
+          </div>
+          <div style="display: flex; justify-content: space-between">
+            <div
+              style="
+                font-size: 20px;
+                font-weight: 700;
+                color: red;
+                margin-top: 5px;
+                margin-bottom: 10px;
+              "
+            >
+              💎 {{ userdiamonds }} 钻石
+            </div>
+            <van-button
+              style="margin-top: 0.3rem; margin-left: 1rem"
+              size="small"
+              type="warning"
+              @click="exchangeDiamonds"
+              >换金币</van-button
+            >
           </div>
         </div>
       </div>
@@ -652,7 +745,7 @@ onMounted(async () => {
       </template>
       <template #price>
         <div class="price-container">
-          <span class="price-text">价格：25000 金币</span>
+          <span class="price-text">价格：{{ pricePassiveMagic }}金币</span>
         </div>
       </template>
       <template #footer>
@@ -661,7 +754,7 @@ onMounted(async () => {
             size="mini"
             type="primary"
             class="buy-button"
-            @click="showPassiveMagic=true"
+            @click="getPurchaseList('不灭意志')"
             >购买</van-button
           >
         </div>
@@ -671,7 +764,7 @@ onMounted(async () => {
       v-model:show="showPassiveMagic"
       title="限定技能"
       show-cancel-button
-      @confirm=""
+      @confirm="purchasePassive"
     >
       <img
         src="../assets/usershop_passive_magic2.png"
@@ -686,7 +779,6 @@ onMounted(async () => {
         </div>
       </template>
     </van-dialog>
-
 
     <van-card desc="尝试减少一次" title="消除尝试" class="custom-cell">
       <template #thumb>
@@ -924,6 +1016,41 @@ onMounted(async () => {
         </div>
       </van-cell-group>
     </van-popup>
+
+    <!-- 钻石交换 -->
+    <van-popup
+      v-model:show="showExchange"
+      position="bottom"
+      closeable
+      :style="{ width: '100%', height: '38%' }"
+      :lock-scroll="false"
+      round
+    >
+      <van-cell-group inset>
+        <div style="font-size: 20px; font-weight: 700; margin: 1rem">
+          钻石换金币
+        </div>
+        <van-cell title="消耗钻石">
+          <template #value>
+            <van-stepper
+              v-model="valueDiamonds"
+              step="1"
+              min="1"
+              :max="userdiamonds"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell
+          title="金币增加"
+          :value="valueCoins"
+        />
+        <van-button type="warning" block @click="confirmExchange" style="margin-top: 2rem;"
+          >确认交易</van-button
+        >
+      </van-cell-group>
+    </van-popup>
+
     <loading v-if="loadingOrderList" />
     <toggleTheme ref="toggleThemeRef" v-if="showToggleTheme" />
   </div>

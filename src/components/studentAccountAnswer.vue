@@ -8,11 +8,20 @@ import {
   onBeforeUpdate,
   computed,
 } from "vue";
-import { Divider, showDialog, showToast } from "vant";
+import {
+  Divider,
+  showDialog,
+  showToast,
+  showLoadingToast,
+  showConfirmDialog,
+  closeToast,
+  Toast,
+} from "vant";
 import { useRouter } from "vue-router";
 import WolfBack from "./wolfBack.vue";
 import VictorySheep from "./victorySheep.vue";
 import HalfTrue from "./HalfTrue.vue";
+import VideoList from "./videoList.vue";
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
@@ -41,15 +50,31 @@ const gotoNext = () => {
     });
   }
   refreshAccountData().then((res) => {
-    router.push({
-      path: "/studentAccountList",
-      state: {
-        data: JSON.stringify(res.data),
-        unique_aliases: JSON.stringify(res.unique_aliases),
-        username: res.username,
-        flagRate: rate.value,
-      },
-    });
+    // console.log("res.username", res.username);
+    // console.log("flagRate", rate.value);
+    if (rate.value >= 3 && RateOrigin.value < 3) {
+      // 三星庆祝
+      router.push({
+        path: "/complete3star",
+        state: {
+          data: JSON.stringify(res.data),
+          unique_aliases: JSON.stringify(res.unique_aliases),
+          username: res.username,
+          flagRate: rate.value,
+        },
+      });
+    } else {
+      // 跳转主页
+      router.push({
+        path: "/studentAccountList",
+        state: {
+          data: JSON.stringify(res.data),
+          unique_aliases: JSON.stringify(res.unique_aliases),
+          username: res.username,
+          flagRate: rate.value,
+        },
+      });
+    }
   });
 };
 
@@ -182,6 +207,7 @@ const createTimeAnswer = ref("");
 const createTimeUncertain = ref("");
 const account_data_id = ref(0);
 const account_log_id = ref(0);
+const complement = ref(0);
 const username = ref("");
 const handleAnswerSheetClose = () => {
   // 关闭答案页面执行
@@ -256,35 +282,189 @@ const handleUncertainClose = () => {
 const handlePageUnload = () => {
   // 页面关闭
   handleAnswerSheetClose();
+  sessionStorage.removeItem("videoGame");
+};
+
+// 看视频
+const showVideoPopup = ref(false);
+const showVideoButton = ref(true);
+const videoList = ref([]);
+const customWord = ref([]);
+const userDiamonds = ref("");
+
+const offsetDaily = ref({
+  x: window.innerWidth - 67,
+  y: 70,
+});
+const handleConfirmResult = async () => {
+  if (
+    compareResult.value.length - trueCount.value > 0 &&
+    compareResult.value.length - trueCount.value <= 2
+  ) {
+    let toast1 = showLoadingToast({
+      message: "查询中...",
+      forbidClick: true,
+    });
+    let params = new URLSearchParams();
+    params.append("method", "getUserDiamonds");
+    params.append("user", username.value);
+    params.append("account_log_id", account_log_id.value);
+    let res = await axios.post("words/", params);
+    console.log("res: ", res);
+
+    toast1.close();
+    if (res.data == "补全已完成") {
+      showToast("补全已完成");
+      showVideoButton.value = false;
+      return;
+    }
+    userDiamonds.value = res.data.diamonds;
+    console.log("userDiamonds: ", userDiamonds.value);
+    if (userDiamonds.value >= 3) {
+      compareResult.value.forEach((item) => {
+        if (item.flag !== "true") {
+          const correctAnswer =
+            item["正确答案"] !== undefined ? item["正确答案"] : item["答案"];
+
+          const errorItem = {
+            英文: item["英文"],
+            答案: correctAnswer,
+          };
+          videoList.value.push(errorItem);
+        }
+      });
+      console.log("videList:", videoList.value);
+
+      customWord.value = videoList.value.map(
+        (item) => `${item.英文} ${item.答案}`
+      );
+
+      showConfirmDialog({
+        title: "视频看单词",
+        showCancelButton: true,
+        theme: "round-button",
+        message: `当前账户💎${userDiamonds.value}\n看视频抵消背诵错误，消耗💎*3，\n是否确认？`,
+      }).then(() => {
+        showVideoPopup.value = true;
+      });
+    } else {
+      showConfirmDialog({
+        title: "视频补全失败",
+        theme: "round-button",
+        message: "钻石数量不足，周长任务可以获得钻石",
+        showCancelButton: false,
+      });
+    }
+  } else {
+    showConfirmDialog({
+      title: "视频补全失败",
+      theme: "round-button",
+      message: "错误在2个及以下才能补全错误",
+      showCancelButton: false,
+    });
+  }
+};
+
+const onFinishedVideo = () => {
+  showVideoPopup.value = false;
+  showVideoButton.value = false;
+  showLoadingToast({
+    message: "补全中...",
+    duration: 0,
+  });
+  async function completeLog() {
+    let params = new URLSearchParams();
+    params.append("method", "completeLog");
+    params.append("account_data_id", account_data_id.value);
+    params.append("account_log_id", account_log_id.value);
+    params.append("complement", complement.value);
+    params.append("user", username.value);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  completeLog().then((res) => {
+    // console.log(res);
+    closeToast();
+    showConfirmDialog({
+      title: "恭喜！本次补全完成",
+      theme: "round-button",
+      message: "多多完成周长任务吧！",
+      showCancelButton: false,
+    });
+  });
+};
+
+const onExitVideo = () => {
+  showVideoPopup.value = false;
+  showToast("人不在屏幕前，游戏结束");
+};
+
+const onExitVideo2 = () => {
+  showVideoPopup.value = false;
+  showToast("点击次数过多，不够专心");
+};
+
+const areAnswersDifferent = (answer, correctAnswer) => {
+  // console.log("correctAnswer: ", correctAnswer);
+  // console.log("answer: ", answer);
+  // 定义分隔符，包含逗号和分号
+  const delimiters = /[；,]/;
+
+  // 根据分隔符拆分答案和正确答案为数组
+  const answerArray = answer.split(delimiters).map((s) => s.trim());
+  // console.log('answerArray: ', answerArray);
+  const correctAnswerArray = correctAnswer
+    .split(delimiters)
+    .map((s) => s.trim());
+  // console.log('correctAnswerArray: ', correctAnswerArray);
+  // 创建一个集合，包含所有唯一的答案项
+  const answerSet = new Set(answerArray);
+  const correctAnswerSet = new Set(correctAnswerArray);
+
+  // 检查两个集合是否相等
+  if (answerSet.size !== correctAnswerSet.size) {
+    // console.log(111)
+    // console.log('--------------------------------')
+    return true;
+  }
+  for (let ans of answerSet) {
+    if (!correctAnswerSet.has(ans)) {
+      // console.log(222)
+      // console.log('--------------------------------')
+      return true;
+    }
+  }
+  // console.log(333)
+  // console.log('--------------------------------')
+  return false;
 };
 
 const newCoins = ref(0);
 const lock_spell = ref(false);
 const spellVocabulary = ref([]);
+const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   // document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("beforeunload", handlePageUnload);
   // window.removeEventListener("pagehide", handlePageUnload);
 });
 onMounted(async () => {
-  // document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("beforeunload", handlePageUnload);
-  // window.addEventListener("pagehide", handlePageUnload);
   createTimeAnswer.value = new Date();
-  // console.log("createTimeAnswer:", createTimeAnswer.value);
-
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
 
-    // console.log("compareResult:", compareResult.value);
     account_data_id.value = history.state.nid;
     account_log_id.value = history.state.account_log_id;
+    RateOrigin.value = history.state.RateOrigin;
+    complement.value = history.state.complement;
     username.value = history.state.username;
 
     uncertainResult.value = JSON.parse(history.state.uncertainResult);
     spellVocabulary.value = JSON.parse(history.state.spellVocabulary);
     lock_spell.value = history.state.lock_spell;
-    console.log("spellVocabulary: ", spellVocabulary.value);
+    // console.log("spellVocabulary: ", spellVocabulary.value);
     // console.log("lock_spell: ", lock_spell.value);
 
     uncertainResult.value.sort((a, b) => {
@@ -315,16 +495,15 @@ onMounted(async () => {
     newCoins.value = history.state.newCoins;
     userSelected.value = JSON.parse(history.state.userSelected);
     rate.value = history.state.rate;
-    console.log("rate", rate.value);
     nid.value = history.state.nid;
     halfTrue.value = history.state.halfTrue;
     resolve(compareResult.value);
   });
   res.then((res) => {
-    console.log("compareResult", res);
-    console.log("uncertainResult", uncertainResult.value);
+    // console.log("compareResult", res);
+    // console.log("uncertainResult", uncertainResult.value);
     // console.log('trueCount.value: ', trueCount.value);
-    // console.log('compareResult.value: ', compareResult.value.length);
+    console.log("compareResult.value: ", compareResult.value);
 
     if (trueCount.value == compareResult.value.length) {
       showAnimationShineVictory();
@@ -336,6 +515,7 @@ onMounted(async () => {
       showWelcome.value = true;
       showAnimationShine();
     }
+    return "ok";
   });
 });
 </script>
@@ -348,6 +528,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
+      @confirm=""
     >
       <template #title>
         <div class="custom-title">很遗憾！下次加油哦</div>
@@ -380,6 +561,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
+      @confirm=""
     >
       <template #title>
         <div class="custom-title">还不错！获得1/2奖励</div>
@@ -494,6 +676,19 @@ onMounted(async () => {
       </van-cell-group>
     </van-floating-panel>
 
+    <!-- 视频 -->
+    <div class="child">
+      <van-floating-bubble
+        v-if="showVideoButton"
+        class="dailyFloat"
+        axis="xy"
+        magnetic="x"
+        v-model:offset="offsetDaily"
+        icon="gem-o"
+        @click="handleConfirmResult()"
+      />
+    </div>
+
     <!-- 延迟库 -->
     <van-popup
       v-model:show="showUncertain"
@@ -568,7 +763,7 @@ onMounted(async () => {
       >
         <van-cell
           :label="
-            item.正确答案 === '无'|| !item.正确答案
+            item.正确答案 === '无' || !item.正确答案
               ? `答案：${item.答案}`
               : `答案：${item.正确答案}`
           "
@@ -581,6 +776,23 @@ onMounted(async () => {
           </template>
         </van-cell>
       </div>
+    </van-popup>
+
+    <!-- 看视频 -->
+    <van-popup
+      v-model:show="showVideoPopup"
+      position="bottom"
+      :style="{ height: '100%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <VideoList
+        v-if="showVideoPopup"
+        :words="customWord"
+        @finished="onFinishedVideo"
+        @exit="onExitVideo"
+        @exit2="onExitVideo2"
+      />
     </van-popup>
 
     <!-- 列表 -->
@@ -656,8 +868,8 @@ onMounted(async () => {
               class="answer-cell"
             >
               <template #title>
-                <div v-if="item.答案 === '以上都不对'">
-                  以上都不对 ｜ 正确答案：{{ item.正确答案 }}
+                <div v-if="item.答案 !== item.正确答案">
+                  正确答案：{{ item.正确答案 }}
                 </div>
                 <div v-else>答案：{{ item.答案 }}</div>
               </template>
@@ -673,6 +885,25 @@ onMounted(async () => {
             >
               <template #title>
                 <div>以上都不对 ｜ 正确答案：{{ item.正确答案 }}</div>
+              </template>
+            </van-cell>
+
+            <van-cell
+              v-if="
+                item.正确答案 &&
+                areAnswersDifferent(item.答案, item.正确答案) &&
+                item.答案 !== '以上都不对' &&
+                !item.is_spell &&
+                item.flag === 'true'
+              "
+              style="background-color: lightgreen"
+            >
+              <template #title>
+                <!-- {{ areAnswersDifferent(item.答案, item.正确答案) }}
+              {{ item.答案 !== '以上都不对' }}
+              {{ !item.is_spell }}
+              {{ item.flag === 'true' }} -->
+                <div>{{ item.答案 }} ｜ 完全答案：{{ item.正确答案 }}</div>
               </template>
             </van-cell>
           </van-cell-group>
@@ -804,7 +1035,21 @@ onMounted(async () => {
   }
 }
 
-/* .custom-dialog {
-  top: 0% !important;
-} */
+.dailyFloat.van-floating-bubble {
+  width: 40px !important; /* 矩形宽度 */
+  height: 50px !important; /* 矩形高度 */
+  border-radius: 8px !important; /* 直角矩形，去掉圆角 */
+  z-index: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 79, 79, 0.3),
+    rgba(240, 166, 202, 0.3)
+  ) !important;
+}
+
+/* 确保图标居中 */
+.dailyFloat .van-floating-bubble__icon {
+  margin: auto;
+  font-size: 28px !important;
+}
 </style>

@@ -305,7 +305,8 @@ const clickTitleDialog = (action, done) => {
         if (res == "ok") {
           localStorage.setItem(
             "teacherPassword",
-            Base64.encode(passwordTeacher.value)
+            // Base64.encode(passwordTeacher.value)
+            passwordTeacher.value
           );
           showSuccessToast("密码正确");
         } else {
@@ -382,6 +383,8 @@ const submitAccount = () => {
         showFailToast("用户名不存在");
       } else if (res == "密码错误") {
         showFailToast("密码错误");
+      } else if (res.status == false) {
+        showFailToast("用户暂时冻结");
       } else {
         // 主题选择
         localStorage.setItem('theme_name', res.theme.theme_name);
@@ -407,7 +410,7 @@ const submitAccount = () => {
         }
 
         async function executeTasks() {
-          try {
+          // try {
             // 先执行 missTask
             // isLoading.value = true;
             const res_miss = await missTask();
@@ -452,9 +455,9 @@ const submitAccount = () => {
                 },
               });
             }
-          } catch (error) {
-            console.error("Error executing tasks:", error);
-          }
+          // } catch (error) {
+          //   console.error("Error executing tasks:", error);
+          // }
         }
         executeTasks();
       }
@@ -621,12 +624,13 @@ onUnmounted(() => {
     <van-floating-bubble axis="xy" magnetic="x" icon="chat" @click="showHell" />
     <!-- closeable -->
     <van-popup
+    
       v-model:show="showAccountPop"
       position="bottom"
       :style="{ height: '100%' }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
-      
     >
+    <!-- closeable -->
       <div
         style="
           display: flex;

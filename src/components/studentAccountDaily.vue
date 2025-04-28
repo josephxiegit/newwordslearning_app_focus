@@ -8,19 +8,20 @@ import {
   nextTick,
   onBeforeUnmount,
   inject,
+  reactive,
 } from "vue";
 import {
   showFailToast,
   showDialog,
   showConfirmDialog,
   showLoadingToast,
+  showSuccessToast,
   showToast,
   Divider,
-  showSuccessToast,
 } from "vant";
 
 import { useRouter } from "vue-router";
-import preExamAnimation from "./preExam.vue";
+import dailyAnimation from "./dailyAnimation.vue";
 import chineseMeaningSrcGoatAndWolf from "../assets/chinese_meaning.png";
 import chineseMeaningSrcBears from "../assets/Boonie Bears/chinese_meaning.png";
 const flagTheme = inject("flagTheme");
@@ -34,25 +35,6 @@ const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
 const checkboxRefs = ref([]);
 
-// 全局导航
-const popNavshow = ref(false);
-const gridMeaningshow = ref(false);
-const gridChinese = ref("");
-const gridEnglish = ref("");
-
-const shownavWords = () => {
-  if (currentIndex.value == 0) {
-    showFailToast("第二个词显示导航");
-    return;
-  }
-  popNavshow.value = true;
-};
-const showGridMeaning = (index) => {
-  gridChinese.value = synonymsOptions.value[index]["正确答案"];
-  gridEnglish.value = synonymsOptions.value[index]["英文"];
-  gridMeaningshow.value = true;
-  speakWordEnglish(gridEnglish.value, gridChinese.value);
-};
 const speakWord = (english, answer) => {
   // 发音
   try {
@@ -61,23 +43,6 @@ const speakWord = (english, answer) => {
     if (!/[a-zA-Z]/.test(english)) {
       utterance.lang = "zh-CN";
     } else {
-      utterance.lang = "en-US";
-    }
-    window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    console.error("Error speaking word:", error);
-  }
-};
-
-const speakWordEnglish = (english, answer) => {
-  try {
-    let utterance;
-
-    if (!/[a-zA-Z]/.test(english)) {
-      utterance = new SpeechSynthesisUtterance(answer);
-      utterance.lang = "zh-CN";
-    } else {
-      utterance = new SpeechSynthesisUtterance(english);
       utterance.lang = "en-US";
     }
     window.speechSynthesis.speak(utterance);
@@ -194,43 +159,10 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
   ); // 确保结果是按序号排序的
 };
 
-const clickSubmitUser = async (action, done) => {
-  // 直接提交
-  mergedData.value = mergeAnswerAndSynonym();
-
-  // 将用户选择转化为中文
-  const synonymsSelectedChinese = convertSelections(
-    synonymsSelected.value,
-    synonymsOptions.value
-  );
-  // console.log("synonymsSelectedChinese", synonymsSelectedChinese);
-  // 将中文用户选择和选项答案合并
-  const synonymAndSelections = mergeSynonymAndSelections(
-    synonymsSelectedChinese
-  );
-  console.log("synonymAndSelections", synonymAndSelections);
-  console.log("username", username.value);
-  console.log("basicPreExam", basicPreExam.value);
-  showSuccessToast({
-    duration: 4000,
-    closeOnClick: true,
-    closeOnClickOverlay: true,
-    message: "恭喜！💎数量增加+1",
-  });
-  router.push({
-    path: "/studentAccountList",
-    state: {
-      username: username.value,
-      data: basicPreExam.value,
-    },
-  });
-};
-
 // 点击选项
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
 const flagSingleOrMultiChoice = ref("单选");
-const uncertainVocabulary = ref(new Set());
 const flagChoose = ref(true);
 
 let originalChinese = "";
@@ -379,44 +311,26 @@ const toggleCheckChinese = (index, index2) => {
     return count;
   }, 0);
 };
+
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
-const countdownMeaningClose = ref(5);
-const isDisabledMeaningClose = ref(true);
-const buttonTextMeaningClose = ref(`关闭 (${countdownMeaningClose.value}s)`);
 
 const closeMeaning = () => {
   meaningShow.value = false;
-};
-let interval;
-const startCountdown = () => {
-  clearInterval(interval);
-  countdownMeaningClose.value = 5; // 555555
-  // countdownMeaningClose.value = 0;
-  isDisabledMeaningClose.value = true;
-  buttonTextMeaningClose.value = `${countdownMeaningClose.value}`;
-  interval = setInterval(() => {
-    if (countdownMeaningClose.value > 1) {
-      countdownMeaningClose.value -= 1;
-      buttonTextMeaningClose.value = `关闭 (${countdownMeaningClose.value}s)`;
-    } else {
-      clearInterval(interval); // 清除定时器
-      isDisabledMeaningClose.value = false; // 启用按钮
-      buttonTextMeaningClose.value = "关闭"; // 更新按钮文本
-    }
-  }, 1000); // 每秒更新一次
+  startAnimation();
 };
 
 const goToNext = async () => {
   // 获取当前轮播图的索引
   const currentSlideIndex = currentIndex.value;
-
+  // console.log("selectedIndexes:", selectedIndexes.value);
+  // console.log("currentSlideIndex:", currentSlideIndex);
   // 检查当前轮播图中的选中项
   const currentSlideSelections = Object.keys(selectedIndexes.value).filter(
-    (key) => key.startsWith(`${currentSlideIndex}-`)
+    (key) => key.startsWith(`${String(currentSlideIndex)}-`)
   );
-
+  // console.log("currentSlideSelections:", currentSlideSelections);
   const hasSelection = currentSlideSelections.some(
     (key) => selectedIndexes.value[key]
   );
@@ -434,11 +348,6 @@ const goToNext = async () => {
       buttonTextType.value = "warning";
       isCheckboxDisabled.value = true;
       // 判断对错
-      // console.log(
-      //   "用户选择",
-      //   resultDataTempt.value[currentSlideIndex]["用户选择"]
-      // );
-      // console.log("正确答案", synonymsOptions.value[currentSlideIndex]["答案"]);
       const userSelection =
         resultDataTempt.value[currentSlideIndex]["用户选择"];
       const correctAnswer = synonymsOptions.value[currentSlideIndex]["答案"];
@@ -464,18 +373,20 @@ const goToNext = async () => {
         flagChoose.value = true;
         textColor.value = "green";
       } else {
+        mistakesList.value.push(resultDataTempt.value[currentSlideIndex]);
+        // console.log("mistakesList:", mistakesList.value);
+
         getVocabularyMeaning();
-        startCountdown();
         flagChoose.value = false;
         textColor.value = "red";
       }
       if (currentIndex.value === totalSlides.value - 1) {
-        buttonText.value = "下一步";
+        buttonText.value = "任务完成";
         buttonTextType.value = "danger";
       }
-      showAnimation_true();
     } else {
       // 进入下一个单词
+      submitList.value.push(resultDataTempt.value[currentSlideIndex]);
       if (currentIndex.value < totalSlides.value - 1) {
         flagSingleOrMultiChoice.value = getSingeOrMultiChoice(
           currentIndex.value + 1
@@ -493,11 +404,134 @@ const goToNext = async () => {
         );
       } else {
         // 到达最后一个轮播图，执行提交函数
-        updateAccountLog();
-        popNavshow.value = true;
+        // console.log("cartCount:", cartCount.value)
+        showSuccessToast("恭喜！💎数量增加+2");
+        if (cartCount.value == 0) {
+          router.push({
+            path: "/studentAccountList",
+            state: {
+              username: username.value,
+              data: basicPreExam.value,
+            },
+          });
+          updateAccountLog();
+          // console.log("提交");
+          // console.log("submitList:", submitList.value);
+        } else {
+          if(!localStorage.getItem("dailyAnimation")) {
+            showAnimation_true();
+            localStorage.setItem("dailyAnimation", "true")
+          }
+          
+          synonymsOptions.value = mistakesList.value;
+          function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [array[i], array[j]] = [array[j], array[i]]; // 交换元素
+            }
+            return array;
+          }
+          synonymsOptions.value.forEach((item, index) => {
+            item.序号 = index + 1;
+            item.中文 = shuffleArray([...item.中文]); // 使用扩展运算符创建副本，避免直接修改原始数组
+          });
+          completeCount.value = 0;
+          isCheckboxDisabled.value = false;
+          selectedItems.value = [];
+          speakWord(
+            synonymsOptions.value[0].英文,
+            synonymsOptions.value[0].正确答案
+          );
+          flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+          answerShow.value = false;
+          selectedIndexes.value = {};
+          synonymsSelected.value = [];
+          buttonText.value = "显示答案";
+          buttonTextType.value = "success";
+          currentIndex.value = 0;
+          totalSlides.value = synonymsOptions.value.length;
+          mistakesList.value = [];
+          cartCount.value = 0;
+
+          nextTick(() => {
+            if (swipeRef.value) {
+              swipeRef.value.swipeTo(0);
+            }
+          });
+        }
       }
     }
   }
+};
+
+// 购物车
+const mistakesList = ref([]);
+const submitList = ref([]);
+const cartIcon = ref(null); // 购物车图标的引用
+const showAnimation = ref(false); // 控制动画显示
+const animationStyle = reactive({
+  left: "50vw", // 初始水平位置（屏幕中间）
+  top: "50vh", // 初始垂直位置（屏幕中间）
+  transform: "translate(-50%, -50%)", // 居中显示
+});
+const cartCount = ref(0); // 购物车数量
+
+const startAnimation = () => {
+  cartCount.value++; // 增加购物车数量
+  showAnimation.value = true; // 显示动画元素
+
+  // 获取起点和终点位置
+  const startX = window.innerWidth / 2;
+  const startY = window.innerHeight / 4;
+  const cartRect = cartIcon.value.$el.getBoundingClientRect();
+  const endX = cartRect.left + cartRect.width / 2;
+  const endY = cartRect.top + cartRect.height / 2;
+
+  // 定义动画参数
+  const duration = 500; // 动画持续时间，1.5秒
+  let startTime = null;
+  const height = -150; // 抛物线最高点向上偏移（负值表示向上抛高）
+
+  // 缓动函数
+  const easeOutQuad = (t) => t * (2 - t); // ease-out for ascent
+  const easeInQuad = (t) => t * t; // ease-in for descent
+
+  // 动画函数
+  const animate = (timestamp) => {
+    if (!startTime) startTime = timestamp;
+    const elapsed = timestamp - startTime;
+    let t = elapsed / duration;
+    if (t >= 1) {
+      // 动画结束
+      showAnimation.value = false;
+      animationStyle.left = "50vw";
+      animationStyle.top = "50vh";
+      animationStyle.transform = "translate(-50%, -50%)";
+      return;
+    }
+
+    // 调整 t 以实现非匀速动画
+    if (t < 0.5) {
+      t = easeOutQuad(t * 2) / 2; // 前半段缓动
+    } else {
+      t = 0.5 + easeInQuad((t - 0.5) * 2) / 2; // 后半段缓动
+    }
+
+    // 计算抛物线路径
+    const x = startX + (endX - startX) * t;
+    const y = startY + (endY - startY) * t + height * t * (1 - t); // 抛物线公式
+
+    // 更新动画元素位置
+    animationStyle.left = `${x}px`;
+    animationStyle.top = `${y}px`;
+    animationStyle.transform = "translate(-50%, -50%)";
+
+    // 继续下一帧
+    requestAnimationFrame(animate);
+  };
+
+  // 开始动画
+  requestAnimationFrame(animate);
 };
 
 // 显示中文答案
@@ -558,7 +592,7 @@ const getVocabularyMeaning = () => {
         meaningData.value["高考"]["中文"] = res["高考"]["中文"];
         meaningData.value["高考"]["英文"] = res["高考"]["英文"];
       }
-      console.log("meaningData", meaningData.value);
+      // console.log("meaningData", meaningData.value);
     })
     .then((res) => {
       setTimeout(() => {
@@ -577,6 +611,7 @@ const preExamAnimationRef = ref(null);
 function showAnimation_true() {
   preExamAnimationRef.value.show();
 }
+
 
 const swipeRef = ref(null);
 const completeCount = ref("1");
@@ -621,7 +656,9 @@ async function updateAccountLog() {
   params.append("username", username.value);
   params.append("submittoken", submittoken.value);
   params.append("account_id_list", account_id_list.value);
-  params.append("log", JSON.stringify(resultDataTempt.value));
+  params.append("flagReview", "周常任务");
+  // params.append("log", JSON.stringify(resultDataTempt.value));
+  params.append("log", JSON.stringify(submitList.value));
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
   });
@@ -633,33 +670,18 @@ const basicPreExam = ref("");
 const account_id_list = ref("");
 const srcTheme = ref("");
 
-onBeforeUnmount(async () => {
-  clearInterval(interval);
-  // 在页面离开时执行的逻辑
-  isLoading.value = true;
-  isLoading.value = false;
-  window.removeEventListener("beforeunload", handleBeforeUnload);
-  // console.log("监测到离开");
-});
-const handleBeforeUnload = async (event) => {
-  // 在页面刷新时执行的逻辑
-  console.log("监测到刷新");
-  isLoading.value = true;
-  isLoading.value = false;
-  event.returnValue = ""; // 旧浏览器支持
-};
 onMounted(async () => {
+  localStorage.removeItem("dailyAnimation");
   if (flagTheme.value == 1) {
     srcTheme.value = chineseMeaningSrcGoatAndWolf;
   }
   if (flagTheme.value == 2) {
     srcTheme.value = chineseMeaningSrcBears;
   }
-  window.addEventListener("beforeunload", handleBeforeUnload);
   const initData = async () => {
     // 初始化数据
     synonymsOptions.value = JSON.parse(history.state.data);
-    // synonymsOptions.value = JSON.parse(history.state.data).slice(0 ,3);
+    // synonymsOptions.value = JSON.parse(history.state.data).slice(0, 3);
     console.log("synonymsOptions: ", synonymsOptions.value);
 
     synonymsOptions.value.forEach((item) => {
@@ -697,7 +719,7 @@ onMounted(async () => {
     totalSlides.value = synonymsOptions.value.length;
 
     submittoken.value = new Date().getTime();
-    console.log("submittoken: ", submittoken.value);
+    // console.log("submittoken: ", submittoken.value);
 
     username.value = history.state.username;
     account_id_list.value = history.state.account_id_list;
@@ -732,8 +754,6 @@ onMounted(async () => {
       <van-nav-bar
         title="一起来复习"
         :left-text="`${completeCount}/${synonymsOptions.length}`"
-        right-text="导航"
-        @click-right="shownavWords"
       >
       </van-nav-bar>
     </div>
@@ -749,7 +769,6 @@ onMounted(async () => {
           ref="swipeRef"
           :touchable="false"
           style="height: 420px"
-          vertical
         >
           <van-swipe-item v-for="(item, index) in synonymsOptions" :key="index">
             <div class="card">
@@ -813,27 +832,6 @@ onMounted(async () => {
                             >
                               写错了！{{ item.正确答案 }}
                             </div>
-                            <!-- <van-button
-                              type="default"
-                              size="mini"
-                              style="height: 16px; margin-top: -0rem"
-                            >
-                              <van-swipe
-                                vertical
-                                style="height: 14px; line-height: 14px"
-                                :autoplay="2000"
-                                :touchable="true"
-                                :show-indicators="false"
-                                @click="getVocabularyMeaning"
-                              >
-                                <van-swipe-item style="font-size: 12px"
-                                  >查看</van-swipe-item
-                                >
-                                <van-swipe-item style="font-size: 12px"
-                                  >讲解</van-swipe-item
-                                >
-                              </van-swipe>
-                            </van-button> -->
                           </div>
                         </div>
 
@@ -895,7 +893,25 @@ onMounted(async () => {
       </van-col>
     </van-row>
 
-    <!-- 按钮 -->
+    <!-- 购物车 -->
+    <van-row>
+      <van-col span="8" offset="16" style="margin-top: -40px">
+        <van-badge :content="cartCount">
+          <van-icon
+            ref="cartIcon"
+            name="cart-o"
+            color="#1989fa"
+            size="2.5rem"
+          />
+        </van-badge>
+      </van-col>
+    </van-row>
+    <div
+      v-if="showAnimation"
+      class="animated-item"
+      :style="animationStyle"
+    ></div>
+
     <van-row class="my-swipe-container" style="position: relative">
       <van-col span="2"></van-col>
       <van-col span="14">
@@ -908,113 +924,12 @@ onMounted(async () => {
         >
       </van-col>
       <van-col span="2"></van-col>
-      <preExamAnimation ref="preExamAnimationRef" :flagChoose="flagChoose" />
     </van-row>
-
-    <!-- grid显示 -->
-    <van-popup
-      position="bottom"
-      :style="{ height: '80%' }"
-      v-model:show="popNavshow"
-      style="padding: 1rem"
-      closeable
-    >
-      <div style="display: flex">
-        <div
-          style="
-            font-weight: 700;
-            font-size: 25px;
-            color: black;
-            margin-bottom: 1rem;
-          "
-        >
-          全局背诵
-        </div>
-        <div
-          style="
-            font-size: 12px;
-            color: red;
-            font-weight: 700;
-            margin-top: 0.8rem;
-            margin-left: 0.5rem;
-          "
-        >
-          带有 🔍 可以点击显示中文和发音
-        </div>
-      </div>
-      <van-button
-        v-if="currentIndex == totalSlides - 1"
-        block
-        type="danger"
-        @click="clickSubmitUser"
-        >结束复习</van-button
-      >
-      <van-grid
-        style="margin-top: 0.5rem"
-        :column-num="4"
-        clickable
-        icon-size="14px"
-      >
-        <van-grid-item
-          v-for="(item, index) in resultDataTempt"
-          :key="index"
-          :text="item.英文"
-          class="grid-item-text"
-          :icon="item['用户选择'].includes('无') ? null : 'search'"
-          :class="{
-            'small-font': isTextOverflow(item.英文),
-            'gray-background': !item['用户选择'].includes('无'),
-            'not-clickable': item['用户选择'].includes('无'),
-          }"
-          @click="
-            !['无'].includes(item['用户选择']) ? showGridMeaning(index) : null
-          "
-        />
-      </van-grid>
-    </van-popup>
-
-    <!-- grid中文查询 -->
-    <van-dialog
-      v-model:show="gridMeaningshow"
-      round-button
-      theme="round-button"
-    >
-      <template #title>
-        <div
-          style="display: flex; justify-content: center"
-          @click="speakWordEnglish(gridEnglish, gridChinese)"
-        >
-          <div style="font-size: 21px">
-            {{ gridEnglish }}
-            <img
-              src="../assets/speaker.png"
-              style="width: 12px; height: auto"
-            />
-          </div>
-        </div>
-      </template>
-      <div style="display: flex">
-        <img
-          :src="srcTheme"
-          style="
-            width: 40px;
-            height: auto;
-            margin-right: rem;
-            margin-left: 1.5rem;
-            margin-top: 0.5rem;
-          "
-        />
-
-        <div style="margin-left: 1rem; font-size: smaller; margin-top: 1.1rem">
-          {{ gridChinese }}
-        </div>
-      </div>
-    </van-dialog>
 
     <!-- vocabulary meaning -->
     <van-popup
-      position="bottom"
-      :style="{ height: '90%' }"
+      position="top"
+      :style="{ height: '50%' }"
       v-model:show="meaningShow"
       style="padding: 1rem"
       :close-on-click-overlay="false"
@@ -1057,23 +972,18 @@ onMounted(async () => {
         <div>无</div>
         <Divider></Divider>
       </div>
-      <div style="display: flex; justify-content: space-between">
-        <div style="font-weight: 700; margin-bottom: 0.3rem">天津3500:</div>
-      </div>
-      <div style="white-space: pre-wrap; font-size: 14px">
-        {{ meaningData["高考"]["中文"] }}
-      </div>
+
       <van-button
         block
-        :disabled="isDisabledMeaningClose"
         type="primary"
         @click="closeMeaning"
         style="margin-top: 1rem"
       >
-        {{ buttonTextMeaningClose }}
+        关闭
       </van-button>
     </van-popup>
 
+    <dailyAnimation ref="preExamAnimationRef"/>
     <loading v-if="isLoading" />
   </div>
 </template>
@@ -1088,12 +998,6 @@ html {
 .my-swipe {
   margin-top: 30px;
 }
-
-/* .block {
-  width: 120px;
-  height: 120px;
-  background-color: #fff;
-} */
 
 .selected-cell {
   font-weight: bold;
@@ -1132,14 +1036,6 @@ html {
   border-bottom: none; /* 移除最后一个中文选项的分割线 */
 }
 
-/* .block {
-  display: inline-block;
-  width: 22px;
-  color: #fff;
-  font-size: 12px;
-  text-align: center;
-  background-color: #ee0a24;
-} */
 .nav-bar-container {
   position: sticky;
   top: 0;
@@ -1166,15 +1062,6 @@ html {
   justify-content: center;
 }
 
-/* .block {
-  display: inline-block;
-  width: 22px;
-  color: #fff;
-  font-size: 12px;
-  text-align: center;
-  background-color: #1989fa;
-  height: 20px;
-} */
 .flying-tag {
   animation: fly-up 0.5s ease-out;
   display: flex;
@@ -1192,5 +1079,14 @@ html {
 .not-clickable {
   pointer-events: none; /* 禁止点击 */
   background-color: transparent; /* 背景保持透明 */
+}
+/* 购物车 */
+.animated-item {
+  position: fixed;
+  width: 20px;
+  height: 20px;
+  background: red; /* 绿色小球 */
+  border-radius: 50%;
+  z-index: 999; /* 确保在其他元素之上 */
 }
 </style>

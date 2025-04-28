@@ -146,7 +146,12 @@ const compareAndAddFlag = (dictArray) => {
       }
       // 部分匹配：用户选择数组至少包含一个答案数组中的元素
       else if (answerArray.some((ans) => userSelectionArray.includes(ans))) {
-        flag = "half";
+        if(答案 == 用户选择) {
+          flag = "true"
+        } else {
+          flag = "half";
+        }
+        
       }
     }
     // 返回结果
@@ -232,7 +237,12 @@ const clickSubmitUser = async (action, done) => {
         const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
         function isPhrase(text) {
-          return /\s|,|\/|\.|…|-|_/.test(text);
+          return /\s|,|\/|\.|…|-|_|'/.test(text);
+        }
+        function containsChineseSemicolon(str) {
+          const hasChineseSemicolon = str.includes('；');
+          const hasEnglishComma = str.includes(',');
+          return hasChineseSemicolon || hasEnglishComma;
         }
 
         compareResult.forEach((item) => {
@@ -249,12 +259,14 @@ const clickSubmitUser = async (action, done) => {
               correctAnswer = answer;
             }
           }
-
+          // console.log(english, correctAnswer)
           if (
             item.flag !== "true" &&
             !addedEnglishSet.has(english) &&
-            !isPhrase(english)
+            !isPhrase(english) &&
+            !containsChineseSemicolon(correctAnswer)
           ) {
+            // console.log(english);
             spellVocabularyResult.push({
               英文: english,
               答案: answer,
@@ -298,7 +310,8 @@ const clickSubmitUser = async (action, done) => {
 
         return spellVocabularyResult; // 返回局部变量
       }
-
+      // console.log("compareResult", compareResult.value);
+      // console.log("uncertainVocabulary", uncertainVocabulary.value);
       spellVocabulary.value = getSpellVocabulary(
         compareResult,
         uncertainVocabulary.value
@@ -396,6 +409,9 @@ const clickSubmitUser = async (action, done) => {
         params.append("numberprev", 0);
         params.append("numbershowanswer", 0);
         params.append("numbertransparent", 0);
+        params.append("numbertransparent", 0);
+        params.append("checkedNoneOfAbove", checkedNoneOfAbove.value);
+        params.append("checkedSpell", checkedSpell.value);
 
         // 更新spell vocabulary
         params.append("data_words", JSON.stringify(spellVocabulary.value));
@@ -436,7 +452,7 @@ const clickSubmitUser = async (action, done) => {
         isLoading.value = false;
         return;
       } else {
-        function redirect() {
+        function redirect(accountDataResult) {
           router.push({
             path: "/studentAccountAnswer",
             state: {
@@ -453,6 +469,8 @@ const clickSubmitUser = async (action, done) => {
               account_log_id: accountDataResult["new_log_nid"],
               spellVocabulary: JSON.stringify(spellVocabulary.value),
               lock_spell: lock_spell.value,
+              complement: 1 - rate,
+              RateOrigin: RateOrigin.value
             },
           });
         }
@@ -474,7 +492,7 @@ const clickSubmitUser = async (action, done) => {
               message: "跳转答案页",
               theme: "round-button",
             }).then(() => {
-              redirect();
+              redirect(accountDataResult);
             });
             return;
           }
@@ -483,7 +501,6 @@ const clickSubmitUser = async (action, done) => {
           if (error.message === "请求超时") {
             isLoading.value = false; // 停止加载
             stopAnimation();
-            console.log(22222);
             showDialog({
               title: "超时",
               message: "请求超时，请稍后再试。",
@@ -523,12 +540,13 @@ const clickSubmitUser = async (action, done) => {
           sessionStorage.removeItem("flagHelp");
           // 执行页面跳转等其他操作
           if (accountDataResult && accountDataResult !== "不能提交相同内容") {
-            console.log(11111);
-            redirect();
+            redirect(accountDataResult);
           }
         }
       }
     }
+  } else if (action === "cancel") {
+    showDialogSubmit.value = false;
   }
 };
 
@@ -1142,6 +1160,9 @@ const handlePageHide = (event) => {
   sessionStorage.setItem("showMagic", JSON.stringify(showMagic.value));
   sessionStorage.setItem("flagHelp", JSON.stringify(flagHelp.value));
 };
+const checkedNoneOfAbove = ref(false);
+const checkedSpell = ref(false);
+const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
@@ -1164,7 +1185,10 @@ onMounted(async () => {
   }
 
   const data = JSON.parse(history.state.data);
-  // console.log('data: ', data);
+  RateOrigin.value = history.state.RateOrigin;
+  checkedNoneOfAbove.value = history.state.checkedNoneOfAbove;
+  checkedSpell.value = history.state.checkedSpell;
+
   alias.value = data.alias;
   alias.value = data.alias;
   lock_spell.value = history.state.lock_spell;
@@ -1214,6 +1238,13 @@ onMounted(async () => {
   });
   console.log("synonymsOptions", synonymsOptions.value);
   console.log("answers", answers.value);
+  // answers.value.forEach((item) => {
+  //   if(item.英文 == "since") {
+  //     console.log("英文：", item.英文);
+  //     console.log("中文：", item.中文);
+  //     console.log("正确答案：", item.正确答案);
+  //   }
+  // })
 });
 </script>
 

@@ -25,6 +25,7 @@ const axios = instance.appContext.config.globalProperties.$ajax;
 
 const originalData = ref([]);
 const filteredFiles = ref([]);
+const showDiamondConsume = ref(false);
 
 // 获得日志
 async function queryData() {
@@ -63,6 +64,8 @@ function processData(res) {
         numbershowanswer,
         numbertransparent,
         alias,
+        complement,
+        diamondConsume,
       } = item;
       const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
@@ -76,21 +79,24 @@ function processData(res) {
         .replace(/can"t/g, "can't")
         .replace(/mustn"t/g, "mustn't")
         .replace(/needn"t/g, "needn't")
-        .replace(/won"t/g, "won't");
+        .replace(/o"clock/g, "o'clock")
+        .replace(/"are/g, "'are'")
+        .replace(/won"t/g, "won't")
+        .replace(/it"s/g, "it's");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
       dataString = dataString
         .replace(/\bFalse\b/g, "false")
         .replace(/\bTrue\b/g, "true")
         .replace(/\bNone\b/g, "null");
-        
+
       let parsedLog;
-      // try {
+      try {
         parsedLog = JSON.parse(dataString);
-      // } catch (error) {
-      //   console.error("JSON parsing error:", error); 
-      //   return null; 
-      // }
+      } catch (error) {
+        console.error("JSON parsing error:", error);
+        return null;
+      }
 
       const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
       if (!hasFlagField) {
@@ -135,6 +141,8 @@ function processData(res) {
         numbershowanswer,
         numbertransparent,
         alias,
+        complement,
+        diamondConsume,
       };
     })
     .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
@@ -157,6 +165,19 @@ const loading = ref(false);
 const finished = ref(false);
 const pageIndex = ref(0);
 
+// 筛选类型
+const valueVariety = ref("");
+const showVarietyPicker = ref(false);
+const columnsVarieties = [
+  { text: "普通", value: "普通" },
+  { text: "游戏", value: "游戏" },
+  { text: "周长", value: "周长" },
+  { text: "复习", value: "复习" },
+];
+const onConfirmVariety = ({ selectedValues }) => {
+  showVarietyPicker.value = false;
+  valueVariety.value = selectedValues[0];
+};
 const onLoad = async () => {
   if (loading.value || finished.value) {
     return;
@@ -166,6 +187,8 @@ const onLoad = async () => {
   // params.append("alias", title);
   params.append("filterStudent", valueSearchStudent.value);
   params.append("filterXlsm", valueSearchLog.value);
+  params.append("variety", valueVariety.value);
+  params.append("alias", valueAliasLog.value);
   params.append("page", pageIndex.value + 1); // 请求下一页的数据
   params.append("page_size", 20); // 每页数据大小
 
@@ -185,6 +208,7 @@ const clearFilterData = () => {
   valueSearchStudent.value = "";
   valueSearchLog.value = "";
   valueAliasLog.value = "";
+  valueVariety.value = "";
 };
 async function filterData() {
   let params = new URLSearchParams();
@@ -192,12 +216,18 @@ async function filterData() {
   params.append("filterStudent", valueSearchStudent.value);
   params.append("filterXlsm", valueSearchLog.value);
   params.append("alias", valueAliasLog.value);
+  params.append("variety", valueVariety.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
   });
 }
 const filteredStudent = () => {
-  if (valueSearchStudent.value == "" && valueSearchLog.value == "") {
+  if (
+    valueSearchStudent.value == "" &&
+    valueSearchLog.value == "" &&
+    valueAliasLog.value == "" &&
+    valueVariety.value == ""
+  ) {
     return;
   }
   filterData().then((res) => {
@@ -234,6 +264,7 @@ const detailList = ref([]);
 const numberprev = ref(0);
 const numbershowanswer = ref(0);
 const numbertransparent = ref(0);
+const diamondConsume = ref("");
 // 延迟库
 async function getUncertain(nid) {
   loadingUncertain.value = true;
@@ -286,6 +317,7 @@ const toggleDetail = (index) => {
   numberprev.value = detail["numberprev"];
   numbershowanswer.value = detail["numbershowanswer"];
   numbertransparent.value = detail["numbertransparent"];
+  diamondConsume.value = detail["diamondConsume"];
 
   detailRate.value =
     detail["log"].length - detail["falseCount"] + "/" + detail["log"].length;
@@ -486,6 +518,22 @@ const reloadPage = () => {
           label="分组"
           placeholder="请输入分组"
         />
+        <!-- 类型 -->
+        <van-field
+          v-model="valueVariety"
+          is-link
+          readonly
+          label="类型"
+          placeholder="选择类型"
+          @click="showVarietyPicker = true"
+        />
+        <van-popup v-model:show="showVarietyPicker" round position="bottom">
+          <van-picker
+            :columns="columnsVarieties"
+            @cancel="showVarietyPicker = false"
+            @confirm="onConfirmVariety"
+          />
+        </van-popup>
         <van-button
           @click="filteredStudent()"
           type="danger"
@@ -554,7 +602,18 @@ const reloadPage = () => {
           <template #value>
             <div>
               <div style="color: black">
-                {{ item.log.length - item.falseCount }} / {{ item.log.length }}
+                <div v-if="item.complement == 1" style="display: flex; justify-content: flex-end">
+                  <van-tag type="primary" plain mark size="medium"
+                    >{{ item.log.length - item.falseCount }} /
+                    {{ item.log.length }}
+                  </van-tag>
+                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''" style="margin-top: 0.2rem;">&nbsp;💎</div>
+                </div>
+                <div v-else style="display: flex; justify-content: flex-end">
+                  {{ item.log.length - item.falseCount }} /
+                  {{ item.log.length }}
+                  <div v-if="item.diamondConsume != null  && item.diamondConsume != ''">&nbsp;💎</div>
+                </div>
               </div>
               <div style="color: red">{{ item.username }}</div>
             </div>
@@ -687,7 +746,9 @@ const reloadPage = () => {
             <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
             <div>答案:{{ numbershowanswer }}</div>
             <div>透视:{{ numbertransparent }}</div>
+            <div v-if="diamondConsume != null && diamondConsume != ''">💎{{ diamondConsume }}</div>
           </div>
+          <div v-if="diamondConsume != null && diamondConsume != '' && detailMode === '普通'" style="font-size: 13px;color: gray;margin: 5px 15px;">💎 {{ diamondConsume }}</div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
           <van-cell

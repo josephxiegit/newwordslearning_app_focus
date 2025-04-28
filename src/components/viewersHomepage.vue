@@ -368,6 +368,7 @@ async function submitAccountData() {
   params.append("password", passwordAccount.value);
 
   return await axios.post("words/", params).then((ret) => {
+    console.log(ret.data)
     return ret.data;
   });
 }

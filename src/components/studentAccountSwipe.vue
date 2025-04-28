@@ -174,7 +174,11 @@ const compareAndAddFlag = (dictArray) => {
       }
       // 部分匹配：用户选择数组至少包含一个答案数组中的元素
       else if (answerArray.some((ans) => userSelectionArray.includes(ans))) {
-        flag = "half";
+        if(答案 == 用户选择) {
+          flag = "true"
+        } else {
+          flag = "half";
+        }
       }
     }
 
@@ -259,12 +263,21 @@ const clickSubmitUser = async (action, done) => {
   // 计算拼写库
   if (!lock_spell.value) {
     function getSpellVocabulary(compareResult, uncertainVocabulary) {
+      console.log('uncertainVocabulary: ', uncertainVocabulary)
+      console.log('compareResult: ', compareResult)
+      console.log(111111)
       const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
       const addedEnglishSet = new Set();
       const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
 
       function isPhrase(text) {
-        return /\s|,|\/|\.|…|-|_/.test(text);
+        return /\s|,|\/|\.|…|-|_|'/.test(text);
+      }
+      function containsChineseSemicolon(str) {
+        // return str.includes('；');
+        const hasChineseSemicolon = str.includes('；');
+        const hasEnglishComma = str.includes(',');
+        return hasChineseSemicolon || hasEnglishComma;
       }
 
       compareResult.forEach((item) => {
@@ -281,12 +294,15 @@ const clickSubmitUser = async (action, done) => {
             correctAnswer = answer;
           }
         }
+        // console.log(english, correctAnswer)
 
         if (
           item.flag !== "true" &&
           !addedEnglishSet.has(english) &&
-          !isPhrase(english)
+          !isPhrase(english) &&
+          !containsChineseSemicolon(correctAnswer)
         ) {
+          // console.log(english);
           spellVocabularyResult.push({
             英文: english,
             答案: answer,
@@ -405,6 +421,8 @@ const clickSubmitUser = async (action, done) => {
     params.append("numberprev", clickNumberPrev.value);
     params.append("numbershowanswer", clickNumberShowAnswer.value);
     params.append("numbertransparent", clickNumberTransparent.value);
+    params.append("checkedNoneOfAbove", checkedNoneOfAbove.value);
+    params.append("checkedSpell", checkedSpell.value);
 
     // 更新spell vocabulary
     params.append("data_words", JSON.stringify(spellVocabulary.value));
@@ -435,8 +453,7 @@ const clickSubmitUser = async (action, done) => {
   const newCoins = totalCoins.value;
   // console.log("newCoins: ", newCoins);
 
-  function redirect() {
-    // clearTimeout(redirectTimeout);
+  function redirect(accountDataResult) {
     router.push({
       path: "/studentAccountAnswer",
       state: {
@@ -451,46 +468,11 @@ const clickSubmitUser = async (action, done) => {
         account_log_id: accountDataResult["new_log_nid"],
         spellVocabulary: JSON.stringify(spellVocabulary.value),
         lock_spell: lock_spell.value,
+        complement: 1.5 - rate,
+        RateOrigin: RateOrigin.value
       },
     });
   }
-
-  // let accountDataResult;
-  // if (compareResult.length == 0) {
-  //   showFailToast("提交数据不能为空");
-  //   isLoading.value = false;
-  //   return;
-  // } else {
-  //   // 如果 updateAccountlog 成功，继续执行其他操作
-  //   accountDataResult = await updateAccountData();
-  //   if (accountDataResult === "不能提交相同内容") {
-  //     isLoading.value = false;
-  //     showDialog({
-  //       title: "错误",
-  //       message: "数据已提交，跳转答案页",
-  //       theme: "round-button",
-  //     }).then(() => {
-  //       redirect();
-  //     });
-
-  //     return;
-  //   }
-
-  //   let UncertainResult;
-  //   if (uncertainVocabulary.value.size != 0) {
-  //     UncertainResult = await updateUncertain(accountDataResult.new_log_nid);
-  //   }
-
-  //   // 如果所有操作都成功，处理结果
-  //   isLoading.value = false;
-
-  //   // 清楚store
-  //   sessionStorage.removeItem("numberShowAnswer");
-  //   sessionStorage.removeItem("numberTransparent");
-  //   sessionStorage.removeItem("numberPrev");
-  //   changeOverlayColor("rgba(128, 128, 128, 0.6)");
-  //   redirect();
-  // }
 
   // 开始加载
   isLoading.value = true;
@@ -518,7 +500,7 @@ const clickSubmitUser = async (action, done) => {
         message: "跳转答案页",
         theme: "round-button",
       }).then(() => {
-        redirect();
+        redirect(accountDataResult);
       });
       return;
     }
@@ -561,7 +543,7 @@ const clickSubmitUser = async (action, done) => {
 
     // 跳转（只有在没有超时的情况下才执行）
     if (accountDataResult && accountDataResult !== "不能提交相同内容") {
-      redirect();
+      redirect(accountDataResult);
     }
   }
 };
@@ -907,7 +889,6 @@ const goToNext = () => {
       console.log("totalTimeInterval: ", totalTimeInterval.value);
       console.log("standardTimeInterval: ", standardTimeInterval.value);
       if (submitFlag) {
-        console.log(111)
         pause();
         clickSubmitUser();
       } else {
@@ -1582,10 +1563,14 @@ const durationRolling = ref(0.8);
 const isRewardEligible = ref(true);
 const lock_spell = ref(false);
 const spellVocabulary = ref([]);
+const checkedNoneOfAbove = ref(false);
+const checkedSpell = ref(false);
+const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onMounted(async () => {
+  RateOrigin.value = history.state.RateOrigin;
   // 被动技能
   flagPassiveMagic.value = passive_magic.value;
   // flagPassiveMagic.value = true;
@@ -1633,6 +1618,8 @@ onMounted(async () => {
 
   const initData = async () => {
     // 初始化数据
+    checkedNoneOfAbove.value = history.state.checkedNoneOfAbove;
+    checkedSpell.value = history.state.checkedSpell;
     // console.log("history.state: ", history.state);
     const data = JSON.parse(history.state.data);
     console.log("data: ", data);
@@ -1901,7 +1888,7 @@ onMounted(async () => {
                           "
                         >
                           <div>{{ item.序号 + ". " + item.英文 }}</div>
-                          <div style="font-size: 13px; color: red">
+                          <div style="font-size: 17px; color: red">
                             {{ flagSingleOrMultiChoice }}
                           </div>
                         </div>

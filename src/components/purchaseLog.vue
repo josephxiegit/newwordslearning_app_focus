@@ -100,6 +100,16 @@ const onCancelSearchTextBook = () => {
   refreshData();
 };
 
+const processedTitle = (title) => {
+  if (!title) return title;
+  try {
+    return title.split(".")[0];
+  } catch (error) {
+    console.error("处理标题时出错:", error);
+    return title;
+  }
+
+};
 onMounted(async () => {
   refreshData();
 });
@@ -168,14 +178,15 @@ const reloadPage = () => {
         <van-cell
           :title="item.user__username"
           :value="item.type + ' ' + item.coins"
-          :label="item.create_time"
           is-link
         >
+          <template #label>
+            <div>{{ item.create_time }}</div>
+            <div style="margin-top: 0.2rem;">{{ processedTitle(item.account_data__title) }}</div>
+          </template>
         </van-cell>
       </div>
     </van-cell-group>
-
-
   </div>
 </template>
 

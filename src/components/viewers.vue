@@ -190,7 +190,12 @@ const searchLog = (item, index) => {
             .replace(/"m /g, "'m ")
             .replace(/can"t/g, "can't")
             .replace(/mustn"t/g, "mustn't")
-            .replace(/needn"t/g, "needn't");
+            .replace(/o"clock/g, "o'clock")
+            .replace(/needn"t/g, "needn't")
+            .replace(/o"clock/g, "o'clock")
+            .replace(/"are/g, "'are'")
+            .replace(/won"t/g, "won't")
+            .replace(/it"s/g, "it's");
 
           dataString = dataString
             .replace(/\bFalse\b/g, "false")
@@ -269,6 +274,7 @@ const detailList = ref([]);
 const numberprev = ref(0);
 const numbershowanswer = ref(0);
 const numbertransparent = ref(0);
+const diamondConsume = ref("");
 // 延迟库
 const showUncertain = ref(false);
 const uncertainResult = ref("");
@@ -342,6 +348,7 @@ const toggleDetail = (item, index) => {
   numberprev.value = item["numberprev"];
   numbershowanswer.value = item["numbershowanswer"];
   numbertransparent.value = item["numbertransparent"];
+  diamondConsume.value = item["diamondConsume"];
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
   detailList.value = item["log"];
@@ -532,7 +539,7 @@ const onLoadOriginalData = async (title = "全部") => {
   isLoading.value = false;
 };
 
-// 点击tab
+// 点击tab年级
 const onClickTab = ({ title }) => {
   filterName.value = "";
   activeSidebar.value = 0;
@@ -561,12 +568,87 @@ const gotoItem = async (index) => {
   });
 };
 
+// 周长细节
+const showDailyDetail = ref(false);
+const showDailyRange = ref(false);
+const dateDaily = ref("");
+const minDateDaily = ref(new Date(2025, 0, 1));
+const formatDate = (date) =>
+  `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+const onConfirmDailyRange = async (values) => {
+  let toast1 = showLoadingToast({
+    message: "查询中...",
+    forbidClick: true,
+  });
+  const [start, end] = values;
+  showDailyRange.value = false;
+  dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;
+  LastDaysDailyTask.value = [];
+  LastDaysReview.value = [];
+  listDailyAndReview.value = [];
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", dailyUser.value);
+  params.append("dateRange", dateDaily.value);
+  let res = await axios.post("words/", params);
+  console.log("res: ", res.data);
+  listDailyAndReview.value = [
+    ...res.data.logs_daily,
+    ...res.data.logs_review,
+  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+  toast1.close();
+};
+
+// 复习细节
+const LastDaysReview = ref([]);
+
 // 点击sidebar
 const activeSidebar = ref(0);
+const dailyUser = ref("");
 const filterName = ref("");
 const backupSides = ref([]);
+const LastDaysDailyTask = ref([]);
+const listDailyAndReview = ref([]);
+const showLastDaysDailyTask = ref(false);
 
+async function getLastDaysDailyTask(username) {
+  dailyUser.value = username;
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", username);
+  let res = await axios.post("words/", params);
+  console.log("res: ", res.data);
+  LastDaysDailyTask.value = res.data.logs_daily;
+  LastDaysReview.value = res.data.logs_review;
+  listDailyAndReview.value = [
+    ...LastDaysDailyTask.value,
+    ...LastDaysReview.value,
+  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+}
+async function refreshtLastDaysDailyTask() {
+  let toast1 = showLoadingToast({
+    message: "查询中...",
+    forbidClick: true,
+  });
+  LastDaysDailyTask.value = [];
+  LastDaysReview.value = [];
+  listDailyAndReview.value = [];
+  dateDaily.value = "";
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", dailyUser.value);
+  let res = await axios.post("words/", params);
+  LastDaysDailyTask.value = res.data.logs_daily;
+  LastDaysReview.value = res.data.logs_review;
+  listDailyAndReview.value = [
+    ...LastDaysDailyTask.value,
+    ...LastDaysReview.value,
+  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+  toast1.close();
+}
 const onChangeSidebar = async (index) => {
+  showLastDaysDailyTask.value = sidesName.value[index].username !== "全部";
+  getLastDaysDailyTask(sidesName.value[index]["username"]);
   let title;
   if (sidesName.value[index]["username"] == "全部") {
     filterName.value = "";
@@ -591,7 +673,9 @@ const onChangeSidebar = async (index) => {
   // 重新加载数据
   onLoadOriginalData(title);
 };
-
+watch(sidesName, () => {
+  showLastDaysDailyTask.value = false;
+});
 // 地点选择
 const showGridLocation = ref(false);
 const checkedGridLocation = ref(false);
@@ -756,7 +840,7 @@ onMounted(async () => {
   let users = data.users.map((item) => item.username);
   users.unshift("全部");
   sidesName.value = await getSidesNameReviews(users);
-  // console.log('sidesName: ', sidesName.value);
+  // console.log("sidesName: ", sidesName.value);
 
   backupSides.value = [...sidesName.value];
   // backupSides.value = [...sidesName.value];
@@ -865,6 +949,23 @@ const reloadPage = () => {
             <div style="height: 45px"></div>
           </van-sidebar>
           <div class="list-container">
+            <!-- 周长细节 -->
+            <van-cell
+              v-show="showLastDaysDailyTask"
+              is-link
+              center
+              clickable
+              class="custom-cell"
+              @click="showDailyDetail = true"
+            >
+              <template #title>
+                <div style="margin-bottom: 0.5rem; font-weight: 400">
+                  最近十五天周长 {{ LastDaysDailyTask.length }} 次，复习
+                  {{ LastDaysReview.length }} 次
+                </div>
+              </template>
+            </van-cell>
+
             <van-list
               v-model="loadingOriginalData"
               :finished="finishedOriginalData"
@@ -928,7 +1029,7 @@ const reloadPage = () => {
                               最后一次背诵时间：
                             </div>
                             <div
-                              v-if="item.is_review_required > 0"
+                              v-if="item.is_review_required == 1"
                               style="margin-top: 0.3rem; color: lightgray"
                             >
                               {{ item.create_time }}
@@ -1168,6 +1269,22 @@ const reloadPage = () => {
               <div style="height: 45px"></div>
             </van-sidebar>
             <div class="list-container">
+              <!-- 周长细节 -->
+              <van-cell
+                v-show="showLastDaysDailyTask"
+                is-link
+                center
+                clickable
+                class="custom-cell"
+                @click="showDailyDetail = true"
+              >
+                <template #title>
+                  <div style="margin-bottom: 0.5rem; font-weight: 400">
+                    最近十五天周长 {{ LastDaysDailyTask.length }} 次，复习
+                    {{ LastDaysReview.length }} 次
+                  </div>
+                </template>
+              </van-cell>
               <van-list
                 v-model="loadingOriginalData"
                 :finished="finishedOriginalData"
@@ -1231,7 +1348,7 @@ const reloadPage = () => {
                                 最后一次背诵时间：
                               </div>
                               <div
-                                v-if="item.is_review_required > 0"
+                                v-if="item.is_review_required == 1"
                                 style="margin-top: 0.3rem; color: lightgray"
                               >
                                 {{ item.create_time }}
@@ -1471,6 +1588,90 @@ const reloadPage = () => {
       </div>
     </van-tabs>
 
+    <!-- 周长日志 -->
+    <van-popup
+      v-model:show="showDailyDetail"
+      position="bottom"
+      :style="{ height: '70%' }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset>
+        <div
+          style="
+            margin-left: 0.5rem;
+            font-weight: 700;
+            margin-right: 2rem;
+            display: flex;
+          "
+        >
+          <div style="font-size: 20px; color: black; margin-top: 1rem">
+            周长复习日志
+          </div>
+          <div
+            v-if="dateDaily == ''"
+            style="font-size: 12px; color: gray; margin-top: 1.65rem"
+            @click="refreshtLastDaysDailyTask()"
+          >
+            &nbsp;&nbsp;&nbsp;近十五天
+            <van-icon
+              name="replay"
+              v-show="!loadingUncertain"
+              style="margin-left: -0.08rem"
+            />
+          </div>
+          <div
+            v-if="dateDaily !== ''"
+            style="
+              font-size: 12px;
+              color: lightgray;
+              margin-top: 1.65rem;
+              text-decoration: line-through;
+            "
+            @click="refreshtLastDaysDailyTask()"
+          >
+            &nbsp;&nbsp;&nbsp;近十五天
+            <van-icon
+              name="replay"
+              v-show="!loadingUncertain"
+              style="margin-left: -0.08rem"
+            />
+          </div>
+        </div>
+        <van-cell
+          title="选择日期区间"
+          :value="dateDaily"
+          @click="showDailyRange = true"
+          style="margin: 0.5rem 0 0.5rem 0"
+          is-link
+        />
+        <van-calendar
+          allow-same-day
+          :min-date="minDateDaily"
+          v-model:show="showDailyRange"
+          type="range"
+          @confirm="onConfirmDailyRange"
+        />
+        <div v-for="(item, index) in listDailyAndReview" :key="index">
+          <van-cell :label="processedTitle(item.title)">
+            <template #title>
+              <div style="width: 120%">
+                {{ formatDate_log(item.create_time) }}
+              </div>
+            </template>
+            <template #value>
+              <div v-if="item.swipe == '周长'" style="color: blue">
+                {{ item.swipe }}
+              </div>
+              <div v-if="item.swipe == '复习'" style="color: red">
+                {{ item.swipe }}
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+    </van-popup>
+
     <!-- log日志 -->
     <van-popup
       v-model:show="showAccountLog"
@@ -1523,12 +1724,7 @@ const reloadPage = () => {
         <!-- 复习记录 -->
         <div v-if="reviewLogList.length > 0">
           <div
-            style="
-              font-weight: 700;
-              margin: 1rem 0 0.5rem 1rem;
-              color: green;
-              font-size: ;
-            "
+            style="font-weight: 700; margin: 1rem 0 0.5rem 1rem; color: green"
           >
             复习次数记录:
           </div>
@@ -1659,11 +1855,19 @@ const reloadPage = () => {
           </div>
           <!-- 背诵log -->
           <div v-for="(item, index) in answerLogList" :key="index">
-            <van-cell
-              :label="`正确率：${item.true_length} / ${item.log.length}`"
-              is-link
-              @click="toggleDetail(item, index)"
-            >
+            <van-cell is-link @click="toggleDetail(item, index)">
+              <template #label>
+                <div v-if="item.complement == 1" style="display: flex; justify-content: flex-start">
+                  <van-tag type="primary" plain mark size="medium">
+                    正确率{{ item.true_length }} / {{ item.log.length }}
+                  </van-tag>
+                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''" style="margin-top: 0.2rem;">&nbsp;💎</div>
+                </div>
+                <div v-else style="display: flex; justify-content: flex-start">
+                  正确率{{ item.true_length }} / {{ item.log.length }}
+                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''">&nbsp;💎</div>
+                </div>
+              </template>
               <template #title>
                 <div style="font-size: smaller; font-weight: 700">
                   <div>背诵时间:</div>
@@ -1798,11 +2002,7 @@ const reloadPage = () => {
                   >迟疑库 {{ uncertainResult.length }}</span
                 >
                 <div style="display: flex; margin-top: 0.1rem">
-                  <van-icon
-                    name="replay"
-                    v-show="!loadingUncertain"
-                    @click="getUncertainVocabulary()"
-                  />
+                  <van-icon name="replay" v-show="!loadingUncertain" />
                   <van-loading
                     size="14"
                     v-show="loadingUncertain"
@@ -1829,6 +2029,10 @@ const reloadPage = () => {
             <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
             <div>答案:{{ numbershowanswer }}</div>
             <div>透视:{{ numbertransparent }}</div>
+            <div v-if="diamondConsume != null && diamondConsume != ''">💎 {{ diamondConsume }}</div>
+          </div>
+          <div v-if="diamondConsume != null && diamondConsume != '' && detailMode === '普通'" style="font-size: 13px;color: gray;margin: 5px 10px;">
+            💎 {{ diamondConsume }}
           </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">

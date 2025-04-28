@@ -49,16 +49,23 @@ function processData(data) {
     dataString = dataString
       .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
       .replace(/'/g, '"')
-      .replace(/s" /g, "s' ")
-      .replace(/"s /g, "'s ")
-      .replace(/"t /g, "'t ")
-      .replace(/can"t/g, "can't")
-      .replace(/mustn"t/g, "mustn't")
-      .replace(/won"t/g, "won't");
+        .replace(/s" /g, "s' ")
+        .replace(/"s /g, "'s ")
+        .replace(/"t /g, "'t ")
+        .replace(/"m /g, "'m ")
+        .replace(/can"t/g, "can't")
+        .replace(/mustn"t/g, "mustn't")
+        .replace(/needn"t/g, "needn't")
+        .replace(/o"clock/g, "o'clock")
+        .replace(/"are/g, "'are'")
+        .replace(/won"t/g, "won't")
+        .replace(/it"s/g, "it's")
+        .replace(/you"d/g, "you'd");
 
     dataString = dataString
       .replace(/\bFalse\b/g, "false")
-      .replace(/\bTrue\b/g, "true");
+      .replace(/\bTrue\b/g, "true")
+      .replace(/\bNone\b/g, "null");
     // console.log('dataString: ', dataString);
 
     const parsedLog = JSON.parse(dataString);

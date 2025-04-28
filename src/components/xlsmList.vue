@@ -359,7 +359,12 @@ const deleteItem = (item, index) => {
     theme: "round-button",
   }).then(() => {
     // console.log(item["nid"]);
+    let toast1 = showLoadingToast({
+    message: "删除中...",
+    forbidClick: true,
+  });
     DeleteUser().then((ret) => {
+      toast1.close();
       // refreshUserList();
       filteredStudent();
     });
@@ -436,10 +441,13 @@ const showViewers = (item, index) => {
   selectedGradeIndex.value = [valueGrade.value];
 
   // 被动技能
-  selectedPassiveMagicIndex.value = item["passive_magic"]? ['true']: ['false'];
+  selectedPassiveMagicIndex.value = item["passive_magic"]
+    ? ["true"]
+    : ["false"];
   valuePassiveMagic.value = selectedPassiveMagicIndex.value[0];
 
   userPassword.value = item["password"];
+  daily_times.value = item["daily_times"];
 
   // 在校状态
   valueStatus.value = item["status"].toString();
@@ -479,8 +487,8 @@ const showViewers = (item, index) => {
     columnsReviseViewers.value = [];
     columnsReviseViewers.value = viewerData.map((item) => item.viewer_name);
 
-    checkedRevisedViewers.value = res['viewer_name_list'];
-    checkedRevisedThemes.value = res['theme_name_list'];
+    checkedRevisedViewers.value = res["viewer_name_list"];
+    checkedRevisedThemes.value = res["theme_name_list"];
     console.log("checkedRevisedViewers: ", checkedRevisedViewers.value);
     console.log("checkedRevisedThemes: ", checkedRevisedThemes.value);
     columnsReviseViewers.value.sort((a, b) => {
@@ -503,7 +511,6 @@ const showViewers = (item, index) => {
 };
 const toggleViewerRevised = (index) => {
   checkboxRefsViewerRevised.value[index].toggle();
-  
 };
 
 const viewersRevised = () => {
@@ -524,6 +531,7 @@ const viewersRevised = () => {
     params.append("password", userPassword.value);
     params.append("status", valueStatus.value);
     params.append("passive_magic", valuePassiveMagic.value);
+    params.append("daily_times", daily_times.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -614,6 +622,7 @@ const onConfirmLocation = ({ selectedValues }) => {
 
 const userAccount = ref("");
 const userPassword = ref("123456");
+const daily_times = ref(4);
 
 function newStudent() {
   async function addStudent() {
@@ -668,6 +677,7 @@ function clearStudent() {
 const showReviseCoins = ref(false);
 const usernameCoins = ref("");
 const userCoins = ref(0);
+const userDiamonds = ref(0);
 const indexReviseCoins = ref(null);
 const reviseCoins = (index) => {
   indexReviseCoins.value = index;
@@ -675,6 +685,7 @@ const reviseCoins = (index) => {
   // console.log(filterStudentData.value[index]);
   showReviseCoins.value = true;
   userCoins.value = filterStudentData.value[index]["coins"];
+  userDiamonds.value = filterStudentData.value[index]["diamonds"];
   usernameCoins.value = filterStudentData.value[index]["username"];
 };
 
@@ -689,6 +700,7 @@ const confirmReviseCoins = () => {
       params.append("method", "reviseCoins");
       params.append("nid", filterStudentData.value[index]["nid"]);
       params.append("coins", userCoins.value);
+      params.append("diamonds", userDiamonds.value);
       return await axios.post("words/", params).then((ret) => {
         return ret.data;
       });
@@ -784,11 +796,13 @@ const addNewStudentList = () => {
         params.append("title", JSON.stringify(selectXlsm.value));
         params.append("catalogue", titlecatalogue.value);
         params.append("merge_option", checkedMergeOption.value);
+        params.append("clear_pinned", checkedClearPinned.value);
         params.append("type", valueType.value);
         params.append("reversed_number", valueReversedNumber.value);
         params.append("none_of_above", none_of_above);
         params.append("is_spell_number", valueSpellNumber.value);
         params.append("lock_spell", lock_spell.value);
+        params.append("pinned", valuePinned.value);
         params.append(
           "selectedVocabulary",
           JSON.stringify(selectedVocabulary.value)
@@ -853,6 +867,7 @@ const sortXlsm = () => {
 // 其他按钮
 const showOthers = ref(false);
 const checkedMergeOption = ref(true);
+const checkedClearPinned = ref(false);
 const popupOthers = () => {
   showOthers.value = true;
 };
@@ -860,9 +875,11 @@ const popupOthers = () => {
 // 模式选择
 const showTypePicker = ref(false);
 const showNoneOfAbove = ref(false);
+const showPinned = ref(false);
 const valueType = ref("普通双模式");
 const valueNoneOfAbove = ref(7);
-const valueSpellNumber = ref(3);
+const valuePinned = ref(0);
+const valueSpellNumber = ref(2);
 const showSelectSpellVocabulary = ref(false);
 const synonymsSelected = ref([]);
 const selectSpellVocabulary = ref([]);
@@ -875,9 +892,17 @@ const columnsNoneOfAbove = [
   { text: 6, value: 6 },
   { text: 7, value: 7 },
 ];
+const columnsPinned = [
+  { text: 0, value: 0 },
+  { text: 1, value: 1 },
+];
 const onConfirmType = ({ selectedValues }) => {
   showTypePicker.value = false;
   valueType.value = selectedValues[0];
+};
+const onConfirmPinned = ({ selectedValues }) => {
+  showPinned.value = false;
+  valuePinned.value = selectedValues[0];
 };
 const onConfirmNoneOfAbove = ({ selectedValues }) => {
   showNoneOfAbove.value = false;
@@ -1453,7 +1478,7 @@ const viewersConfirm = () => {
       <van-popup
         v-model:show="showNewStudent"
         position="bottom"
-        :style="{ height: '50%' }"
+        :style="{ height: '70%' }"
         closeable
       >
         <van-cell-group inset style="">
@@ -1678,13 +1703,14 @@ const viewersConfirm = () => {
                 <div style="display: flex; justify-content: space-between">
                   <van-tag color="#7232dd" plain>{{ item2.username }}</van-tag>
                   <van-button
+                    style="width: 120%"
                     round
                     plain
                     color="goldenrod"
-                    :text="`${item2.coins}`"
+                    :text="`${item2.coins}/${item2.diamonds}`"
                     @click.stop="reviseCoins(index2)"
                   />
-                  <!-- <div style="font-size: 13px;color: goldenrod;margin-top: 2px;">{{ item2.coins }}金币</div> -->
+                  <!-- <div style="font-size: 13px;color: goldenrod;margin-top: 2px;">{{ item2.diamonds }}</div> -->
                 </div>
               </template>
               <template #right-icon>
@@ -1714,6 +1740,11 @@ const viewersConfirm = () => {
             label="金币"
             placeholder="请输入金币数"
           />
+          <van-field
+            v-model="userDiamonds"
+            label="钻石"
+            placeholder="请输入钻石"
+          />
           <div style="margin-top: 1rem">
             <van-button
               block
@@ -1741,7 +1772,13 @@ const viewersConfirm = () => {
       </div>
       <van-field name="switch" label="拼接选项">
         <template #input>
-          <van-switch v-model="checkedMergeOption" />
+          <div style="display: flex; align-items: center">
+            <van-switch v-model="checkedMergeOption" />
+            <div style="display: flex; align-items: center; margin-left: 30px">
+              <span style="margin-right: 16px">清除置顶</span>
+              <van-switch v-model="checkedClearPinned" active-color="#ee0a24"/>
+            </div>
+          </div>
         </template>
       </van-field>
       <!-- 模式选择 -->
@@ -1773,6 +1810,14 @@ const viewersConfirm = () => {
         placeholder="选项数量"
         @click="showNoneOfAbove = true"
       />
+      <van-field
+        v-model="valuePinned"
+        is-link
+        readonly
+        label="是否置顶"
+        @click="showPinned = true"
+      />
+
       <van-field v-model="valueSpellNumber" type="digit" label="拼写数量">
         <template #right-icon>
           <van-button
@@ -1790,6 +1835,13 @@ const viewersConfirm = () => {
           :columns="columnsNoneOfAbove"
           @cancel="showNoneOfAbove = false"
           @confirm="onConfirmNoneOfAbove"
+        />
+      </van-popup>
+      <van-popup v-model:show="showPinned" round position="bottom">
+        <van-picker
+          :columns="columnsPinned"
+          @cancel="showPinned = false"
+          @confirm="onConfirmPinned"
         />
       </van-popup>
       <div style="margin-top: 1rem">
@@ -1956,6 +2008,13 @@ const viewersConfirm = () => {
           placeholder="请输入密码"
         />
 
+        <!-- 周长 -->
+        <van-field
+          v-model="daily_times"
+          label="周长"
+          placeholder="请输入周长次数"
+        />
+
         <!-- 在校状态 -->
         <van-field
           v-model="valueStatus"
@@ -1983,7 +2042,11 @@ const viewersConfirm = () => {
           placeholder="选择状态"
           @click="showPassiveMagicPicker = true"
         />
-        <van-popup v-model:show="showPassiveMagicPicker" round position="bottom">
+        <van-popup
+          v-model:show="showPassiveMagicPicker"
+          round
+          position="bottom"
+        >
           <van-picker
             :columns="columnsPassiveMagic"
             v-model="selectedPassiveMagicIndex"
@@ -2013,8 +2076,8 @@ const viewersConfirm = () => {
         </van-cell-group>
       </van-checkbox-group>
 
-        <!-- 主题查看 -->
-        <van-checkbox-group v-model="checkedRevisedThemes">
+      <!-- 主题查看 -->
+      <van-checkbox-group v-model="checkedRevisedThemes">
         <van-cell-group inset>
           <div style="margin: 1rem 0 0 0.1rem">主题查看</div>
           <van-cell
@@ -2034,11 +2097,7 @@ const viewersConfirm = () => {
             </template>
           </van-cell>
         </van-cell-group>
-      
-
-        
       </van-checkbox-group>
-
 
       <van-button
         type="warning"

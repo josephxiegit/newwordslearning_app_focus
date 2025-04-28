@@ -13,6 +13,7 @@ import StudentAccountSwipe from './components/studentAccountSwipe.vue';
 import StudentAccountTest from './components/studentAccountTest.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
 import StudentAccountPreExam from './components/studentAccountPreExam.vue';
+import StudentAccountDaily from './components/studentAccountDaily.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
@@ -21,6 +22,7 @@ import UserInformation from './components/userInformation.vue';
 import PurchaseLog from './components/purchaseLog.vue';
 import Viewers from './components/viewers.vue';
 import ViewersHomepage from './components/viewersHomepage.vue';
+import Complete3star from './components/complete3star.vue';
 import 'vant/lib/index.css';
 import Global from "./components/Global.vue";
 
@@ -110,6 +112,15 @@ const routes = [
         }
     },
     {
+        path: '/studentAccountDaily',
+        name: 'studentAccountDaily',
+        component: StudentAccountDaily,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
         path: '/userinformation',
         name: 'userinformation',
         component: UserInformation,
@@ -188,6 +199,15 @@ const routes = [
             preventBack: true
         }
     },
+    {
+        path: '/complete3star',
+        name: 'complete3star',
+        component: Complete3star,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
 ];
 // 创建router实例
 const router = createRouter({
@@ -198,24 +218,35 @@ const router = createRouter({
 // 设置全局前置守卫
 router.beforeEach((to, from, next) => {
     let localTeacherPassword = window.localStorage.getItem('teacherPassword');
-    localTeacherPassword = atob(localTeacherPassword);
-    // console.log('localTeacherPassword: ', localTeacherPassword);
-    if (localTeacherPassword == "ss27834894") {
-        next();
+    // localTeacherPassword = atob(localTeacherPassword);
+    // console.log('localTeacherPassword: ', localTeacherPassword)
+    if (localTeacherPassword == "ss654321") {
+        // next();
+        if (to.path === '/viewers' && !from.name) {
+            next('/teacherComment'); // 跳转到 TeacherComment 组件
+        } else {
+            next();
+        }
     } else {
         if (from.path === '/homepage') {
             if (to.fullPath === from.fullPath) {
                 // 重定向到根目录
                 next('/');
+                if (to.path === '/viewers' && !from.name) {
+                    next('/teacherComment'); // 跳转到 TeacherComment 组件
+                } else {
+                    next();
+                }
             }
         };
         if ((from.path === '/studentAnswer' && to.meta.preventBack) ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') ||
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
+            (from.path === '/studentAccountList' && to.path === '/complete3star') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
-            // (from.path === '/studentAccountPreExam' && to.path === '/studentAccountList') && (!to.state || !to.state.username || !to.state.data)||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
+            (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
             (from.path === '/studentAccountItem' && to.meta.preventBack)) {
             // 如果满足以上任何条件，阻止导航
@@ -249,15 +280,15 @@ const theme_name = localStorage.getItem("theme_name");
 const themeMapping = {
     "喜羊羊与灰太狼": 1,
     "熊出没": 2,
-  };
+};
 const flagTheme = ref(themeMapping[theme_name] || 1);
 const passive_magic = ref(0);
 
 
 import {
-    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps,Divider, ActionSheet,
+    Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps, Divider, ActionSheet,
     Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row, ConfigProvider, BackTop, DropdownMenu, DropdownItem,
-    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem, NoticeBar,
+    Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem, NoticeBar, Barrage,
     SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover
 } from 'vant';
 import 'vant/lib/index.css';
@@ -276,6 +307,7 @@ app.config.globalProperties.$bonnieBearsSrc = Global.BONNIE_BEARS_SRC;
 app.use(Button)
     .use(Checkbox)
     .use(NoticeBar)
+    .use(Barrage)
     .use(Popover)
     .use(ActionSheet)
     .use(DropdownMenu)

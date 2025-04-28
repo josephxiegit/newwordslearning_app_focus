@@ -390,6 +390,8 @@ const clickSubmitUser = async (action, done) => {
       params.append("numberprev", clickNumberPrev.value);
       params.append("numbershowanswer", clickNumberShowAnswer.value);
       params.append("numbertransparent", clickNumberTransparent.value);
+      params.append("checkedNoneOfAbove", checkedNoneOfAbove.value);
+      params.append("checkedSpell", checkedSpell.value);
 
       // 更新spell vocabulary
       params.append("data_words", JSON.stringify(spellVocabulary.value));
@@ -1267,10 +1269,14 @@ const isRewardEligible = ref(true);
 const lock_spell = ref(false);
 const spellVocabulary = ref([]);
 const coinsFlag = ref(true);
+const checkedNoneOfAbove = ref(false);
+const checkedSpell = ref(false);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onMounted(async () => {
+  checkedNoneOfAbove.value = history.state.checkedNoneOfAbove;
+  checkedSpell.value = history.state.checkedSpell;
   showAnimationTest();
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
@@ -1426,6 +1432,7 @@ onMounted(async () => {
   };
   // 调用初始化函数
   initData();
+  flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0)
 });
 </script>
 
