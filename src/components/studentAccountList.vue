@@ -93,6 +93,25 @@ const goToNextPage = (
   type = 0,
   is_spell_number = 3
 ) => {
+  // 删除并备份试题
+  const shiti_backup = [];
+  for (let i = data.synonyms.length - 1; i >= 0; i--) {
+    const synonym = data.synonyms[i];
+    if (synonym["排除"] === "试题") {
+      // 备份
+      shiti_backup.push({
+        synonym: synonym,
+        answer: data.answers[i],
+      });
+      // 删除对应的项
+      data.synonyms.splice(i, 1);
+      data.answers.splice(i, 1);
+    }
+  }
+
+  console.log("处理后 data:", data);
+  console.log("备份的 shiti_backup:", shiti_backup);
+
   // console.log("data", data);
   isInChooseMode.value = false;
   // 判断6个还是7个选项
@@ -592,6 +611,7 @@ const goToNextPage = (
   console.log("data_pinjie: ", data);
 
   // 增加中译英选项
+
   function processData3(data, reversd_number, numberOption) {
     // reversd_number = 10
     // 创建 data 的深拷贝
@@ -1247,6 +1267,236 @@ const goToNextPage = (
     }
     return data;
   }
+
+  function getZhenduoxuan(data) {
+    // 如果没有none_of_above, 添加正确答案
+    if (!data.answers.every((answer) => "正确答案" in answer)) {
+      data.answers.forEach((answer) => {
+        if (!("正确答案" in answer)) {
+          answer.正确答案 = answer.中文;
+        }
+      });
+    }
+
+    if (data.merge_option) {
+      // 有拼接
+      data.answers.forEach((answer, index) => {
+        // 仅当符合排除条件且 answer.中文 不为 "以上都不对" 才进行处理
+        if (
+          (data.synonyms?.[index]?.["排除"] !== "试题" &&
+            answer.中文 !== "以上都不对" &&
+            answer.正确答案 &&
+            answer.正确答案.includes("；")) ||
+          (answer.中文 !== "以上都不对" && answer.中文.includes("；"))
+        ) {
+          // 同时处理中文分号和英文逗号作为分隔符的情况
+          let parts = answer.中文
+            .split(/[；,]/g)
+            .map((s) => s.trim())
+            .filter((s) => s);
+
+          // 根据 parts 的数量随机确定 numToRemove（删除0个概率0.3，1个的概率0.3，2个的概率0.4）
+          let probabilities = {
+            2: [0.3, 0.7],
+            3: [0, 1, 0],
+            4: [0.2, 0.2, 0.2, 0.4],
+            5: [0.15, 0.15, 0.15, 0.15, 0.4],
+          };
+          let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
+          let randomValue = Math.random();
+          let cumulative = 0;
+          let numToRemove = 0;
+
+          for (let i = 0; i < distribution.length; i++) {
+            cumulative += distribution[i];
+            if (randomValue < cumulative) {
+              numToRemove = i;
+              break;
+            }
+          }
+          numToRemove = Math.min(numToRemove, parts.length);
+
+          // 随机删除 numToRemove 个部分
+          for (let i = 0; i < numToRemove; i++) {
+            if (parts.length === 0) break;
+            let removeIndex = Math.floor(Math.random() * parts.length); // 随机删除的索引
+            let removed = parts.splice(removeIndex, 1)[0]; // 随机删除的元素存储到removed
+            console.log("removed: ", removed);
+
+            // 使用相同的索引，在 data.synonyms 中找到对应的项
+            let synonymItem = data.synonyms[index];
+            if (synonymItem) {
+              // 找到 removed 在 synonyms 里对应的索引（比对时去除首尾空格）
+              let synonymIndex = synonymItem.中文.findIndex(
+                (item) => item.trim() === removed
+              );
+              if (synonymIndex !== -1) {
+                // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
+                let availableOptions = [...allChineseSet2]
+                  .flatMap((ch) =>
+                    /[,；]/.test(ch) // 检查是否包含英文逗号或中文分号
+                      ? ch.split(/[,；]/).map((item) => item.trim()) // 按逗号或分号拆分，并去掉空格
+                      : [ch]
+                  )
+                  .filter(
+                    (ch) =>
+                      !synonymItem.中文.some((item) =>
+                        /[,；]/.test(item)
+                          ? item
+                              .split(/[,；]/)
+                              .map((i) => i.trim())
+                              .includes(ch)
+                          : item.trim() === ch
+                      )
+                  );
+
+                // 替换答案
+                function escapeRegExp(string) {
+                  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                }
+
+                const rawKeyword = synonymItem.中文[synonymIndex];
+                const keyword = escapeRegExp(rawKeyword);
+                const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
+                answer.中文 = answer.中文.replace(regex, "");
+
+                // 清理可能遗留的多余分隔符
+                answer.中文 = answer.中文
+                  .replace(/^[；,]\s*|\s*[；,]$/g, "")
+                  .replace(/[；,]\s*[；,]/g, "；");
+
+                if (availableOptions.length > 0) {
+                  let randomReplacement =
+                    availableOptions[
+                      Math.floor(Math.random() * availableOptions.length)
+                    ];
+                  console.log("randomReplacement", randomReplacement);
+                  console.log("------------------------------------");
+                  synonymItem.中文[synonymIndex] = randomReplacement;
+                }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // 无拼接
+      data.answers.forEach((answer, index) => {
+        // 仅当符合排除条件且 answer.中文 不为 "以上都不对" 才进行处理
+        if (
+          data.synonyms?.[index]?.["排除"] !== "试题" &&
+          answer.中文 !== "以上都不对" &&
+          answer.正确答案 &&
+          answer.正确答案.includes("；")
+        ) {
+          // 以 "；" 拆分中文字段，并去除首尾空格
+          let parts = answer.中文.split("；").map((s) => s.trim());
+
+          // 根据 parts 的数量随机确定 numToRemove （删除0个概率0.3，1个的概率0.3，2个的概率0.4）
+          let probabilities = {
+            2: [0.3, 0.7],
+            3: [0.3, 0.3, 0.4],
+            4: [0.2, 0.2, 0.2, 0.4],
+            5: [0.15, 0.15, 0.15, 0.15, 0.4],
+          };
+          let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
+          let randomValue = Math.random();
+          let cumulative = 0;
+          let numToRemove = 0;
+
+          for (let i = 0; i < distribution.length; i++) {
+            cumulative += distribution[i];
+            if (randomValue < cumulative) {
+              numToRemove = i;
+              break;
+            }
+          }
+          numToRemove = Math.min(numToRemove, parts.length);
+
+          // 随机删除 numToRemove 个部分
+          for (let i = 0; i < numToRemove; i++) {
+            if (parts.length === 0) break;
+            let removeIndex = Math.floor(Math.random() * parts.length);
+            let removed = parts.splice(removeIndex, 1)[0];
+            console.log("removed: ", removed);
+
+            // 使用相同的索引，在 data.synonyms 中找到对应的项
+            let synonymItem = data.synonyms[index];
+            if (synonymItem) {
+              let synonymIndex = synonymItem.中文.findIndex(
+                (item) => item.trim() === removed
+              );
+              if (synonymIndex !== -1) {
+                let availableOptions = [...allChineseSet2].filter(
+                  (ch) => !synonymItem.中文.includes(ch)
+                );
+                if (availableOptions.length > 0) {
+                  let randomReplacement =
+                    availableOptions[
+                      Math.floor(Math.random() * availableOptions.length)
+                    ];
+                  console.log("randomReplacement", randomReplacement);
+                  console.log("------------------------------------");
+                  synonymItem.中文[synonymIndex] = randomReplacement;
+                }
+              }
+            }
+          }
+
+          // 更新答案的中文字段，将处理后的数组重新用 "；" 连接
+          answer.中文 = parts.join("；");
+        }
+      });
+    }
+    return data;
+  }
+  // 放回试题
+  function shuffleArray(arr) {
+    const newArr = arr.slice(); // 拷贝一份数组
+    for (let i = newArr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+    }
+    return newArr;
+  }
+  function insertBackupIntoData(data, shiti_backup) {
+    // 随机插入
+    shiti_backup.forEach((item) => {
+      const insertIndex = Math.floor(
+        Math.random() * (data.synonyms.length + 1)
+      );
+
+      // 处理中文字段
+      if (Array.isArray(item.synonym.中文)) {
+        const shuffled = shuffleArray(item.synonym.中文);
+        shuffled.push("无"); // 添加第七项
+        item.synonym.中文 = shuffled;
+      }
+
+      // 插入到对应位置
+      data.synonyms.splice(insertIndex, 0, item.synonym);
+      data.answers.splice(insertIndex, 0, item.answer);
+    });
+
+    // 重新编号
+    for (let i = 0; i < data.synonyms.length; i++) {
+      const newIndex = i + 1;
+      if (data.synonyms[i].hasOwnProperty("序号")) {
+        data.synonyms[i]["序号"] = newIndex;
+      }
+      if (
+        typeof data.answers[i] === "object" &&
+        data.answers[i] !== null &&
+        data.answers[i].hasOwnProperty("序号")
+      ) {
+        data.answers[i]["序号"] = newIndex;
+      }
+      if(data.synonyms[i]['排除'] === "试题"){
+        data.answers[i]["正确答案"] = data.answers[i]["中文"];
+      }
+    }
+  }
+
   // 是否增加拼写
   if (none_of_above && is_spell_number > 0 && !checkedSpell.value) {
     // 有拼写
@@ -1408,23 +1658,32 @@ const goToNextPage = (
       })
       .then((data) => {
         data = getZhenduoxuan(data);
+
+        // data.answers.forEach((item) => {
+        //   if (item.英文 === "treatment") {
+        //     console.log("treatment");
+        //     console.log("答案", item.中文);
+        //     console.log("正确答案", item.正确答案);
+        //   }
+        // });
+        // data.synonyms.forEach((item) => {
+        //   if (item.英文 === "treatment") {
+        //     console.log("中文", item.中文);
+        //   }
+        // });
+        return data;
+      })
+      .then((data) => {
+        // 放回试题
+        if (shiti_backup.length > 0) {
+          insertBackupIntoData(data, shiti_backup);
+        }
         console.log("data_youpinxie: ", data);
-        data.answers.forEach(item => {
-          if(item.英文 === "treatment") {
-            console.log("treatment")
-            console.log("答案", item.中文)
-            console.log("正确答案", item.正确答案)
-          }
-        })
-        data.synonyms.forEach(item => {
-          if(item.英文 === "treatment") {
-            console.log("中文", item.中文)
-          }
-        })
         redirect();
       });
   } else {
     // 无拼写
+
     function replaceOptionInSynonyms(data) {
       // 获取所有 "正确答案" 列表
       const correctAnswersMap = data.answers.reduce((map, answer) => {
@@ -1499,11 +1758,16 @@ const goToNextPage = (
 
       return data;
     }
+
     data = replaceOptionInSynonyms(data);
 
     data = getZhenduoxuan(data);
-    console.log("data_wupinxie: ", data);
 
+    // 放回试题
+    if (shiti_backup.length > 0) {
+      insertBackupIntoData(data, shiti_backup);
+    }
+    console.log("data_wupinxie: ", data);
     redirect();
   }
 };

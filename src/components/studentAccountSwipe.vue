@@ -94,6 +94,7 @@ const mergeAnswerAndSynonym = () => {
     obj["is_spell"] = synonymsOptions.value[i].is_spell;
     obj["答案"] = answers.value[i].中文;
     obj["正确答案"] = answers.value[i].正确答案;
+    obj["排除"] = synonymsOptions.value[i].排除;
     newList.push(obj);
   }
   // console.log("newList: ", newList);
@@ -174,8 +175,8 @@ const compareAndAddFlag = (dictArray) => {
       }
       // 部分匹配：用户选择数组至少包含一个答案数组中的元素
       else if (answerArray.some((ans) => userSelectionArray.includes(ans))) {
-        if(答案 == 用户选择) {
-          flag = "true"
+        if (答案 == 用户选择) {
+          flag = "true";
         } else {
           flag = "half";
         }
@@ -263,9 +264,9 @@ const clickSubmitUser = async (action, done) => {
   // 计算拼写库
   if (!lock_spell.value) {
     function getSpellVocabulary(compareResult, uncertainVocabulary) {
-      console.log('uncertainVocabulary: ', uncertainVocabulary)
-      console.log('compareResult: ', compareResult)
-      console.log(111111)
+      console.log("uncertainVocabulary: ", uncertainVocabulary);
+      console.log("compareResult: ", compareResult);
+      console.log(111111);
       const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
       const addedEnglishSet = new Set();
       const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
@@ -275,8 +276,8 @@ const clickSubmitUser = async (action, done) => {
       }
       function containsChineseSemicolon(str) {
         // return str.includes('；');
-        const hasChineseSemicolon = str.includes('；');
-        const hasEnglishComma = str.includes(',');
+        const hasChineseSemicolon = str.includes("；");
+        const hasEnglishComma = str.includes(",");
         return hasChineseSemicolon || hasEnglishComma;
       }
 
@@ -469,7 +470,7 @@ const clickSubmitUser = async (action, done) => {
         spellVocabulary: JSON.stringify(spellVocabulary.value),
         lock_spell: lock_spell.value,
         complement: 1.5 - rate,
-        RateOrigin: RateOrigin.value
+        RateOrigin: RateOrigin.value,
       },
     });
   }
@@ -607,7 +608,15 @@ const totalTimeInterval = ref(0);
 const standardTimeInterval = ref(0);
 
 let originalChinese = "";
+const isDisabled = (index, index2) => {
+  const item = synonymsOptions.value[index];
+  const chineseOption = item.中文[index2];
+  return chineseOption === "无";
+};
 const toggleCheckChinese = (index, index2) => {
+  if (isDisabled(index, index2)) {
+    return;
+  }
   const key = `${index}-${index2}`;
   const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
@@ -618,7 +627,7 @@ const toggleCheckChinese = (index, index2) => {
   const wasSelected = selectedIndexes.value[key]; // 之前的状态
   selectedIndexes.value[key] = !wasSelected; // 切换状态
 
-  if (wasSelected && !synonymsOptions.value[index].is_spell) {
+  if (wasSelected && !synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
     const content = "撤销";
     const uncertainItem = synonymsOptions.value[index].英文;
 
@@ -894,7 +903,7 @@ const goToNext = () => {
       } else {
         if (totalTimeInterval.value <= standardTimeInterval.value) {
           submitFlag.value = true;
-          console.log(222)
+          console.log(222);
           clickSubmitUser();
         } else {
           showFailToast("监测到作弊行为，请重新作答");
@@ -909,10 +918,10 @@ const percentage = ref(100); // 初始值为 100%
 const showProgress = ref(false);
 let intervalId = null; // 保存定时器的 ID
 const stopAnimation = () => {
-    clearInterval(intervalId); // 清除定时器
-    intervalId = null; // 避免重复调用
-    showProgress.value = false; // 隐藏进度条
-    percentage.value = 0; // 重置进度条为 0
+  clearInterval(intervalId); // 清除定时器
+  intervalId = null; // 避免重复调用
+  showProgress.value = false; // 隐藏进度条
+  percentage.value = 0; // 重置进度条为 0
 };
 const startAnimation = () => {
   if (intervalId) {
@@ -1171,7 +1180,7 @@ const autoSelectAnswer = (index, flag) => {
   //   disabledShowAnswer.value = true;
   //   return;
   // }
-  if (!synonymsOptions.value[index].is_spell) {
+  if (!synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
     addUncertain(index, "点金");
   }
   const answerItem = answers.value.find(
@@ -1273,7 +1282,7 @@ const changeOverlayColor = (color) => {
 
 const transparentHelp = (flag) => {
   //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell) {
+  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
     addUncertain(currentIndex.value, "透视");
   }
 
@@ -1310,7 +1319,7 @@ const gotoPreHelp = (flag) => {
   }
 
   //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell) {
+  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
     addUncertain(currentIndex.value, "回溯");
   }
 
@@ -1338,7 +1347,7 @@ const passiveMagic2Ref = ref(null);
 const flagPassiveMagic = ref(false);
 function showAnimationPassiveMagic() {
   // 加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell) {
+  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
     // console.log("currentIndex.value: ", currentIndex.value);
     addUncertain(currentIndex.value, "被动魔法");
   }
@@ -1457,7 +1466,7 @@ const resetTimer = () => {
       // console.log("totalTimeInterval: ", totalTimeInterval.value);
       // console.log("standardTimeInterval: ", standardTimeInterval.value);
       if (totalTimeInterval.value <= standardTimeInterval.value) {
-        console.log(333)
+        console.log(333);
         clickSubmitUser();
       } else {
         showFailToast("监测到作弊行为，请重新作答");
@@ -1477,7 +1486,8 @@ const handleTimerRate = () => {
   if (
     interval > 6 &&
     !executedWords.has(currentWordIndex) &&
-    !synonymsOptions.value[currentWordIndex].is_spell
+    !synonymsOptions.value[currentWordIndex].is_spell &&
+    synonymsOptions.value[currentWordIndex].排除 !== "试题"
   ) {
     addUncertain(currentIndex.value, "超时");
     // 将当前词标记为已执行
@@ -1514,9 +1524,12 @@ const { pause, resume } = useIntervalFn(
 const handleSwipeChange = (index) => {
   if (synonymsOptions.value[index].is_spell) {
     autoplay2.value = autoplayInit.value + 17000;
+  } else if (synonymsOptions.value[index].排除 === "试题") {
+    autoplay2.value = autoplayInit.value + 27000;
   } else {
     autoplay2.value = autoplayInit.value;
-  }
+  } 
+
   // console.log(autoplay2.value);
   try {
     speakWord(synonymsOptions.value[index]["英文"]);
@@ -1881,6 +1894,7 @@ onMounted(async () => {
                     <van-cell clickable class="bold-title2 border-cell">
                       <template #title>
                         <div
+                          v-if="item.排除 !== '试题'"
                           style="
                             display: flex;
                             justify-content: space-between;
@@ -1891,6 +1905,23 @@ onMounted(async () => {
                           <div style="font-size: 17px; color: red">
                             {{ flagSingleOrMultiChoice }}
                           </div>
+                        </div>
+                        <div
+                          v-else
+                          style="
+                            font-size: 500px;
+                            line-height: 1.3;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                          "
+                        >
+                          <div style="font-weight: 400; font-size: 14px">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                          <!-- <div style="font-size: 10px; color: red">
+                            {{ flagSingleOrMultiChoice }}
+                          </div> -->
                         </div>
 
                         <div v-show="item.is_spell" class="selected-tags">
@@ -1932,6 +1963,7 @@ onMounted(async () => {
                         <template #right-icon>
                           <van-checkbox
                             :name="`${index + 1}-${index2 + 1}`"
+                            :disabled="isDisabled(index, index2)"
                             @click.stop.prevent="
                               toggleCheckChinese(index, index2)
                             "

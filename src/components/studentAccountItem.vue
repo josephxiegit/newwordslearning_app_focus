@@ -65,6 +65,7 @@ const mergeAnswerAndSynonym = () => {
     obj["is_spell"] = synonymsOptions.value[i].is_spell;
     obj["答案"] = answers.value[i].中文;
     obj["正确答案"] = answers.value[i].正确答案;
+    obj["排除"] = synonymsOptions.value[i].排除;
     newList.push(obj);
   }
   return newList;
@@ -146,12 +147,11 @@ const compareAndAddFlag = (dictArray) => {
       }
       // 部分匹配：用户选择数组至少包含一个答案数组中的元素
       else if (answerArray.some((ans) => userSelectionArray.includes(ans))) {
-        if(答案 == 用户选择) {
-          flag = "true"
+        if (答案 == 用户选择) {
+          flag = "true";
         } else {
           flag = "half";
         }
-        
       }
     }
     // 返回结果
@@ -240,8 +240,8 @@ const clickSubmitUser = async (action, done) => {
           return /\s|,|\/|\.|…|-|_|'/.test(text);
         }
         function containsChineseSemicolon(str) {
-          const hasChineseSemicolon = str.includes('；');
-          const hasEnglishComma = str.includes(',');
+          const hasChineseSemicolon = str.includes("；");
+          const hasEnglishComma = str.includes(",");
           return hasChineseSemicolon || hasEnglishComma;
         }
 
@@ -440,6 +440,7 @@ const clickSubmitUser = async (action, done) => {
 
       // 开始加载
       // 创建一个超时的 Promise
+      
       const timeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
       );
@@ -470,7 +471,7 @@ const clickSubmitUser = async (action, done) => {
               spellVocabulary: JSON.stringify(spellVocabulary.value),
               lock_spell: lock_spell.value,
               complement: 1 - rate,
-              RateOrigin: RateOrigin.value
+              RateOrigin: RateOrigin.value,
             },
           });
         }
@@ -773,7 +774,16 @@ const selectedIndexes = ref({});
 const completeCount = ref("0");
 const uncertainVocabulary = ref(new Set());
 let originalChinese = "";
+const isDisabled = (index, index2) => {
+  const item = synonymsOptions.value[index];
+  const chineseOption = item.中文[index2];
+  return chineseOption === "无";
+};
+
 const toggleCheckChinese = (index, index2) => {
+  if (isDisabled(index, index2)) {
+    return;
+  }
   const key = `${index}-${index2}`;
   const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
@@ -784,7 +794,7 @@ const toggleCheckChinese = (index, index2) => {
   const wasSelected = selectedIndexes.value[key]; // 之前的状态
   selectedIndexes.value[key] = !wasSelected; // 切换状态
 
-  if (wasSelected && !synonymsOptions.value[index].is_spell) {
+  if (wasSelected && !synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
     const content = "撤销";
     const uncertainItem = synonymsOptions.value[index].英文;
 
@@ -819,6 +829,7 @@ const toggleCheckChinese = (index, index2) => {
     } else {
       uncertainVocabulary.value.add({ 英文: uncertainItem, type: content });
     }
+    // console.log("uncertainVocabulary:", uncertainVocabulary.value);
   }
 
   // 更新选择结果
@@ -973,10 +984,10 @@ const percentage = ref(100); // 初始值为 100%
 const showProgress = ref(false);
 let intervalId = null; // 保存定时器的 ID
 const stopAnimation = () => {
-    clearInterval(intervalId); // 清除定时器
-    intervalId = null; // 避免重复调用
-    showProgress.value = false; // 隐藏进度条
-    percentage.value = 0; // 重置进度条为 0
+  clearInterval(intervalId); // 清除定时器
+  intervalId = null; // 避免重复调用
+  showProgress.value = false; // 隐藏进度条
+  percentage.value = 0; // 重置进度条为 0
 };
 const startAnimation = () => {
   if (intervalId) {
@@ -1444,6 +1455,7 @@ onMounted(async () => {
                 @click="speakWord(item.英文)"
               >
                 <div
+                  v-if="item.排除 !== '试题'"
                   style="
                     line-height: 1;
                     height: 24px;
@@ -1462,6 +1474,30 @@ onMounted(async () => {
                     "
                   />
                 </div>
+                <div
+                  v-else
+                  style="
+                    font-weight: 400;
+                    font-size: 15px;
+                    line-height: 1.5;
+                    height: 48px;
+                    display: flex;
+                    align-items: center;
+                    margin: 0.3rem 0 0.3rem 0;
+                  "
+                >
+                  {{ item.序号 + ". " + item.英文 }}
+                  <img
+                    src="../assets/speaker.png"
+                    style="
+                      width: 12px;
+                      height: auto;
+                      margin-left: 0.5rem;
+                      margin-top: 0.1rem;
+                    "
+                  />
+                </div>
+
                 <div
                   class="selected-tags"
                   style="
@@ -1510,6 +1546,7 @@ onMounted(async () => {
               <template #right-icon>
                 <van-checkbox
                   :name="`${index + 1}-${index2 + 1}`"
+                  :disabled="isDisabled(index, index2)"
                   :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
                   @click.stop.prevent="toggleCheckChinese(index, index2)"
                 />

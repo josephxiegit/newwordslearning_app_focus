@@ -28,8 +28,17 @@ const router = useRouter();
 const compareResult = ref([]);
 const userSelected = ref([]);
 const nid = ref("");
+
+
+// const trueCount = ref("");
+// const trueCount_shiti = ref("");
 const trueCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "true").length;
+});
+const trueCount_shiti = computed(() => {
+  return compareResult.value.filter(
+    (item) => item.flag === "true" || item.排除 === "试题"
+  ).length;
 });
 const halfCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "half").length;
@@ -297,10 +306,18 @@ const offsetDaily = ref({
   y: 70,
 });
 const handleConfirmResult = async () => {
+  // trueCount.value = 15
+  // trueCount_shiti.value = 16
+  console.log(compareResult.value.length)
+  console.log("trueCount", trueCount.value)
+  console.log("trueCount_shiti", trueCount_shiti.value)
+
   if (
-    compareResult.value.length - trueCount.value > 0 &&
-    compareResult.value.length - trueCount.value <= 2
+    compareResult.value.length - trueCount.value >= 0 &&
+    compareResult.value.length - trueCount.value <= 2 &&
+    trueCount_shiti.value - trueCount.value >= 0
   ) {
+    // console.log('补全单词');
     let toast1 = showLoadingToast({
       message: "查询中...",
       forbidClick: true,
@@ -322,7 +339,7 @@ const handleConfirmResult = async () => {
     console.log("userDiamonds: ", userDiamonds.value);
     if (userDiamonds.value >= 3) {
       compareResult.value.forEach((item) => {
-        if (item.flag !== "true") {
+        if (item.flag !== "true" && item.排除 !== "试题") {
           const correctAnswer =
             item["正确答案"] !== undefined ? item["正确答案"] : item["答案"];
 
@@ -357,9 +374,10 @@ const handleConfirmResult = async () => {
     }
   } else {
     showConfirmDialog({
-      title: "视频补全失败",
+      title: `视频补全失败`,
       theme: "round-button",
-      message: "错误在2个及以下才能补全错误",
+      message: `错误在2个及以下才能补全错误<br><b>(不含试题部分)</b>`,
+      allowHtml: true, 
       showCancelButton: false,
     });
   }
@@ -604,6 +622,7 @@ onMounted(async () => {
         </div>
       </template>
     </van-dialog>
+
     <!-- 标题 -->
     <div class="nav-bar-container">
       <van-nav-bar title="背诵答案">
@@ -812,7 +831,28 @@ onMounted(async () => {
             }"
           >
             <template #title>
-              <div @click="speakWord(item.英文, item.正确答案)">
+              <div 
+                v-if="item.排除 !== '试题'" 
+                @click="speakWord(item.英文, item.正确答案)">
+                {{ item.序号 + ". " + item.英文 }}
+                <img
+                  src="../assets/speaker.png"
+                  style="width: 12px; height: auto"
+                />
+              </div>
+              <div 
+                v-else
+                style="
+                    font-weight: 500;
+                    font-size: 15px;
+                    line-height: 1.5;
+                    height: 48px;
+                    display: flex;
+                    align-items: center;
+                    margin: 0.3rem 0 0.3rem 0;
+                  "
+                @click="speakWord(item.英文, item.正确答案)"
+                >
                 {{ item.序号 + ". " + item.英文 }}
                 <img
                   src="../assets/speaker.png"
