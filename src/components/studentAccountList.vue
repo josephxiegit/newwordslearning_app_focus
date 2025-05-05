@@ -134,6 +134,7 @@ const goToNextPage = (
           : [answerObj.中文.trim()];
       })
   );
+  // console.log("excludedChineseSet2:", excludedChineseSet2);
 
   let allChineseSet2 = new Set(
     data.answers
@@ -150,7 +151,8 @@ const goToNextPage = (
           !excludedChineseSet2.has(word) // 检查是否在排除集中
       )
   );
-  // console.log('allChineseSet2: ', allChineseSet2);
+  // console.log("allChineseSet2: ", allChineseSet2);
+
   function shuffle(array) {
     let currentIndex = array.length,
       temporaryValue,
@@ -225,7 +227,7 @@ const goToNextPage = (
       // 处理带 / 的选项
       if (synonym.选项) {
         // 拆分 / 并移除每个部分
-        synonym.选项.split("/").forEach((opt) => {
+        synonym.选项.split("；").forEach((opt) => {
           const trimmedOpt = opt.trim();
           if (trimmedOpt) {
             allChineseSet.delete(trimmedOpt);
@@ -235,7 +237,7 @@ const goToNextPage = (
       // 构建当前 synonym 可用的选项
       let finalOptions = new Set(correctChineseAnswers);
       if (synonym.选项) {
-        synonym.选项.split("/").forEach((option) => {
+        synonym.选项.split("；").forEach((option) => {
           const trimmedOption = option.trim();
           if (trimmedOption) {
             finalOptions.add(trimmedOption);
@@ -282,6 +284,7 @@ const goToNextPage = (
 
     return data;
   }
+
   function processData(data, numberOption) {
     // Helper function to shuffle an array
     function shuffle(array) {
@@ -364,7 +367,7 @@ const goToNextPage = (
             : [answerObj.中文.trim()];
         })
     );
-    // console.log("excludedChineseSet: ", excludedChineseSet);
+    console.log("excludedChineseSet: ", excludedChineseSet);
 
     // Collect all Chinese options excluding those marked "无"
     let allChineseSet = new Set(
@@ -373,22 +376,19 @@ const goToNextPage = (
           const chinese = answer?.中文;
           if (!chinese) return []; // 如果中文不存在，返回空数组
 
-          // 按分号拆分并去除两端空格
-          return chinese.split("；").map((word) => word.trim());
+          const splitWords = chinese.split("；").map((word) => word.trim());
+          return splitWords;
         })
-        .filter(
-          (word) =>
-            word && // 过滤掉空字符串
-            !excludedChineseSet.has(word) // 检查是否在排除集中
-        )
+        .filter((word) => {
+          const shouldKeep = word && !excludedChineseSet.has(word);
+          return shouldKeep;
+        })
     );
-    // console.log("allChineseSet", allChineseSet);
 
     data.synonyms.forEach((synonym) => {
       if (synonym.选项) {
-        // 如果选项中有 "/"，则分割后逐个删除
-        if (synonym.选项.includes("/")) {
-          synonym.选项.split("/").forEach((opt) => {
+        if (synonym.选项.includes("；")) {
+          synonym.选项.split("；").forEach((opt) => {
             allChineseSet.delete(opt.trim());
           });
         } else {
@@ -404,7 +404,7 @@ const goToNextPage = (
         : [answerObj.中文];
 
       correctChineseAnswers.forEach((answer) => allChineseSet.delete(answer));
-
+      // console.log("allChineseSet", allChineseSet);
       let mixedChinese;
       if (correctChineseAnswers.length === 5) {
         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
@@ -450,7 +450,6 @@ const goToNextPage = (
       } else if (correctChineseAnswers.length === 4) {
         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
         const randomOption = Math.random();
-        // const randomOption = 0;
         if (randomOption < 0.25) {
           mixedChinese = shuffle([
             ...shuffledCorrectAnswers,
@@ -503,7 +502,6 @@ const goToNextPage = (
       } else if (correctChineseAnswers.length === 3) {
         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
         if (Math.random() < 0.4) {
-          // if (Math.random() < 1) {
           const [first, second] = shuffle([
             shuffledCorrectAnswers[0],
             shuffledCorrectAnswers[1],
@@ -533,7 +531,6 @@ const goToNextPage = (
       } else if (correctChineseAnswers.length === 2) {
         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
         if (Math.random() < 0.2) {
-          // if (Math.random() < 1) {
           const [first, second] = shuffle([
             shuffledCorrectAnswers[0],
             shuffledCorrectAnswers[1],
@@ -579,7 +576,12 @@ const goToNextPage = (
       }
 
       synonym.中文 = mixedChinese.slice(0, numberOption);
-      correctChineseAnswers.forEach((answer) => allChineseSet.add(answer));
+
+      correctChineseAnswers.forEach((answer) => {
+        if (!excludedChineseSet.has(answer)) {
+          allChineseSet.add(answer);
+        }
+      });
     });
 
     data.answers.sort((a, b) => {
@@ -611,7 +613,6 @@ const goToNextPage = (
   console.log("data_pinjie: ", data);
 
   // 增加中译英选项
-
   function processData3(data, reversd_number, numberOption) {
     // reversd_number = 10
     // 创建 data 的深拷贝
@@ -843,7 +844,7 @@ const goToNextPage = (
           correctAnswerObj.中文 = noneOfTheAbove;
         } else {
           // 处理选项数组
-          const optionsArray = synonym.选项 ? synonym.选项.split("/") : [];
+          const optionsArray = synonym.选项 ? synonym.选项.split("；") : [];
           // 替换一个错误答案
           let replaced = false;
 
@@ -999,7 +1000,7 @@ const goToNextPage = (
           lock_spell: lock_spell.value,
           checkedNoneOfAbove: checkedNoneOfAbove.value,
           checkedSpell: checkedSpell.value,
-          RateOrigin: data['rate']
+          RateOrigin: data["rate"],
         },
       });
     }
@@ -1039,7 +1040,7 @@ const goToNextPage = (
           lock_spell: lock_spell.value,
           checkedNoneOfAbove: checkedNoneOfAbove.value,
           checkedSpell: checkedSpell.value,
-          RateOrigin: data['rate']
+          RateOrigin: data["rate"],
         },
       });
     }
@@ -1268,189 +1269,6 @@ const goToNextPage = (
     return data;
   }
 
-  function getZhenduoxuan(data) {
-    // 如果没有none_of_above, 添加正确答案
-    if (!data.answers.every((answer) => "正确答案" in answer)) {
-      data.answers.forEach((answer) => {
-        if (!("正确答案" in answer)) {
-          answer.正确答案 = answer.中文;
-        }
-      });
-    }
-
-    if (data.merge_option) {
-      // 有拼接
-      data.answers.forEach((answer, index) => {
-        // 仅当符合排除条件且 answer.中文 不为 "以上都不对" 才进行处理
-        if (
-          (data.synonyms?.[index]?.["排除"] !== "试题" &&
-            answer.中文 !== "以上都不对" &&
-            answer.正确答案 &&
-            answer.正确答案.includes("；")) ||
-          (answer.中文 !== "以上都不对" && answer.中文.includes("；"))
-        ) {
-          // 同时处理中文分号和英文逗号作为分隔符的情况
-          let parts = answer.中文
-            .split(/[；,]/g)
-            .map((s) => s.trim())
-            .filter((s) => s);
-
-          // 根据 parts 的数量随机确定 numToRemove（删除0个概率0.3，1个的概率0.3，2个的概率0.4）
-          let probabilities = {
-            2: [0.3, 0.7],
-            3: [0, 1, 0],
-            4: [0.2, 0.2, 0.2, 0.4],
-            5: [0.15, 0.15, 0.15, 0.15, 0.4],
-          };
-          let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
-          let randomValue = Math.random();
-          let cumulative = 0;
-          let numToRemove = 0;
-
-          for (let i = 0; i < distribution.length; i++) {
-            cumulative += distribution[i];
-            if (randomValue < cumulative) {
-              numToRemove = i;
-              break;
-            }
-          }
-          numToRemove = Math.min(numToRemove, parts.length);
-
-          // 随机删除 numToRemove 个部分
-          for (let i = 0; i < numToRemove; i++) {
-            if (parts.length === 0) break;
-            let removeIndex = Math.floor(Math.random() * parts.length); // 随机删除的索引
-            let removed = parts.splice(removeIndex, 1)[0]; // 随机删除的元素存储到removed
-            console.log("removed: ", removed);
-
-            // 使用相同的索引，在 data.synonyms 中找到对应的项
-            let synonymItem = data.synonyms[index];
-            if (synonymItem) {
-              // 找到 removed 在 synonyms 里对应的索引（比对时去除首尾空格）
-              let synonymIndex = synonymItem.中文.findIndex(
-                (item) => item.trim() === removed
-              );
-              if (synonymIndex !== -1) {
-                // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
-                let availableOptions = [...allChineseSet2]
-                  .flatMap((ch) =>
-                    /[,；]/.test(ch) // 检查是否包含英文逗号或中文分号
-                      ? ch.split(/[,；]/).map((item) => item.trim()) // 按逗号或分号拆分，并去掉空格
-                      : [ch]
-                  )
-                  .filter(
-                    (ch) =>
-                      !synonymItem.中文.some((item) =>
-                        /[,；]/.test(item)
-                          ? item
-                              .split(/[,；]/)
-                              .map((i) => i.trim())
-                              .includes(ch)
-                          : item.trim() === ch
-                      )
-                  );
-
-                // 替换答案
-                function escapeRegExp(string) {
-                  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                }
-
-                const rawKeyword = synonymItem.中文[synonymIndex];
-                const keyword = escapeRegExp(rawKeyword);
-                const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
-                answer.中文 = answer.中文.replace(regex, "");
-
-                // 清理可能遗留的多余分隔符
-                answer.中文 = answer.中文
-                  .replace(/^[；,]\s*|\s*[；,]$/g, "")
-                  .replace(/[；,]\s*[；,]/g, "；");
-
-                if (availableOptions.length > 0) {
-                  let randomReplacement =
-                    availableOptions[
-                      Math.floor(Math.random() * availableOptions.length)
-                    ];
-                  console.log("randomReplacement", randomReplacement);
-                  console.log("------------------------------------");
-                  synonymItem.中文[synonymIndex] = randomReplacement;
-                }
-              }
-            }
-          }
-        }
-      });
-    } else {
-      // 无拼接
-      data.answers.forEach((answer, index) => {
-        // 仅当符合排除条件且 answer.中文 不为 "以上都不对" 才进行处理
-        if (
-          data.synonyms?.[index]?.["排除"] !== "试题" &&
-          answer.中文 !== "以上都不对" &&
-          answer.正确答案 &&
-          answer.正确答案.includes("；")
-        ) {
-          // 以 "；" 拆分中文字段，并去除首尾空格
-          let parts = answer.中文.split("；").map((s) => s.trim());
-
-          // 根据 parts 的数量随机确定 numToRemove （删除0个概率0.3，1个的概率0.3，2个的概率0.4）
-          let probabilities = {
-            2: [0.3, 0.7],
-            3: [0.3, 0.3, 0.4],
-            4: [0.2, 0.2, 0.2, 0.4],
-            5: [0.15, 0.15, 0.15, 0.15, 0.4],
-          };
-          let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
-          let randomValue = Math.random();
-          let cumulative = 0;
-          let numToRemove = 0;
-
-          for (let i = 0; i < distribution.length; i++) {
-            cumulative += distribution[i];
-            if (randomValue < cumulative) {
-              numToRemove = i;
-              break;
-            }
-          }
-          numToRemove = Math.min(numToRemove, parts.length);
-
-          // 随机删除 numToRemove 个部分
-          for (let i = 0; i < numToRemove; i++) {
-            if (parts.length === 0) break;
-            let removeIndex = Math.floor(Math.random() * parts.length);
-            let removed = parts.splice(removeIndex, 1)[0];
-            console.log("removed: ", removed);
-
-            // 使用相同的索引，在 data.synonyms 中找到对应的项
-            let synonymItem = data.synonyms[index];
-            if (synonymItem) {
-              let synonymIndex = synonymItem.中文.findIndex(
-                (item) => item.trim() === removed
-              );
-              if (synonymIndex !== -1) {
-                let availableOptions = [...allChineseSet2].filter(
-                  (ch) => !synonymItem.中文.includes(ch)
-                );
-                if (availableOptions.length > 0) {
-                  let randomReplacement =
-                    availableOptions[
-                      Math.floor(Math.random() * availableOptions.length)
-                    ];
-                  console.log("randomReplacement", randomReplacement);
-                  console.log("------------------------------------");
-                  synonymItem.中文[synonymIndex] = randomReplacement;
-                }
-              }
-            }
-          }
-
-          // 更新答案的中文字段，将处理后的数组重新用 "；" 连接
-          answer.中文 = parts.join("；");
-        }
-      });
-    }
-    return data;
-  }
-  // 放回试题
   function shuffleArray(arr) {
     const newArr = arr.slice(); // 拷贝一份数组
     for (let i = newArr.length - 1; i > 0; i--) {
@@ -1491,7 +1309,7 @@ const goToNextPage = (
       ) {
         data.answers[i]["序号"] = newIndex;
       }
-      if(data.synonyms[i]['排除'] === "试题"){
+      if (data.synonyms[i]["排除"] === "试题") {
         data.answers[i]["正确答案"] = data.answers[i]["中文"];
       }
     }
@@ -1618,8 +1436,8 @@ const goToNextPage = (
 
               if (availableIndices.length > 0) {
                 // 如果选项包含 "/", 则拆分成多个选项
-                const options = option.includes("/")
-                  ? option.split("/")
+                const options = option.includes("；")
+                  ? option.split("；")
                   : [option];
 
                 // 替换多个选项
@@ -1726,7 +1544,9 @@ const goToNextPage = (
 
           if (availableIndices.length > 0) {
             // 如果选项包含 "/", 则拆分成多个选项
-            const options = option.includes("/") ? option.split("/") : [option];
+            const options = option.includes("；")
+              ? option.split("；")
+              : [option];
 
             // 替换多个选项
             options.forEach((opt) => {
@@ -2382,10 +2202,19 @@ const handleConfirmCheckAnswer = () => {
       return JSON.parse(dataString);
     });
 
-    console.log("spellWordsList: ", spellWordsList.value);
     difficultyCoefficient.value = 30;
     showAnswerSheet.value = true;
-    answerSheetList.value = originalData.value[gotoIndex.value]["answers"];
+    // answerSheetList.value = originalData.value[gotoIndex.value]["answers"];
+    const answers = originalData.value[gotoIndex.value]?.answers || [];
+    const synonyms = originalData.value[gotoIndex.value]?.synonyms || [];
+
+    answerSheetList.value = answers.map((item, index) => {
+      return {
+        ...item,
+        排除: synonyms[index]?.排除 || null,
+      };
+    });
+    // console.log('answerSheetList: ', answerSheetList.value);
     showCheckAnswerSheet.value = false;
     isLoading.value = false;
   });
@@ -4555,29 +4384,31 @@ onMounted(async () => {
       <van-cell-group inset style="margin-top: 0.5rem; margin-left: -0.2rem">
         <van-cell-group>
           <div v-for="(item, index) in answerSheetList" :key="index">
-            <van-cell
-              :title="`${index + 1}. ${item.英文}`"
-              :value="item.中文"
-              @click="speakWord(item.英文, item.正确答案)"
-            >
-              <!-- 检查 spellWordsList 是否包含当前 item 的英文 -->
-              <van-tag
-                mark
-                v-if="
-                  spellWordsList.some(
-                    (spellItem) => spellItem.英文 === item.英文
-                  )
-                "
-                type="danger"
+            <div v-if="item.排除 !== '试题'">
+              <van-cell
+                :title="`${index + 1}. ${item.英文}`"
+                :value="item.中文"
+                @click="speakWord(item.英文, item.正确答案)"
               >
-                拼
-              </van-tag>
-              {{ item.中文 }}
-              <img
-                src="../assets/speaker.png"
-                style="width: 12px; height: auto"
-              />
-            </van-cell>
+                <!-- 检查 spellWordsList 是否包含当前 item 的英文 -->
+                <van-tag
+                  mark
+                  v-if="
+                    spellWordsList.some(
+                      (spellItem) => spellItem.英文 === item.英文
+                    )
+                  "
+                  type="danger"
+                >
+                  拼
+                </van-tag>
+                {{ item.中文 }}
+                <img
+                  src="../assets/speaker.png"
+                  style="width: 12px; height: auto"
+                />
+              </van-cell>
+            </div>
           </div>
         </van-cell-group>
       </van-cell-group>

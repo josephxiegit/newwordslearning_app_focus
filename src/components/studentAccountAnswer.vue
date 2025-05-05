@@ -29,15 +29,12 @@ const compareResult = ref([]);
 const userSelected = ref([]);
 const nid = ref("");
 
-
-// const trueCount = ref("");
-// const trueCount_shiti = ref("");
 const trueCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "true").length;
 });
-const trueCount_shiti = computed(() => {
+const falseCount_danci = computed(() => {
   return compareResult.value.filter(
-    (item) => item.flag === "true" || item.排除 === "试题"
+    (item) => item.flag != "true" && item.排除 !== "试题"
   ).length;
 });
 const halfCount = computed(() => {
@@ -306,16 +303,10 @@ const offsetDaily = ref({
   y: 70,
 });
 const handleConfirmResult = async () => {
-  // trueCount.value = 15
-  // trueCount_shiti.value = 16
-  console.log(compareResult.value.length)
-  console.log("trueCount", trueCount.value)
-  console.log("trueCount_shiti", trueCount_shiti.value)
 
   if (
-    compareResult.value.length - trueCount.value >= 0 &&
-    compareResult.value.length - trueCount.value <= 2 &&
-    trueCount_shiti.value - trueCount.value >= 0
+    falseCount_danci.value > 0 && falseCount_danci.value <= 2
+
   ) {
     // console.log('补全单词');
     let toast1 = showLoadingToast({
