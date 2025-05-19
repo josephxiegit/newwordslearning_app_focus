@@ -102,18 +102,38 @@ function getRandomPosition() {
 
 // 单词发音函数
 const speakWord = (word) => {
-  try {
-    const parts = word.split(" ");
-    const englishParts = parts.filter((part) => /[a-zA-Z]/.test(part));
-    const englishText = englishParts.join(" ");
-    if (englishText) {
-      const utterance = new SpeechSynthesisUtterance(englishText);
+  // try {
+  //   const parts = word.split(" ");
+  //   const englishParts = parts.filter((part) => /[a-zA-Z]/.test(part));
+  //   const englishText = englishParts.join(" ");
+  //   if (englishText) {
+  //     const utterance = new SpeechSynthesisUtterance(englishText);
+  //     utterance.lang = "en-US";
+  //     window.speechSynthesis.speak(utterance);
+  //   }
+  // } catch (error) {
+  //   console.error("发音出错:", error);
+  // }
+  const parts = word.split(" ");
+  const englishParts = parts.filter((part) => /[a-zA-Z]/.test(part));
+  const englishText = englishParts.join(" ");
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    englishText
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
+    let utterance;
+    utterance = new SpeechSynthesisUtterance(englishText);
+    if (!/[a-zA-Z]/.test(englishText)) {
+      utterance.lang = "zh-CN";
+    } else {
       utterance.lang = "en-US";
-      window.speechSynthesis.speak(utterance);
     }
-  } catch (error) {
-    console.error("发音出错:", error);
-  }
+    utterance.pitch = 0.5;
+    window.speechSynthesis.speak(utterance);
+  });
+
 };
 
 // 显示按钮并启动倒计时

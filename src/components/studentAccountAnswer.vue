@@ -193,20 +193,38 @@ const showUncertainResult = () => {
 
 // 单词发音
 const speakWord = (english, answer) => {
-  try {
-    let utterance;
+  // try {
+  //   let utterance;
 
+  //   if (!/[a-zA-Z]/.test(english)) {
+  //     utterance = new SpeechSynthesisUtterance(answer);
+  //     utterance.lang = "en-US";
+  //   } else {
+  //     utterance = new SpeechSynthesisUtterance(english);
+  //     utterance.lang = "en-US";
+  //   }
+  //   window.speechSynthesis.speak(utterance);
+  // } catch (error) {
+  //   showToast("此浏览器不支持发音，请更换chrome或edge");
+  // }
+  const word = /[a-zA-Z]/.test(english)? english:answer
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    word
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
+    let utterance;
     if (!/[a-zA-Z]/.test(english)) {
       utterance = new SpeechSynthesisUtterance(answer);
-      utterance.lang = "en-US";
     } else {
       utterance = new SpeechSynthesisUtterance(english);
-      utterance.lang = "en-US";
     }
+
+    utterance.lang = "en-US";
+    utterance.pitch = 0.5;
     window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    showToast("此浏览器不支持发音，请更换chrome或edge");
-  }
+  });
 };
 // 记录答案时间
 const createTimeAnswer = ref("");
@@ -303,11 +321,7 @@ const offsetDaily = ref({
   y: 70,
 });
 const handleConfirmResult = async () => {
-
-  if (
-    falseCount_danci.value > 0 && falseCount_danci.value <= 2
-
-  ) {
+  if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
     // console.log('补全单词');
     let toast1 = showLoadingToast({
       message: "查询中...",
@@ -368,7 +382,7 @@ const handleConfirmResult = async () => {
       title: `视频补全失败`,
       theme: "round-button",
       message: `错误在2个及以下才能补全错误<br><b>(不含试题部分)</b>`,
-      allowHtml: true, 
+      allowHtml: true,
       showCancelButton: false,
     });
   }
@@ -822,28 +836,29 @@ onMounted(async () => {
             }"
           >
             <template #title>
-              <div 
-                v-if="item.排除 !== '试题'" 
-                @click="speakWord(item.英文, item.正确答案)">
+              <div
+                v-if="item.排除 !== '试题'"
+                @click="speakWord(item.英文, item.正确答案)"
+              >
                 {{ item.序号 + ". " + item.英文 }}
                 <img
                   src="../assets/speaker.png"
                   style="width: 12px; height: auto"
                 />
               </div>
-              <div 
+              <div
                 v-else
                 style="
-                    font-weight: 500;
-                    font-size: 15px;
-                    line-height: 1.5;
-                    height: 48px;
-                    display: flex;
-                    align-items: center;
-                    margin: 0.3rem 0 0.3rem 0;
-                  "
+                  font-weight: 500;
+                  font-size: 15px;
+                  line-height: 1.5;
+                  height: 48px;
+                  display: flex;
+                  align-items: center;
+                  margin: 0.3rem 0 0.3rem 0;
+                "
                 @click="speakWord(item.英文, item.正确答案)"
-                >
+              >
                 {{ item.序号 + ". " + item.英文 }}
                 <img
                   src="../assets/speaker.png"
@@ -852,92 +867,118 @@ onMounted(async () => {
               </div>
             </template>
           </van-cell>
-          <van-cell-group>
-            <van-cell
-              v-for="(chinese, index2) in item.中文"
-              :key="index2"
-              clickable
-              class="chinese-cell"
-            >
-              <template #title>
-                <div style="text-align: left">{{ chinese }}</div>
-              </template>
-              <template #right-icon>
-                <van-checkbox
-                  :name="`${item.序号}-${index2 + 1}`"
-                  :disabled="true"
-                  :checked="userSelected.includes(`${item.序号}-${index2 + 1}`)"
-                />
-              </template>
-            </van-cell>
-
-            <!-- 当 item.is_spell 为 true 且 item.flag 为 false 时，显示橙色背景和正确答案 -->
-            <van-cell
-              v-if="item.is_spell && item.flag === 'false'"
-              style="background-color: bisque"
-            >
-              <template #title>
-                正确答案：{{ item.正确答案 }} ｜ 用户选择:
-                {{ item.用户选择.join("") }}</template
+          <!-- 显示对应的中文选项 -->
+          <div v-if="item.排除 !== '手写'">
+            <van-cell-group>
+              <van-cell
+                v-for="(chinese, index2) in item.中文"
+                :key="index2"
+                clickable
+                class="chinese-cell"
               >
-            </van-cell>
+                <template #title>
+                  <div style="text-align: left">{{ chinese }}</div>
+                </template>
+                <template #right-icon>
+                  <van-checkbox
+                    :name="`${item.序号}-${index2 + 1}`"
+                    :disabled="true"
+                    :checked="
+                      userSelected.includes(`${item.序号}-${index2 + 1}`)
+                    "
+                  />
+                </template>
+              </van-cell>
 
-            <!-- 当 item.is_spell 为 true 且 item.flag 为 true 时，显示绿色背景和正确答案 -->
-            <van-cell
-              v-else-if="item.is_spell && item.flag === 'true'"
-              style="background-color: lightgreen"
-            >
-              <template #title> 正确答案：{{ item.正确答案 }} </template>
-            </van-cell>
+              <!-- 当 item.is_spell 为 true 且 item.flag 为 false 时，显示橙色背景和正确答案 -->
+              <van-cell
+                v-if="item.is_spell && item.flag === 'false'"
+                style="background-color: bisque"
+              >
+                <template #title>
+                  正确答案：{{ item.正确答案 }} ｜ 用户选择:
+                  {{ item.用户选择.join("") }}</template
+                >
+              </van-cell>
 
-            <!-- 当 item.flag 不为 true 且不属于 is_spell 的情况，显示答案 -->
-            <van-cell
-              v-if="
-                item.flag !== 'true' &&
-                (!item.is_spell || item.flag !== 'false')
-              "
-              class="answer-cell"
-            >
-              <template #title>
-                <div v-if="item.答案 !== item.正确答案">
-                  正确答案：{{ item.正确答案 }}
+              <!-- 当 item.is_spell 为 true 且 item.flag 为 true 时，显示绿色背景和正确答案 -->
+              <van-cell
+                v-else-if="item.is_spell && item.flag === 'true'"
+                style="background-color: lightgreen"
+              >
+                <template #title> 正确答案：{{ item.正确答案 }} </template>
+              </van-cell>
+
+              <!-- 当 item.flag 不为 true 且不属于 is_spell 的情况，显示答案 -->
+              <van-cell
+                v-if="
+                  item.flag !== 'true' &&
+                  (!item.is_spell || item.flag !== 'false')
+                "
+                class="answer-cell"
+              >
+                <template #title>
+                  <div v-if="item.答案 !== item.正确答案">
+                    正确答案：{{ item.正确答案 }}
+                  </div>
+                  <div v-else>答案：{{ item.答案 }}</div>
+                </template>
+              </van-cell>
+
+              <van-cell
+                v-if="
+                  (item.flag === 'true' || item.flag === 'half') &&
+                  item.答案 === '以上都不对' &&
+                  !item.is_spell
+                "
+                style="background-color: lightgreen"
+              >
+                <template #title>
+                  <div>以上都不对 ｜ 正确答案：{{ item.正确答案 }}</div>
+                </template>
+              </van-cell>
+
+              <van-cell
+                v-if="
+                  item.正确答案 &&
+                  areAnswersDifferent(item.答案, item.正确答案) &&
+                  item.答案 !== '以上都不对' &&
+                  !item.is_spell &&
+                  item.flag === 'true'
+                "
+                style="background-color: lightgreen"
+              >
+                <template #title>
+                  <!-- {{ areAnswersDifferent(item.答案, item.正确答案) }}
+                {{ item.答案 !== '以上都不对' }}
+                {{ !item.is_spell }}
+                {{ item.flag === 'true' }} -->
+                  <div>{{ item.答案 }} ｜ 完全答案：{{ item.正确答案 }}</div>
+                </template>
+              </van-cell>
+            </van-cell-group>
+          </div>
+          <div v-else style="margin: 0rem 0 0rem 0rem; font-size: 15px; color: black;">
+            <van-cell-group>
+              <van-cell>
+                <div style="text-align: left">
+                  用户拼写：{{ item.用户选择[0] }}
                 </div>
-                <div v-else>答案：{{ item.答案 }}</div>
-              </template>
-            </van-cell>
-
-            <van-cell
-              v-if="
-                (item.flag === 'true' || item.flag === 'half') &&
-                item.答案 === '以上都不对' &&
-                !item.is_spell
-              "
-              style="background-color: lightgreen"
-            >
-              <template #title>
-                <div>以上都不对 ｜ 正确答案：{{ item.正确答案 }}</div>
-              </template>
-            </van-cell>
-
-            <van-cell
-              v-if="
-                item.正确答案 &&
-                areAnswersDifferent(item.答案, item.正确答案) &&
-                item.答案 !== '以上都不对' &&
-                !item.is_spell &&
-                item.flag === 'true'
-              "
-              style="background-color: lightgreen"
-            >
-              <template #title>
-                <!-- {{ areAnswersDifferent(item.答案, item.正确答案) }}
-              {{ item.答案 !== '以上都不对' }}
-              {{ !item.is_spell }}
-              {{ item.flag === 'true' }} -->
-                <div>{{ item.答案 }} ｜ 完全答案：{{ item.正确答案 }}</div>
-              </template>
-            </van-cell>
-          </van-cell-group>
+              </van-cell>
+              <van-cell
+                v-if="item.排除 === '手写' && item.flag === 'true'"
+                style="background-color: lightgreen"
+              >
+                <template #title>正确答案：{{ item.英文 }}</template>
+              </van-cell>
+              <van-cell
+                v-if="item.排除 === '手写' && item.flag === 'false'"
+                style="background-color: bisque"
+              >
+                <template #title>正确答案：{{ item.英文 }}</template>
+              </van-cell>
+            </van-cell-group>
+          </div>
         </div>
       </van-cell-group>
     </van-checkbox-group>

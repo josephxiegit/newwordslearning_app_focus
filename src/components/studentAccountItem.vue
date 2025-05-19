@@ -8,6 +8,7 @@ import {
   computed,
   nextTick,
   onBeforeUnmount,
+  reactive,
 } from "vue";
 import {
   showFailToast,
@@ -70,13 +71,42 @@ const mergeAnswerAndSynonym = () => {
   }
   return newList;
 };
+// const convertSelections = (synonymsSelected, synonymsOptions) => {
+//   console.log("synonymsOptions: ", synonymsOptions);
+//   console.log("synonymsSelected: ", synonymsSelected);
+//   const resultMap = new Map();
+
+//   synonymsOptions.forEach((option) => {
+//     resultMap.set(option.序号, ["无"]); // 初始标记为“无”
+//   });
+
+//   synonymsSelected.forEach((selection) => {
+//     const [dictNumber, chineseIndex] = selection.split("-").map(Number);
+//     const dictEntry = synonymsOptions.find((item) => item.序号 === dictNumber);
+//     if (dictEntry) {
+//       const chineseWord = dictEntry.中文[chineseIndex - 1];
+//       if (resultMap.get(dictNumber)[0] === "无") {
+//         resultMap.set(dictNumber, [chineseWord]);
+//       } else {
+//         resultMap.get(dictNumber).push(chineseWord);
+//       }
+//     }
+//   });
+
+//   // 将Map转换为所需的数组格式
+//   return Array.from(resultMap, ([序号, 中文]) => ({ 序号, 中文 })).sort(
+//     (a, b) => a.序号 - b.序号
+//   ); // 确保结果是按序号排序的
+// };
 const convertSelections = (synonymsSelected, synonymsOptions) => {
   const resultMap = new Map();
 
+  // 初始化每个序号为 ["无"]
   synonymsOptions.forEach((option) => {
-    resultMap.set(option.序号, ["无"]); // 初始标记为“无”
+    resultMap.set(option.序号, ["无"]);
   });
 
+  // 添加多选的中文项
   synonymsSelected.forEach((selection) => {
     const [dictNumber, chineseIndex] = selection.split("-").map(Number);
     const dictEntry = synonymsOptions.find((item) => item.序号 === dictNumber);
@@ -89,16 +119,31 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
       }
     }
   });
+  if (handwriteAnswers.value.length > 0) {
 
-  // 将Map转换为所需的数组格式
+    handwriteAnswers.value.forEach(({ 序号, 英文 }) => {
+      if (!英文?.trim()) return;
+      const current = resultMap.get(序号);
+      if (current && !current.includes(英文)) {
+        // 如果当前是 ["无"]，则替换
+        if (current.length === 1 && current[0] === "无") {
+          resultMap.set(序号, [英文]);
+        } else {
+          resultMap.get(序号).push(英文);
+        }
+      }
+    });
+  }
+
+  // 返回按序号排序的结果数组
   return Array.from(resultMap, ([序号, 中文]) => ({ 序号, 中文 })).sort(
     (a, b) => a.序号 - b.序号
-  ); // 确保结果是按序号排序的
+  );
 };
 
 const compareAndAddFlag = (dictArray) => {
   return dictArray.map((item) => {
-    const { 答案, 用户选择, 正确答案, is_spell } = item;
+    const { 答案, 用户选择, 正确答案, is_spell, 排除, 英文 } = item;
 
     // 统一处理分隔符，将所有中文分号和逗号替换为英文逗号，然后进行分割和修整
     const normalize = (str) =>
@@ -113,7 +158,6 @@ const compareAndAddFlag = (dictArray) => {
 
     const correctAnswerArray = 正确答案 ? normalize(正确答案).sort() : [];
     const userSelectionArray = normalize(用户选择.join(",")).sort();
-    // console.log('userSelectionArray', userSelectionArray);
 
     // 计算匹配情况
     let flag = "false"; // 默认为没有匹配
@@ -124,6 +168,16 @@ const compareAndAddFlag = (dictArray) => {
       const correctAnswerString = 正确答案.replace(/\s/g, "");
 
       if (userSelectionString === correctAnswerString) {
+        flag = "true";
+      } else {
+        flag = "false";
+      }
+    } else if (排除 == "手写") {
+      const cleanString = (str) => (str || "").toLowerCase().replace(/[^a-z]/g, "");
+      const userInput = cleanString(用户选择[0]);
+      const target = cleanString(英文);
+
+      if (userInput && target && userInput === target) {
         flag = "true";
       } else {
         flag = "false";
@@ -440,7 +494,7 @@ const clickSubmitUser = async (action, done) => {
 
       // 开始加载
       // 创建一个超时的 Promise
-      
+
       const timeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
       );
@@ -767,6 +821,24 @@ const buttonStyle = computed(() => {
     color: heightScroll.value === lowerAnchor ? "green" : "red",
   };
 });
+// 手写模式
+const handwriteInputs = ref({});
+const handwriteAnswers = ref([]);
+
+function saveHandwriteAnswer(index, serialNumber) {
+  const input = (handwriteInputs.value[index] || "").trim();
+  if (!input) return;
+
+  const existing = handwriteAnswers.value.find(
+    (ans) => ans.序号 === serialNumber
+  );
+  if (existing) {
+    existing.英文 = input;
+  } else {
+    handwriteAnswers.value.push({ 序号: serialNumber, 英文: input });
+  }
+  console.log("handwriteAnswers: ", handwriteAnswers.value);
+}
 
 // 点击选项
 const resultDataTempt = ref([]);
@@ -794,7 +866,11 @@ const toggleCheckChinese = (index, index2) => {
   const wasSelected = selectedIndexes.value[key]; // 之前的状态
   selectedIndexes.value[key] = !wasSelected; // 切换状态
 
-  if (wasSelected && !synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
+  if (
+    wasSelected &&
+    !synonymsOptions.value[index].is_spell &&
+    synonymsOptions.value[index].排除 !== "试题"
+  ) {
     const content = "撤销";
     const uncertainItem = synonymsOptions.value[index].英文;
 
@@ -1015,6 +1091,7 @@ const startAnimation = () => {
 const flagHelp = ref(true);
 const totalCoins = ref(0);
 const helpOutside = () => {
+  flagHelp.value = true;
   if (flagHelp.value) {
     showConfirmDialog({
       title: "场外支援",
@@ -1023,19 +1100,20 @@ const helpOutside = () => {
     }).then(() => {
       // 合并答案和选项
       mergedData.value = mergeAnswerAndSynonym();
+      console.log("mergedData.value: ", mergedData.value);
 
       // 将用户选择转化为中文
       const synonymsSelectedChinese = convertSelections(
         synonymsSelected.value,
         synonymsOptions.value
       );
+      console.log("synonymsSelectedChinese: ", synonymsSelectedChinese);
 
       // 将中文用户选择和选项答案合并
       const synonymAndSelections = mergeSynonymAndSelections(
         synonymsSelectedChinese
       );
 
-      // console.log(synonymAndSelections);
       const hasNoneSelected = synonymAndSelections.some((item) =>
         item.用户选择.includes("无")
       );
@@ -1044,9 +1122,10 @@ const helpOutside = () => {
         return;
       }
       console.log("synonymAndSelections", synonymAndSelections);
-      // 比对结果给出flag
 
+      // 比对结果给出flag
       const compareResult = compareAndAddFlag(synonymAndSelections);
+      console.log("compareResult: ", compareResult);
 
       // 计算金币
       function calculateAccuracy(compareResult) {
@@ -1114,7 +1193,13 @@ const helpOutside = () => {
 };
 // 单词发音
 const speakWord = (word) => {
-  try {
+
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    word
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
     let utterance;
     utterance = new SpeechSynthesisUtterance(word);
     if (!/[a-zA-Z]/.test(word)) {
@@ -1122,10 +1207,9 @@ const speakWord = (word) => {
     } else {
       utterance.lang = "en-US";
     }
+    utterance.pitch = 0.5;
     window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    showToast("此浏览器不支持发音，请更换chrome或edge");
-  }
+  });
 };
 
 // 动画鼓励
@@ -1451,6 +1535,7 @@ onMounted(async () => {
           <van-cell clickable class="bold-title border-cell">
             <template #title>
               <div
+                v-if="item.排除 !== '手写'"
                 style="display: flex; align-items: center"
                 @click="speakWord(item.英文)"
               >
@@ -1527,32 +1612,57 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
+              <div
+                v-else
+                style="
+                  line-height: 1;
+                  height: 24px;
+                  display: flex;
+                  align-items: center;
+                "
+              >
+                {{ item.序号 + ". " + answers[index].中文 }}
+              </div>
             </template>
           </van-cell>
 
           <!-- 显示对应的中文选项 -->
-          <van-cell-group>
-            <van-cell
-              v-for="(chinese, index2) in item.中文"
-              :key="index2"
-              clickable
-              @click="toggleCheckChinese(index, index2)"
-              :class="isSelected(index, index2) ? 'selected-cell' : ''"
-              class="chinese-cell"
-            >
-              <template #title>
-                <div style="text-align: left">{{ chinese }}</div>
-              </template>
-              <template #right-icon>
-                <van-checkbox
-                  :name="`${index + 1}-${index2 + 1}`"
-                  :disabled="isDisabled(index, index2)"
-                  :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
-                  @click.stop.prevent="toggleCheckChinese(index, index2)"
-                />
-              </template>
-            </van-cell>
-          </van-cell-group>
+          <div v-if="item.排除 !== '手写'">
+            <van-cell-group>
+              <van-cell
+                v-for="(chinese, index2) in item.中文"
+                :key="index2"
+                clickable
+                @click="toggleCheckChinese(index, index2)"
+                :class="isSelected(index, index2) ? 'selected-cell' : ''"
+                class="chinese-cell"
+              >
+                <template #title>
+                  <div style="text-align: left">{{ chinese }}</div>
+                </template>
+                <template #right-icon>
+                  <van-checkbox
+                    :name="`${index + 1}-${index2 + 1}`"
+                    :disabled="isDisabled(index, index2)"
+                    :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
+                    @click.stop.prevent="toggleCheckChinese(index, index2)"
+                  />
+                </template>
+              </van-cell>
+            </van-cell-group>
+          </div>
+
+          <!-- 手写模式：显示输入框或横线 -->
+          <div v-else class="handwrite-area" style="padding: 0.5rem 1rem">
+            <van-field
+              v-model="handwriteInputs[index]"
+              placeholder="请拼写对应的英文"
+              input-align="left"
+              clearable
+              style="border-bottom: 1px solid #ccc"
+              @blur="saveHandwriteAnswer(index, item.序号)"
+            />
+          </div>
         </div>
       </van-cell-group>
     </van-checkbox-group>

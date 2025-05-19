@@ -61,6 +61,10 @@ const gobackHomepage = () => {
 // 显示答案
 const showAnswerSheet = ref(false);
 const answerSheetList = ref([]);
+const selfCheck = ref(true);
+const toggleCheckSelf = () => {
+  selfCheck.value = !selfCheck.value;
+};
 
 // 点击跳转明细
 function showAnimationShineStartout() {
@@ -97,7 +101,7 @@ const goToNextPage = (
   const shiti_backup = [];
   for (let i = data.synonyms.length - 1; i >= 0; i--) {
     const synonym = data.synonyms[i];
-    if (synonym["排除"] === "试题") {
+    if (synonym["排除"] === "试题" || synonym["排除"] === "手写") {
       // 备份
       shiti_backup.push({
         synonym: synonym,
@@ -1592,8 +1596,31 @@ const goToNextPage = (
   }
 };
 
-const speakWord = (english, answer) => {
-  try {
+const speakWord = async (english, answer) => {
+  // // speachweb
+  // try {
+  //   let utterance;
+  //   if (!/[a-zA-Z]/.test(english)) {
+  //     utterance = new SpeechSynthesisUtterance(answer);
+  //   } else {
+  //     utterance = new SpeechSynthesisUtterance(english);
+  //   }
+
+  //   utterance.lang = "en-US";
+  //   utterance.pitch = 0.5
+  //   window.speechSynthesis.speak(utterance);
+  // } catch (error) {
+  //   showToast("此浏览器不支持发音，请更换chrome或edge");
+  // }
+
+  // youdao fayin
+
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    english
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
     let utterance;
     if (!/[a-zA-Z]/.test(english)) {
       utterance = new SpeechSynthesisUtterance(answer);
@@ -1602,10 +1629,32 @@ const speakWord = (english, answer) => {
     }
 
     utterance.lang = "en-US";
+    utterance.pitch = 0.5;
     window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    showToast("此浏览器不支持发音，请更换chrome或edge");
-  }
+  });
+
+  // // baidu api
+  // // 生成唯一的cuid（随机字符串 + 时间戳）
+  // const cuid = 'web_' + Math.random().toString(36).substr(2, 8) + '_' + Date.now();
+
+  // // 获取AccessToken
+  // const tokenResponse = await fetch(
+  //   `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=UfBjAfe60n05PzmcsKcAT23m&client_secret=I5Dvzi9cfKODgakI3FDf4xbruPITaLVh`
+  // );
+
+  // const tokenData = await tokenResponse.json();
+  // const accessToken = tokenData.access_token;
+
+  // // 调用语音合成API（注意：将lan参数改为'en'以支持英文发音）
+  // const ttsResponse = await fetch(
+  //   `https://tsn.baidu.com/text2audio?tex=${encodeURIComponent(english)}&tok=${accessToken}&cuid=${cuid}&ctp=1&lan=en&per=0`,
+  //   { responseType: 'arraybuffer' }
+  // );
+
+  // const audioBlob = await ttsResponse.blob();
+  // const audioUrl = URL.createObjectURL(audioBlob);
+  // const audio = new Audio(audioUrl);
+  // audio.play();
 };
 
 // 跳转下一面
@@ -1849,17 +1898,17 @@ const flagReviewList = ref(true);
 const nidReview = ref("");
 const handleReviewMode = () => {
   reviewShow.value = true;
-  console.log("flagReviewList", flagReviewList.value);
+  // console.log("flagReviewList", flagReviewList.value);
   if (flagReviewList.value) {
-    console.log("正常列表");
+    // console.log("正常列表");
     dataReview.value = originalData.value[indexAnswer.value]["synonyms"];
     nidReview.value = originalData.value[indexAnswer.value]["nid"];
   } else {
-    console.log("弹出列表");
+    // console.log("弹出列表");
   }
 
   let resultData = [];
-  console.log("dataReview:", dataReview.value);
+  // console.log("dataReview:", dataReview.value);
   for (let i = 0; i < dataReview.value.length; i++) {
     let obj = {};
     obj["is_spell"] = false;
@@ -1876,10 +1925,15 @@ const handleReviewMode = () => {
     obj["用户选择"] = ["无"];
     obj["答案"] = obj["正确答案"];
     obj["英文"] = dataReview.value[i]["英文"];
+    obj["排除"] = dataReview.value[i]["排除"];
     resultData.push(obj);
   }
   console.log("resultData", resultData);
-  console.log("nidReview", nidReview.value);
+  // console.log("nidReview", nidReview.value);
+  const countShiti = resultData.filter((item) => item.排除 != "试题").length;
+  if (countShiti == 0) {
+    showToast("试题组不提供预习\n请直接挑战");
+  }
   dataPreExam.value = resultData;
   dataReview2.value = resultData;
 };
@@ -1900,7 +1954,7 @@ const gotoReview = (index) => {
   indexAnswer.value = index;
   dataReview.value = reviewList.value[index]["synonyms"];
   nidReview.value = reviewList.value[index]["nid"];
-  console.log(nidReview.value);
+  // console.log(nidReview.value);
   flagReviewList.value = false;
   console.log("flagReviewList", flagReviewList.value);
   if (flagTheme.value == 1) {
@@ -2065,9 +2119,10 @@ const gotoDaily = (index) => {
     obj["用户选择"] = ["无"];
     obj["答案"] = obj["正确答案"];
     obj["英文"] = synonyms[i]["英文"];
+    obj["排除"] = synonyms[i]["排除"];
     resultData.push(obj);
   }
-  console.log("resultData:", resultData);
+  // console.log("resultData:", resultData);
   router.push({
     path: "/studentAccountDaily",
     state: {
@@ -2214,7 +2269,14 @@ const handleConfirmCheckAnswer = () => {
         排除: synonyms[index]?.排除 || null,
       };
     });
-    // console.log('answerSheetList: ', answerSheetList.value);
+    console.log("answerSheetList: ", answerSheetList.value);
+    const countShiti = answerSheetList.value.filter(
+      (item) => item.排除 != "试题"
+    ).length;
+    if (countShiti == 0) {
+      showAnswerSheet.value = false;
+      showToast("试题组不提供预习\n请直接挑战");
+    }
     showCheckAnswerSheet.value = false;
     isLoading.value = false;
   });
@@ -2279,6 +2341,7 @@ const handleAnswerSheetClose = () => {
 };
 
 watch(showAnswerSheet, (newVal) => {
+  selfCheck.value = true;
   if (!newVal) {
     handleAnswerSheetClose();
   } else {
@@ -2301,8 +2364,10 @@ const handlePageUnload = () => {
 // 提前查看答案
 const dialogPosition = ref({ x: 0, y: 0 });
 const viewAnswer = (item, index) => {
+  console.log("item: ", item);
   // console.log("item: ", item.attempt);
   // console.log("index: ", index);
+  console.log("originalData: ", originalData.value[index]);
   if (item.attempt == 0) {
     gotoIndex.value = index;
     showCheckAnswerSheet.value = true;
@@ -2318,7 +2383,19 @@ const viewAnswer = (item, index) => {
         return JSON.parse(dataString);
       });
       showAnswerSheet.value = true;
-      answerSheetList.value = item["answers"];
+      // answerSheetList.value = item["answers"];
+      const synonyms = item["synonyms"];
+      const answers = item["answers"];
+
+      answerSheetList.value = answers.map((ans, idx) => {
+        const exclude = synonyms?.[idx]?.排除 || "";
+        return {
+          ...ans,
+          排除: exclude,
+        };
+      });
+
+      console.log("answerSheetList: ", answerSheetList.value);
     });
     return;
   }
@@ -2345,7 +2422,25 @@ const viewAnswer = (item, index) => {
         });
         showAnswerSheet.value = true;
         isLoading.value = false;
-        answerSheetList.value = item["answers"];
+        // answerSheetList.value = item["answers"];
+        const answers = originalData.value[index]?.answers || [];
+        const synonyms = originalData.value[index]?.synonyms || [];
+
+        answerSheetList.value = answers.map((item, index) => {
+          return {
+            ...item,
+            排除: synonyms[index]?.排除 || null,
+          };
+        });
+        console.log("answerSheetList: ", answerSheetList.value);
+        const countShiti = answerSheetList.value.filter(
+          (item) => item.排除 != "试题"
+        ).length;
+        if (countShiti == 0) {
+          showAnswerSheet.value = false;
+          showToast("试题组不提供预习\n请直接挑战");
+          return;
+        }
 
         // 定义异步函数updateView
         async function updateView() {
@@ -2357,7 +2452,6 @@ const viewAnswer = (item, index) => {
             return ret.data;
           });
         }
-
         // 调用updateView并处理其promise
         if (item.attempt > 0) {
           updateView().then((res) => {
@@ -2915,15 +3009,30 @@ const gotoPreExam = () => {
       console.log("res: ", res);
       dataPreExam.value = res.data.dataPreExam;
 
-      dataPreExam.value = dataPreExam.value.map((item) => {
-        if (item["正确答案"] === "无") {
-          return {
-            ...item,
-            正确答案: item["答案"],
-          };
-        }
-        return item;
-      });
+      // dataPreExam.value = dataPreExam.value
+      //   .filter((item) => !/__{3,}/.test(item["英文"])) // 删除含有 3 个或以上下划线的项
+      //   .map((item) => {
+      //     if (item["正确答案"] === "无") {
+      //       return {
+      //         ...item,
+      //         正确答案: item["答案"],
+      //       };
+      //     }
+      //     return item;
+      //   });
+      dataPreExam.value = dataPreExam.value
+        .filter((item) => {
+          return !/__{3,}/.test(item["英文"]) && item["排除"] !== "手写";
+        })
+        .map((item) => {
+          if (item["正确答案"] === "无") {
+            return {
+              ...item,
+              正确答案: item["答案"],
+            };
+          }
+          return item;
+        });
       console.log("dataPreExam: ", dataPreExam.value);
       isLoading.value = false;
       preExamShow.value = true;
@@ -3420,7 +3529,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="选项可能仍有bug...联系老师"
+        text="九年级开启手写模式...有bug联系老师"
       />
     </div>
     <van-toast
@@ -4366,19 +4475,40 @@ onMounted(async () => {
       position="bottom"
       :style="{ height: '90%' }"
     >
-      <div style="font-size: 18px; font-weight: 700; margin: 1rem">
-        挑战前复习
+      <div
+        style="font-size: 18px; font-weight: 700; margin: 1rem 1rem 0.8rem 1rem"
+      >
+        挑战前复习（试题部分不提供预习）
       </div>
       <div
+        @click="toggleCheckSelf"
         style="
           display: flex;
           justify-content: space-between;
+          align-items: center;
           margin-right: 1rem;
-          font-weight: 700;
         "
       >
-        <div style="font-size: 13px; margin: 1rem">
+        <div
+          style="
+            font-size: 13px;
+            margin: 0.5rem 1rem 0.5rem 1rem;
+            font-weight: 700;
+          "
+        >
           {{ answerSheetList.length }}词
+        </div>
+        <div style="display: flex">
+          <div
+            style="font-size: 12px; margin-right: 0.2rem; margin-top: 0.2rem"
+          >
+            点击自查词汇
+          </div>
+          <van-icon
+            :name="selfCheck ? 'eye-o' : 'eye'"
+            style="margin-right: 1rem; margin-top: 0.1rem"
+            size="20"
+          />
         </div>
       </div>
       <van-cell-group inset style="margin-top: 0.5rem; margin-left: -0.2rem">
@@ -4390,23 +4520,28 @@ onMounted(async () => {
                 :value="item.中文"
                 @click="speakWord(item.英文, item.正确答案)"
               >
-                <!-- 检查 spellWordsList 是否包含当前 item 的英文 -->
-                <van-tag
-                  mark
-                  v-if="
-                    spellWordsList.some(
-                      (spellItem) => spellItem.英文 === item.英文
-                    )
-                  "
-                  type="danger"
-                >
-                  拼
-                </van-tag>
-                {{ item.中文 }}
-                <img
-                  src="../assets/speaker.png"
-                  style="width: 12px; height: auto"
-                />
+                <div v-show="selfCheck">
+                  <!-- 检查 spellWordsList 是否包含当前 item 的英文 -->
+                  <van-tag
+                    mark
+                    v-if="
+                      spellWordsList.some(
+                        (spellItem) => spellItem.英文 === item.英文
+                      )
+                    "
+                    type="danger"
+                  >
+                    拼
+                  </van-tag>
+                  <van-tag mark v-if="item.排除 === '手写'" type="warning">
+                    写
+                  </van-tag>
+                  {{ item.中文 }}
+                  <img
+                    src="../assets/speaker.png"
+                    style="width: 12px; height: auto"
+                  />
+                </div>
               </van-cell>
             </div>
           </div>
@@ -4888,23 +5023,28 @@ onMounted(async () => {
         :key="index"
         style="margin-left: -1rem"
       >
-        <van-cell
-          :title="`${index + 1}. ${item.英文}`"
-          :value="item.正确答案"
-          :label="item.type.toString()"
-          @click="speakWord(item.英文, item.正确答案)"
-          clickable
-        >
-          <template #value>
-            <div>
-              {{ item.正确答案 }}
-              <img
-                src="../assets/speaker.png"
-                style="width: 12px; height: auto; margin-left: 0.2rem"
-              />
-            </div>
-          </template>
-        </van-cell>
+        <div v-if="item.排除 != '试题'">
+          <van-cell
+            :title="`${index + 1}. ${item.英文}`"
+            :value="item.正确答案"
+            :label="item.type.toString()"
+            @click="speakWord(item.英文, item.正确答案)"
+            clickable
+          >
+            <template #value>
+              <div>
+                <van-tag mark v-if="item.排除 === '手写'" type="warning">
+                  写
+                </van-tag>
+                {{ item.正确答案 }}
+                <img
+                  src="../assets/speaker.png"
+                  style="width: 12px; height: auto; margin-left: 0.2rem"
+                />
+              </div>
+            </template>
+          </van-cell>
+        </div>
       </van-cell-group>
 
       <van-button

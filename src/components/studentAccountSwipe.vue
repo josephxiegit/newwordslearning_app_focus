@@ -127,8 +127,9 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
 };
 
 const compareAndAddFlag = (dictArray) => {
+  console.log("dictArray: ", dictArray);
   return dictArray.map((item) => {
-    const { 答案, 用户选择, 正确答案, is_spell } = item;
+    const { 答案, 用户选择, 正确答案, is_spell, 排除, 英文, 序号 } = item;
 
     // 统一处理分隔符，将所有中文分号和逗号替换为英文逗号，然后进行分割和修整
     const normalize = (str) =>
@@ -154,6 +155,29 @@ const compareAndAddFlag = (dictArray) => {
         flag = "true";
       } else {
         flag = "false";
+      }
+    } else if (排除 == "手写") {
+      if (
+        Array.isArray(handwriteAnswers.value) &&
+        handwriteAnswers.value.length > 0
+      ) {
+        const answerObj = handwriteAnswers.value.find(
+          (ans) => ans.序号 === 序号
+        );
+        if (answerObj && answerObj.英文) {
+          const cleanedInput = answerObj.英文
+            .replace(/[^a-zA-Z]/g, "")
+            .toLowerCase();
+          const cleanedTarget =
+            英文?.replace(/[^a-zA-Z]/g, "").toLowerCase() || "";
+
+          // 将手写答案赋值给 item.用户选择（以便后续可追踪）
+          item.用户选择 = [answerObj.英文];
+
+          if (cleanedInput && cleanedInput === cleanedTarget) {
+            flag = "true";
+          }
+        }
       }
     } else {
       // 原有的逻辑
@@ -211,7 +235,7 @@ const clickSubmitUser = async (action, done) => {
 
   // 比对结果给出flag
   const compareResult = compareAndAddFlag(synonymAndSelections);
-  // console.log("compareResult: ", compareResult);
+  console.log("compareResult: ", compareResult);
 
   // 处理迟疑库
   function handleUncertain(uncertainVocabulary, compareResult) {
@@ -266,7 +290,6 @@ const clickSubmitUser = async (action, done) => {
     function getSpellVocabulary(compareResult, uncertainVocabulary) {
       console.log("uncertainVocabulary: ", uncertainVocabulary);
       console.log("compareResult: ", compareResult);
-      console.log(111111);
       const spellVocabularyResult = []; // 这里使用局部变量，避免混淆
       const addedEnglishSet = new Set();
       const chineseCharacterRegex = /[\u4e00-\u9fa5]/;
@@ -549,6 +572,10 @@ const clickSubmitUser = async (action, done) => {
   }
 };
 
+// 手写模式
+const handwriteInputs = ref({});
+const handwriteAnswers = ref([]);
+
 // 点击选项
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
@@ -565,7 +592,6 @@ function addUncertain(index, content) {
   const exists = Array.from(uncertainVocabulary.value).find((vocab) => {
     return vocab.英文 === uncertainItem;
   });
-  console.log("exists: ", exists);
 
   if (exists) {
     const types = exists.type.split(","); // 将 type 字符串分割为数组
@@ -627,7 +653,11 @@ const toggleCheckChinese = (index, index2) => {
   const wasSelected = selectedIndexes.value[key]; // 之前的状态
   selectedIndexes.value[key] = !wasSelected; // 切换状态
 
-  if (wasSelected && !synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
+  if (
+    wasSelected &&
+    !synonymsOptions.value[index].is_spell &&
+    synonymsOptions.value[index].排除 !== "试题"
+  ) {
     const content = "撤销";
     const uncertainItem = synonymsOptions.value[index].英文;
 
@@ -805,50 +835,103 @@ function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
 function speakWord(word) {
-  // 发音
-  let utterance = new SpeechSynthesisUtterance(word);
-  if (!/[a-zA-Z]/.test(word)) {
-    utterance.lang = "zh-CN";
-  } else {
-    utterance.lang = "en-US";
-  }
-  // utterance.lang = "zh-CN";
-  setTimeout(() => {
-    window.speechSynthesis.speak(utterance);
-  }, 800);
+
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    word
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
+    let utterance;
+    utterance = new SpeechSynthesisUtterance(word);
+    if (!/[a-zA-Z]/.test(word)) {
+      utterance.lang = "zh-CN";
+    } else {
+      utterance.lang = "en-US";
+    }
+    utterance.pitch = 0.5;
+    setTimeout(() => {
+      window.speechSynthesis.speak(utterance);
+    }, 800);
+  });
 }
 
 const submitFlag = ref(false);
 function isSelectionTrue(currentSlideIndex) {
-  const userSelection = resultDataTempt.value[currentSlideIndex]["用户选择"];
-  const correctAnswer = mergedData.value[currentSlideIndex]["答案"];
-  const correctArray = correctAnswer
-    .split(/；|,/)
-    .map((item) => item.trim())
-    .sort();
-  const userArray = userSelection
-    .join(",")
-    .split(/；|,/)
-    .map((item) => item.trim())
-    .sort();
-  const areEqual =
-    correctArray.length === userArray.length &&
-    correctArray.every((item) => userArray.includes(item));
-  // console.log("areEqual: ", areEqual);
-  return areEqual;
+  if (mergedData.value[currentSlideIndex]["is_spell"]) {
+    const userSelection = resultDataTempt.value[currentSlideIndex]["用户选择"];
+    const correctAnswer = mergedData.value[currentSlideIndex]["正确答案"];
+    const userSelectionStr = userSelection.join("");
+    if (correctAnswer === userSelectionStr) {
+      return true;
+    } else {
+      return false;
+    }
+  } else if (mergedData.value[currentSlideIndex]["排除"] == "手写") {
+    const userSelection = handwriteInputs.value[currentIndex.value];
+    // console.log('userSelection: ', userSelection);
+    const correctAnswer = mergedData.value[currentSlideIndex]["英文"];
+    const cleanString = (str) =>
+      (str || "").toLowerCase().replace(/[^a-z]/g, "");
+    const userInput = cleanString(userSelection);
+    // console.log("userInput: ", userInput);
+    const target = cleanString(correctAnswer);
+    // console.log("target: ", target);
+    if (userInput && target && userInput === target) {
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    const userSelection = resultDataTempt.value[currentSlideIndex]["用户选择"];
+    // console.log("userSelection: ", userSelection);
+    const correctAnswer = mergedData.value[currentSlideIndex]["答案"];
+    // console.log("mergedData: ", mergedData.value[currentSlideIndex]);
+    const correctArray = correctAnswer
+      .split(/；|,/)
+      .map((item) => item.trim())
+      .sort();
+    const userArray = userSelection
+      .join(",")
+      .split(/；|,/)
+      .map((item) => item.trim())
+      .sort();
+    const areEqual =
+      correctArray.length === userArray.length &&
+      correctArray.every((item) => userArray.includes(item));
+    return areEqual;
+  }
 }
 const goToNext = () => {
   // 获取当前轮播图的索引
   const currentSlideIndex = currentIndex.value;
+  
 
   // 检查当前轮播图中的选中项
   const currentSlideSelections = Object.keys(selectedIndexes.value).filter(
     (key) => key.startsWith(`${currentSlideIndex}-`)
   );
 
-  const hasSelection = currentSlideSelections.some(
-    (key) => selectedIndexes.value[key]
-  );
+  let hasSelection = null;
+  if(currentSlideIndex == 0 && (!mergedData.value || Object.keys(mergedData.value).length === 0)) {
+    mergedData.value = mergeAnswerAndSynonym()
+  }
+  if (mergedData.value[currentSlideIndex]["排除"] == "手写") {
+    const input = (handwriteInputs.value[currentSlideIndex] || "").trim();
+    if (!input) {
+      showFailToast("不能为空");
+      return;
+    }
+    handwriteAnswers.value.push({
+      序号: mergedData.value[currentSlideIndex]["序号"],
+      英文: input,
+    });
+    hasSelection = true;
+  } else {
+    hasSelection = currentSlideSelections.some(
+      (key) => selectedIndexes.value[key]
+    );
+  }
 
   if (!hasSelection) {
     showFailToast("不能为空");
@@ -856,6 +939,7 @@ const goToNext = () => {
   }
   // 判断对错
   const areEqual = isSelectionTrue(currentSlideIndex);
+  // console.log("areEqual: ", areEqual);
   if (!areEqual && flagPassiveMagic.value) {
     const randomChance = Math.random();
     if (randomChance < 0.7) {
@@ -903,7 +987,6 @@ const goToNext = () => {
       } else {
         if (totalTimeInterval.value <= standardTimeInterval.value) {
           submitFlag.value = true;
-          console.log(222);
           clickSubmitUser();
         } else {
           showFailToast("监测到作弊行为，请重新作答");
@@ -911,6 +994,7 @@ const goToNext = () => {
       }
     }
   }
+  // console.log("synonymsOptions", synonymsOptions.value)
 };
 
 // 提交进度条
@@ -1176,11 +1260,15 @@ const disabledShowAnswer = ref(false);
 const showAnswerButton = ref(true);
 const showAnswerIsSpell = ref("");
 const autoSelectAnswer = (index, flag) => {
-  // if (flag == false && numberShowAnswer.value <= 0) {
-  //   disabledShowAnswer.value = true;
-  //   return;
-  // }
-  if (!synonymsOptions.value[index].is_spell && synonymsOptions.value[index].排除 !== "试题") {
+  if (synonymsOptions.value[index].排除 == "手写") {
+    showToast("拼写无法点金");
+    return;
+  }
+  if (
+    !synonymsOptions.value[index].is_spell &&
+    synonymsOptions.value[index].排除 !== "试题" &&
+    synonymsOptions.value[index].排除 !== "手写"
+  ) {
     addUncertain(index, "点金");
   }
   const answerItem = answers.value.find(
@@ -1282,7 +1370,11 @@ const changeOverlayColor = (color) => {
 
 const transparentHelp = (flag) => {
   //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
+  if (
+    !synonymsOptions.value[currentIndex.value].is_spell &&
+    synonymsOptions.value[currentIndex.value].排除 !== "试题" &&
+    synonymsOptions.value[currentIndex.value].排除 !== "手写"
+  ) {
     addUncertain(currentIndex.value, "透视");
   }
 
@@ -1318,8 +1410,14 @@ const gotoPreHelp = (flag) => {
     return;
   }
 
+  console.log(synonymsOptions.value);
+  console.log("currentIndex - 1", currentIndex.value - 1);
   //加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
+  if (
+    !synonymsOptions.value[currentIndex.value - 1].is_spell &&
+    synonymsOptions.value[currentIndex.value - 1].排除 !== "试题" &&
+    synonymsOptions.value[currentIndex.value - 1].排除 !== "手写"
+  ) {
     addUncertain(currentIndex.value, "回溯");
   }
 
@@ -1347,7 +1445,11 @@ const passiveMagic2Ref = ref(null);
 const flagPassiveMagic = ref(false);
 function showAnimationPassiveMagic() {
   // 加入迟疑库
-  if (!synonymsOptions.value[currentIndex.value].is_spell && synonymsOptions.value[currentIndex.value].排除 !== "试题") {
+  if (
+    !synonymsOptions.value[currentIndex.value].is_spell &&
+    synonymsOptions.value[currentIndex.value].排除 !== "试题" &&
+    synonymsOptions.value[currentIndex.value].排除 !== "手写"
+  ) {
     // console.log("currentIndex.value: ", currentIndex.value);
     addUncertain(currentIndex.value, "被动魔法");
   }
@@ -1466,7 +1568,6 @@ const resetTimer = () => {
       // console.log("totalTimeInterval: ", totalTimeInterval.value);
       // console.log("standardTimeInterval: ", standardTimeInterval.value);
       if (totalTimeInterval.value <= standardTimeInterval.value) {
-        console.log(333);
         clickSubmitUser();
       } else {
         showFailToast("监测到作弊行为，请重新作答");
@@ -1487,7 +1588,8 @@ const handleTimerRate = () => {
     interval > 6 &&
     !executedWords.has(currentWordIndex) &&
     !synonymsOptions.value[currentWordIndex].is_spell &&
-    synonymsOptions.value[currentWordIndex].排除 !== "试题"
+    synonymsOptions.value[currentWordIndex].排除 !== "试题" &&
+    synonymsOptions.value[currentWordIndex].排除 !== "手写"
   ) {
     addUncertain(currentIndex.value, "超时");
     // 将当前词标记为已执行
@@ -1521,18 +1623,36 @@ const { pause, resume } = useIntervalFn(
   70,
   { immediate: false }
 );
+const currentHeight = ref("");
 const handleSwipeChange = (index) => {
+  nextTick(() => {
+    const el = swipeRef.value?.$el?.querySelector(
+      `.van-swipe-item:nth-child(${index + 1}) .card`
+    );
+    if (el) {
+      currentHeight.value = el.offsetHeight;
+      // console.log('当前 swipe-item 高度：', currentHeight.value);
+    }
+  });
   if (synonymsOptions.value[index].is_spell) {
     autoplay2.value = autoplayInit.value + 17000;
-  } else if (synonymsOptions.value[index].排除 === "试题") {
+  } else if (
+    synonymsOptions.value[index].排除 === "试题" ||
+    synonymsOptions.value[index].排除 === "手写"
+  ) {
     autoplay2.value = autoplayInit.value + 27000;
   } else {
     autoplay2.value = autoplayInit.value;
-  } 
+  }
 
   // console.log(autoplay2.value);
   try {
-    speakWord(synonymsOptions.value[index]["英文"]);
+    if (
+      synonymsOptions.value[index]["排除"] !== "试题" &&
+      synonymsOptions.value[index]["排除"] !== "手写"
+    ) {
+      speakWord(synonymsOptions.value[index]["英文"]);
+    }
   } catch (error) {
     console.error("Error speaking word:", error);
   }
@@ -1583,6 +1703,15 @@ onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onMounted(async () => {
+  nextTick(() => {
+    const el = swipeRef.value?.$el?.querySelector(
+      ".van-swipe-item:nth-child(1) .card"
+    );
+    if (el) {
+      currentHeight.value = el.offsetHeight;
+      // console.log('初始第一个 item 高度：', currentHeight.value);
+    }
+  });
   RateOrigin.value = history.state.RateOrigin;
   // 被动技能
   flagPassiveMagic.value = passive_magic.value;
@@ -1635,7 +1764,8 @@ onMounted(async () => {
     checkedSpell.value = history.state.checkedSpell;
     // console.log("history.state: ", history.state);
     const data = JSON.parse(history.state.data);
-    console.log("data: ", data);
+
+    // console.log("data: ", data);
 
     autoplay2.value = history.state.autoplay2;
     autoplayInit.value = history.state.autoplay2;
@@ -1676,9 +1806,14 @@ onMounted(async () => {
 
     console.log("synonymsOptions: ", synonymsOptions.value);
     try {
-      speakWord(synonymsOptions.value[0]["英文"]);
+      if (
+        synonymsOptions.value[0]["排除"] !== "试题" &&
+        synonymsOptions.value[0]["排除"] !== "手写"
+      ) {
+        speakWord(synonymsOptions.value[0]["英文"]);
+      }
     } catch (error) {
-      showToast("此浏览器不支持发音，请更换chrome或edge");
+      console.error("Error speaking word:", error);
     }
     answers.value = data.answers;
     synonymsOptions.value.forEach((item) => {
@@ -1901,8 +2036,16 @@ onMounted(async () => {
                             align-items: center;
                           "
                         >
-                          <div>{{ item.序号 + ". " + item.英文 }}</div>
-                          <div style="font-size: 17px; color: red">
+                          <div v-if="item.排除 !== '手写'">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                          <div v-else>
+                            {{ item.序号 + ". " + answers[index].中文 }}
+                          </div>
+                          <div
+                            v-if="item.排除 !== '手写'"
+                            style="font-size: 17px; color: red"
+                          >
                             {{ flagSingleOrMultiChoice }}
                           </div>
                         </div>
@@ -1946,34 +2089,50 @@ onMounted(async () => {
                       </template>
                     </van-cell>
 
-                    <van-cell-group>
-                      <van-cell
-                        v-for="(chinese, index2) in item.中文"
-                        :key="index2"
-                        clickable
-                        @click="toggleCheckChinese(index, index2)"
-                        :class="
-                          isSelected(index, index2) ? 'selected-cell' : ''
-                        "
-                        class="chinese-cell"
-                      >
-                        <template #title>
-                          <div style="text-align: left">{{ chinese }}</div>
-                        </template>
-                        <template #right-icon>
-                          <van-checkbox
-                            :name="`${index + 1}-${index2 + 1}`"
-                            :disabled="isDisabled(index, index2)"
-                            @click.stop.prevent="
-                              toggleCheckChinese(index, index2)
-                            "
-                            :ref="
-                              (el) => (checkboxRefs[`${index}-${index2}`] = el)
-                            "
-                          />
-                        </template>
-                      </van-cell>
-                    </van-cell-group>
+                    <div v-if="item.排除 !== '手写'">
+                      <van-cell-group>
+                        <van-cell
+                          v-for="(chinese, index2) in item.中文"
+                          :key="index2"
+                          clickable
+                          @click="toggleCheckChinese(index, index2)"
+                          :class="
+                            isSelected(index, index2) ? 'selected-cell' : ''
+                          "
+                          class="chinese-cell"
+                        >
+                          <template #title>
+                            <div style="text-align: left">{{ chinese }}</div>
+                          </template>
+                          <template #right-icon>
+                            <van-checkbox
+                              :name="`${index + 1}-${index2 + 1}`"
+                              :disabled="isDisabled(index, index2)"
+                              @click.stop.prevent="
+                                toggleCheckChinese(index, index2)
+                              "
+                              :ref="
+                                (el) =>
+                                  (checkboxRefs[`${index}-${index2}`] = el)
+                              "
+                            />
+                          </template>
+                        </van-cell>
+                      </van-cell-group>
+                    </div>
+                    <div
+                      v-else
+                      class="handwrite-area"
+                      style="padding: 0.5rem 1rem"
+                    >
+                      <van-field
+                        v-model="handwriteInputs[index]"
+                        placeholder="请拼写对应的英文"
+                        input-align="left"
+                        clearable
+                        style="border-bottom: 1px solid #ccc"
+                      />
+                    </div>
                   </div>
                 </van-cell-group>
               </van-checkbox-group>
@@ -1983,7 +2142,11 @@ onMounted(async () => {
       </van-col>
     </van-row>
 
-    <van-row class="my-swipe-container" justify="space-between">
+    <van-row
+      class="my-swipe-container"
+      justify="space-between"
+      :style="{ marginTop: currentHeight - 305 + 'px' }"
+    >
       <van-col span="20" offset="">
         <van-row>
           <van-col span="8">
@@ -2033,6 +2196,7 @@ onMounted(async () => {
         </van-row>
       </van-col>
     </van-row>
+
     <!-- 进度条 -->
     <div class="progress" v-if="showProgress">
       <van-progress

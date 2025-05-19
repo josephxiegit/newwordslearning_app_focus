@@ -91,6 +91,8 @@ const mergeAnswerAndSynonym = () => {
     obj["is_spell"] = synonymsOptions.value[i].is_spell;
     obj["答案"] = answers.value[i].中文;
     obj["正确答案"] = answers.value[i].正确答案;
+    obj["type"] = synonymsOptions.value[i].type;
+    obj["排除"] = synonymsOptions.value[i].排除;
     newList.push(obj);
   }
   // console.log("newList: ", newList);
@@ -124,7 +126,7 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
 
 const compareAndAddFlag = (dictArray) => {
   return dictArray.map((item) => {
-    const { 答案, 用户选择, 正确答案, is_spell } = item;
+    const { 答案, 用户选择, 正确答案, is_spell, 排除, 英文, 序号 } = item;
 
     // 统一处理分隔符，将所有中文分号和逗号替换为英文逗号，然后进行分割和修整
     const normalize = (str) =>
@@ -149,6 +151,29 @@ const compareAndAddFlag = (dictArray) => {
         flag = "true";
       } else {
         flag = "false";
+      }
+    } else if (排除 == "手写") {
+      if (
+        Array.isArray(handwriteAnswers.value) &&
+        handwriteAnswers.value.length > 0
+      ) {
+        const answerObj = handwriteAnswers.value.find(
+          (ans) => ans.序号 === 序号
+        );
+        if (answerObj && answerObj.英文) {
+          const cleanedInput = answerObj.英文
+            .replace(/[^a-zA-Z]/g, "")
+            .toLowerCase();
+          const cleanedTarget =
+            英文?.replace(/[^a-zA-Z]/g, "").toLowerCase() || "";
+
+          // 将手写答案赋值给 item.用户选择（以便后续可追踪）
+          item.用户选择 = [answerObj.英文];
+
+          if (cleanedInput && cleanedInput === cleanedTarget) {
+            flag = "true";
+          }
+        }
       }
     } else {
       // 完全匹配：用户选择和答案（或正确答案）完全一致
@@ -199,20 +224,24 @@ const clickSubmitUser = async (action, done) => {
     // 直接提交
     showDialogSubmit.value = false;
     mergedData.value = mergeAnswerAndSynonym();
+    console.log('mergedData.value: ', mergedData.value);
 
     // 将用户选择转化为中文
     const synonymsSelectedChinese = convertSelections(
       synonymsSelected.value,
       synonymsOptions.value
     );
+    // console.log('synonymsSelectedChinese: ', synonymsSelectedChinese);
 
     // 将中文用户选择和选项答案合并
     const synonymAndSelections = mergeSynonymAndSelections(
       synonymsSelectedChinese
     );
+    // console.log('synonymAndSelections: ', synonymAndSelections);
 
     // 比对结果给出flag
     const compareResult = compareAndAddFlag(synonymAndSelections);
+    // console.log('compareResult: ', compareResult);
 
     // 处理迟疑库
     function handleUncertain(uncertainVocabulary, compareResult) {
@@ -341,7 +370,7 @@ const clickSubmitUser = async (action, done) => {
       spellVocabulary.value = spellVocabulary.value;
     }
 
-    console.log("spellVocabulary", spellVocabulary.value);
+    // console.log("spellVocabulary", spellVocabulary.value);
 
     // 计算金币
     if (isRewardEligible) {
@@ -522,6 +551,10 @@ const clickSubmitUser = async (action, done) => {
     isLoading.value = false;
   }
 };
+
+// 手写模式
+const handwriteInputs = ref({});
+const handwriteAnswers = ref([]);
 
 // 点击选项
 const resultDataTempt = ref([]);
@@ -737,9 +770,22 @@ const goToNext = () => {
     (key) => selectedIndexes.value[key]
   );
 
-  if (!hasSelection) {
-    showFailToast("不能为空");
-    return; // 如果没有选中项，直接返回，不进行后续操作
+  if (synonymsOptions.value[currentSlideIndex]["排除"] == "手写") {
+    const input = (handwriteInputs.value[currentSlideIndex] || "").trim();
+    if (!input) {
+      showFailToast("不能为空");
+      return;
+    }
+    handwriteAnswers.value.push({
+      序号: mergedData.value[currentSlideIndex]["序号"],
+      英文: input,
+    });
+
+  } else {
+    if (!hasSelection) {
+      showFailToast("不能为空哦");
+      return;
+    }
   }
 
   // 计算时间间隔和迟疑库
@@ -1365,6 +1411,7 @@ onMounted(async () => {
       synonymsOptions.value = data.synonyms;
       answers.value = data.answers;
       synonymsOptions.value.forEach((item) => {
+        
         if (item.is_spell) {
           const answerItem = answers.value.find(
             (answer) => answer.序号 === item.序号
@@ -1375,7 +1422,7 @@ onMounted(async () => {
         }
       });
       titleData.value = data.title;
-
+      console.log('synonymsOptions: ', synonymsOptions.value);
       // console.log("titleData: ", titleData.value);
 
       username.value = data.username;
@@ -1395,9 +1442,19 @@ onMounted(async () => {
       console.log("standardTimeInterval: ", standardTimeInterval.value);
 
       flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+
       // 初始化计时器
-      countDownTime.value = answers.value.length * 10 * 1000;
-      // countDownTime.value = 8 * 1000;
+      const countShiti = synonymsOptions.value.filter(
+        (item) => item["排除"]?.trim() === "试题"
+      ).length;
+      const countShouxie = synonymsOptions.value.filter(
+        (item) => item["排除"]?.trim() === "手写"
+      ).length;
+      countDownTime.value =
+        answers.value.length * 10 * 1000 +
+        countShiti * 30 * 1000 +
+        countShouxie * 40 * 1000;
+      // countDownTime.value = 99999999;
       // console.log(countDownTime.value);
 
       // 获取用户金币
@@ -1432,7 +1489,7 @@ onMounted(async () => {
   };
   // 调用初始化函数
   initData();
-  flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0)
+  flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
 });
 </script>
 
@@ -1481,17 +1538,41 @@ onMounted(async () => {
                     <van-cell clickable class="bold-title2 border-cell">
                       <template #title>
                         <div
+                          v-if="item.排除 !== '试题'"
                           style="
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
                           "
                         >
-                          <div>{{ item.序号 + ". " + item.英文 }}</div>
-                          <div style="font-size: 13px; color: red">
+                          <div v-if="item.排除 !== '手写'">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                          <div v-else>
+                            {{ item.序号 + ". " + answers[index].中文 }}
+                          </div>
+                          <div
+                            v-if="item.排除 !== '手写'"
+                            style="font-size: 17px; color: red"
+                          >
                             {{ flagSingleOrMultiChoice }}
                           </div>
                         </div>
+                        <div
+                          v-else
+                          style="
+                            font-size: 500px;
+                            line-height: 1.3;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                          "
+                        >
+                          <div style="font-weight: 400; font-size: 14px">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                        </div>
+
                         <div v-show="item.is_spell" class="selected-tags">
                           <div
                             v-for="(selected, index2) in selectedItems"
@@ -1513,33 +1594,49 @@ onMounted(async () => {
                       </template>
                     </van-cell>
 
-                    <van-cell-group>
-                      <van-cell
-                        v-for="(chinese, index2) in item.中文"
-                        :key="index2"
-                        clickable
-                        @click="toggleCheckChinese(index, index2)"
-                        :class="
-                          isSelected(index, index2) ? 'selected-cell' : ''
-                        "
-                        class="chinese-cell"
-                      >
-                        <template #title>
-                          <div style="text-align: left">{{ chinese }}</div>
-                        </template>
-                        <template #right-icon>
-                          <van-checkbox
-                            :name="`${index + 1}-${index2 + 1}`"
-                            @click.stop.prevent="
-                              toggleCheckChinese(index, index2)
-                            "
-                            :ref="
-                              (el) => (checkboxRefs[`${index}-${index2}`] = el)
-                            "
-                          />
-                        </template>
-                      </van-cell>
-                    </van-cell-group>
+                    <div v-if="item.排除 !== '手写'">
+                      <van-cell-group>
+                        <van-cell
+                          v-for="(chinese, index2) in item.中文"
+                          :key="index2"
+                          clickable
+                          @click="toggleCheckChinese(index, index2)"
+                          :class="
+                            isSelected(index, index2) ? 'selected-cell' : ''
+                          "
+                          class="chinese-cell"
+                        >
+                          <template #title>
+                            <div style="text-align: left">{{ chinese }}</div>
+                          </template>
+                          <template #right-icon>
+                            <van-checkbox
+                              :name="`${index + 1}-${index2 + 1}`"
+                              @click.stop.prevent="
+                                toggleCheckChinese(index, index2)
+                              "
+                              :ref="
+                                (el) =>
+                                  (checkboxRefs[`${index}-${index2}`] = el)
+                              "
+                            />
+                          </template>
+                        </van-cell>
+                      </van-cell-group>
+                    </div>
+                    <div
+                      v-else
+                      class="handwrite-area"
+                      style="padding: 0.5rem 1rem"
+                    >
+                      <van-field
+                        v-model="handwriteInputs[index]"
+                        placeholder="请拼写对应的英文"
+                        input-align="left"
+                        clearable
+                        style="border-bottom: 1px solid #ccc"
+                      />
+                    </div>
                   </div>
                 </van-cell-group>
               </van-checkbox-group>

@@ -512,6 +512,10 @@ const valueCoins = computed(() => {
   return Number(valueDiamonds.value) * 70;
 });
 const exchangeDiamonds = () => {
+  if(userdiamonds.value <= 0){  
+    showFailToast("钻石不足，无法交易");
+    return;
+  }
   showExchange.value = true;
 };
 const confirmExchange = () => {

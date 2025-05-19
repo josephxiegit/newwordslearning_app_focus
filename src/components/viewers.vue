@@ -193,9 +193,12 @@ const searchLog = (item, index) => {
             .replace(/o"clock/g, "o'clock")
             .replace(/needn"t/g, "needn't")
             .replace(/o"clock/g, "o'clock")
-            .replace(/"are/g, "'are'")
+            // .replace(/"are/g, "'are'")
             .replace(/won"t/g, "won't")
-            .replace(/it"s/g, "it's");
+            .replace(/it"s/g, "it's")
+            .replace(/we"re/gi, "we're'")
+            .replace(/You"re/gi, "you're'")
+            .replace(/they"re/gi, "they're'");
 
           dataString = dataString
             .replace(/\bFalse\b/g, "false")
@@ -2041,6 +2044,9 @@ const reloadPage = () => {
               <div style="font-size: larger; font-weight: 700">
                 {{ item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
+                <van-tag mark v-if="item.排除 === '手写'" type="warning">
+                  写
+                </van-tag>
               </div>
               <div
                 style="margin-top: 0.5rem"

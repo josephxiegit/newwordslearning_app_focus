@@ -28,7 +28,7 @@ const visible = ref(false);
 
 function show() {
   visible.value = true;
-  setTimeout(hide, 800);
+  setTimeout(hide, 300);
 }
 
 function hide() {

@@ -39,6 +39,7 @@ const popNavshow = ref(false);
 const gridMeaningshow = ref(false);
 const gridChinese = ref("");
 const gridEnglish = ref("");
+const gridException = ref("");
 
 const shownavWords = () => {
   if (currentIndex.value == 0) {
@@ -49,13 +50,20 @@ const shownavWords = () => {
 };
 const showGridMeaning = (index) => {
   gridChinese.value = synonymsOptions.value[index]["正确答案"];
+  // console.log('synonymsOptions: ', synonymsOptions.value);
   gridEnglish.value = synonymsOptions.value[index]["英文"];
+  gridException.value = synonymsOptions.value[index]["排除"];
   gridMeaningshow.value = true;
   speakWordEnglish(gridEnglish.value, gridChinese.value);
 };
 const speakWord = (english, answer) => {
-  // 发音
-  try {
+
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    english
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
     let utterance;
     utterance = new SpeechSynthesisUtterance(english);
     if (!/[a-zA-Z]/.test(english)) {
@@ -64,13 +72,17 @@ const speakWord = (english, answer) => {
       utterance.lang = "en-US";
     }
     window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    console.error("Error speaking word:", error);
-  }
+  });
 };
 
 const speakWordEnglish = (english, answer) => {
-  try {
+  const word = /[a-zA-Z]/.test(english) ? english : answer;
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    word
+  )}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch(() => {
+    console.log("Fallback to SpeechSynthesis");
     let utterance;
 
     if (!/[a-zA-Z]/.test(english)) {
@@ -81,9 +93,7 @@ const speakWordEnglish = (english, answer) => {
       utterance.lang = "en-US";
     }
     window.speechSynthesis.speak(utterance);
-  } catch (error) {
-    console.error("Error speaking word:", error);
-  }
+  });
 };
 
 const isTextOverflow = (text) => {
@@ -225,6 +235,10 @@ const clickSubmitUser = async (action, done) => {
     },
   });
 };
+
+// 手写模式
+const handwriteInputs = ref({});
+const handwriteDisabled = ref(false);
 
 // 点击选项
 const resultDataTempt = ref([]);
@@ -420,10 +434,17 @@ const goToNext = async () => {
   const hasSelection = currentSlideSelections.some(
     (key) => selectedIndexes.value[key]
   );
-
-  if (!hasSelection) {
-    showFailToast("不能为空哦");
-    return;
+  if (synonymsOptions.value[currentSlideIndex]["排除"] == "手写") {
+    const input = (handwriteInputs.value[currentSlideIndex] || "").trim();
+    if (!input) {
+      showFailToast("不能为空");
+      return;
+    }
+  } else {
+    if (!hasSelection) {
+      showFailToast("不能为空哦");
+      return;
+    }
   }
 
   if (!isButtonDisabled.value) {
@@ -433,33 +454,47 @@ const goToNext = async () => {
       buttonText.value = "下一个";
       buttonTextType.value = "warning";
       isCheckboxDisabled.value = true;
+      handwriteDisabled.value = true;
       // 判断对错
       // console.log(
       //   "用户选择",
       //   resultDataTempt.value[currentSlideIndex]["用户选择"]
       // );
       // console.log("正确答案", synonymsOptions.value[currentSlideIndex]["答案"]);
-      const userSelection =
-        resultDataTempt.value[currentSlideIndex]["用户选择"];
-      const correctAnswer = synonymsOptions.value[currentSlideIndex]["答案"];
+      let areEqual = false;
+      if (synonymsOptions.value[currentSlideIndex]["排除"] == "手写") {
+        const userSelection = handwriteInputs.value[currentSlideIndex];
+        console.log("userSelection: ", userSelection);
+        const correctAnswer = synonymsOptions.value[currentSlideIndex]["英文"];
+        const cleanString = (str) =>
+          (str || "").toLowerCase().replace(/[^a-z]/g, "");
+        const userInput = cleanString(userSelection);
+        const target = cleanString(correctAnswer);
+        if (userInput && target && userInput === target) {
+          areEqual = true;
+        } else {
+          areEqual = false;
+        }
+      } else {
+        const userSelection =
+          resultDataTempt.value[currentSlideIndex]["用户选择"];
+        const correctAnswer = synonymsOptions.value[currentSlideIndex]["答案"];
 
-      const correctArray = correctAnswer
-        .split(/；|,/)
-        .map((item) => item.trim())
-        .sort();
-      // console.log("correctArray", correctArray);
-      // const userArray = userSelection.sort();
-      const userArray = userSelection
-        .join(",")
-        .split(/；|,/)
-        .map((item) => item.trim())
-        .sort();
-      // console.log("userArray", userArray);
-      // const areEqual =
-      //   JSON.stringify(userArray) === JSON.stringify(correctArray);
-      const areEqual =
-        correctArray.length === userArray.length &&
-        correctArray.every((item) => userArray.includes(item));
+        const correctArray = correctAnswer
+          .split(/；|,/)
+          .map((item) => item.trim())
+          .sort();
+        const userArray = userSelection
+          .join(",")
+          .split(/；|,/)
+          .map((item) => item.trim())
+          .sort();
+
+        areEqual =
+          correctArray.length === userArray.length &&
+          correctArray.every((item) => userArray.includes(item));
+      }
+
       if (areEqual) {
         flagChoose.value = true;
         textColor.value = "green";
@@ -477,20 +512,39 @@ const goToNext = async () => {
     } else {
       // 进入下一个单词
       if (currentIndex.value < totalSlides.value - 1) {
+        if (isButtonDisabled.value) return; // 如果正在动画中则直接返回
+        isButtonDisabled.value = true;
+
+        swipeRef.value.next();
         flagSingleOrMultiChoice.value = getSingeOrMultiChoice(
           currentIndex.value + 1
         );
         completeCount.value = (parseInt(completeCount.value) + 1).toString();
-        swipeRef.value.next();
+        
         buttonTextType.value = "success";
         isCheckboxDisabled.value = false;
+        handwriteDisabled.value = false;
         answerShow.value = false;
         buttonText.value = "显示答案";
         console.log("resultDataTempt: ", resultDataTempt.value);
-        speakWord(
-          synonymsOptions.value[currentIndex.value + 1].英文,
-          synonymsOptions.value[currentIndex.value + 1].正确答案
-        );
+        if (
+          synonymsOptions.value[currentIndex.value + 1]["排除"] !== "试题" &&
+          synonymsOptions.value[currentIndex.value + 1]["排除"] !== "手写"
+        ) {
+          speakWord(
+            synonymsOptions.value[currentIndex.value + 1].英文,
+            synonymsOptions.value[currentIndex.value + 1].正确答案
+          );
+        }
+        try{
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error('动画执行出错:', error);
+        } finally {
+          isButtonDisabled.value = false; // 动画结束后启用按钮
+        }
+
+
       } else {
         // 到达最后一个轮播图，执行提交函数
         updateAccountLog();
@@ -614,6 +668,15 @@ function getSingeOrMultiChoice(currentIndex) {
 
 const handleSwipeChange = (index) => {
   currentIndex.value = index;
+  nextTick(() => {
+    const el = swipeRef.value?.$el?.querySelector(
+      `.van-swipe-item:nth-child(${index + 1}) .card`
+    );
+    if (el) {
+      currentHeight.value = el.offsetHeight;
+      // console.log('当前 swipe-item 高度：', currentHeight.value);
+    }
+  });
 };
 async function updateAccountLog() {
   let params = new URLSearchParams();
@@ -648,7 +711,17 @@ const handleBeforeUnload = async (event) => {
   isLoading.value = false;
   event.returnValue = ""; // 旧浏览器支持
 };
+const currentHeight = ref("");
 onMounted(async () => {
+  nextTick(() => {
+    const el = swipeRef.value?.$el?.querySelector(
+      ".van-swipe-item:nth-child(1) .card"
+    );
+    if (el) {
+      currentHeight.value = el.offsetHeight;
+      // console.log('初始第一个 item 高度：', currentHeight.value);
+    }
+  });
   if (flagTheme.value == 1) {
     srcTheme.value = chineseMeaningSrcGoatAndWolf;
   }
@@ -659,7 +732,8 @@ onMounted(async () => {
   const initData = async () => {
     // 初始化数据
     synonymsOptions.value = JSON.parse(history.state.data);
-    // synonymsOptions.value = JSON.parse(history.state.data).slice(0 ,3);
+    // synonymsOptions.value = JSON.parse(history.state.data).reverse().slice(0 ,3);
+    // synonymsOptions.value = [JSON.parse(history.state.data).reverse()[0]];
     console.log("synonymsOptions: ", synonymsOptions.value);
 
     synonymsOptions.value.forEach((item) => {
@@ -716,13 +790,19 @@ onMounted(async () => {
     // synonymsOptions.value = resultDataTempt.value;
     console.log("synonymsOptions: ", synonymsOptions.value);
     console.log("resultDataTempt: ", resultDataTempt.value);
-    speakWord(synonymsOptions.value[0].英文, synonymsOptions.value[0].正确答案);
+    // speakWord(synonymsOptions.value[0].英文, synonymsOptions.value[0].正确答案);
+    if (
+      synonymsOptions.value[0]["排除"] !== "试题" &&
+      synonymsOptions.value[0]["排除"] !== "手写"
+    ) {
+      speakWord(synonymsOptions.value[0].英文, synonymsOptions.value[0].正确答案);
+    }
     flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
   };
 
   // 调用初始化函数
   initData();
-  flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0)
+  flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
 });
 </script>
 
@@ -767,14 +847,23 @@ onMounted(async () => {
                     >
                       <template #title>
                         <div
+                          v-if="item.排除 !== '试题'"
                           style="
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
                           "
                         >
-                          <div>{{ item.序号 + ". " + item.英文 }}</div>
-                          <div style="font-size: 13px; color: red">
+                          <div v-if="item.排除 !== '手写'">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                          <div v-else>
+                            <div>{{ item.序号 + ". " + item.正确答案 }}</div>
+                          </div>
+                          <div
+                            v-if="item.排除 !== '手写'"
+                            style="font-size: 13px; color: red"
+                          >
                             {{ flagSingleOrMultiChoice }}
                             <img
                               src="../assets/speaker.png"
@@ -788,6 +877,21 @@ onMounted(async () => {
                           </div>
                         </div>
                         <div
+                          v-else
+                          style="
+                            font-size: 500px;
+                            line-height: 1.3;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                          "
+                        >
+                          <div style="font-weight: 400; font-size: 14px">
+                            {{ item.序号 + ". " + item.英文 }}
+                          </div>
+                        </div>
+
+                        <div
                           :style="{
                             marginTop: '0.6rem',
                             marginBottom: '0.1rem',
@@ -796,44 +900,16 @@ onMounted(async () => {
                         >
                           <div class="flying-tag" v-if="answerShow">
                             <div
-                              v-if="flagChoose"
                               :style="{
                                 fontSize: '15px',
                                 color: textColor,
                               }"
                             >
-                              恭喜！{{ item.正确答案 }}
+                              {{ flagChoose ? "恭喜！" : "写错了！" }}
+                              {{
+                                item.排除 === "手写" ? item.英文 : item.正确答案
+                              }}
                             </div>
-                            <div
-                              v-else
-                              :style="{
-                                fontSize: '15px',
-                                color: textColor,
-                              }"
-                            >
-                              写错了！{{ item.正确答案 }}
-                            </div>
-                            <!-- <van-button
-                              type="default"
-                              size="mini"
-                              style="height: 16px; margin-top: -0rem"
-                            >
-                              <van-swipe
-                                vertical
-                                style="height: 14px; line-height: 14px"
-                                :autoplay="2000"
-                                :touchable="true"
-                                :show-indicators="false"
-                                @click="getVocabularyMeaning"
-                              >
-                                <van-swipe-item style="font-size: 12px"
-                                  >查看</van-swipe-item
-                                >
-                                <van-swipe-item style="font-size: 12px"
-                                  >讲解</van-swipe-item
-                                >
-                              </van-swipe>
-                            </van-button> -->
                           </div>
                         </div>
 
@@ -858,34 +934,51 @@ onMounted(async () => {
                       </template>
                     </van-cell>
 
-                    <van-cell-group>
-                      <van-cell
-                        v-for="(chinese, index2) in item.中文"
-                        :key="index2"
-                        clickable
-                        @click="toggleCheckChinese(index, index2)"
-                        :class="
-                          isSelected(index, index2) ? 'selected-cell' : ''
-                        "
-                        class="chinese-cell"
-                      >
-                        <template #title>
-                          <div style="text-align: left">{{ chinese }}</div>
-                        </template>
-                        <template #right-icon>
-                          <van-checkbox
-                            :name="`${index + 1}-${index2 + 1}`"
-                            @click.stop.prevent="
-                              toggleCheckChinese(index, index2)
-                            "
-                            :ref="
-                              (el) => (checkboxRefs[`${index}-${index2}`] = el)
-                            "
-                            :disabled="isCheckboxDisabled"
-                          />
-                        </template>
-                      </van-cell>
-                    </van-cell-group>
+                    <div v-if="item.排除 !== '手写'">
+                      <van-cell-group>
+                        <van-cell
+                          v-for="(chinese, index2) in item.中文"
+                          :key="index2"
+                          clickable
+                          @click="toggleCheckChinese(index, index2)"
+                          :class="
+                            isSelected(index, index2) ? 'selected-cell' : ''
+                          "
+                          class="chinese-cell"
+                        >
+                          <template #title>
+                            <div style="text-align: left">{{ chinese }}</div>
+                          </template>
+                          <template #right-icon>
+                            <van-checkbox
+                              :name="`${index + 1}-${index2 + 1}`"
+                              @click.stop.prevent="
+                                toggleCheckChinese(index, index2)
+                              "
+                              :ref="
+                                (el) =>
+                                  (checkboxRefs[`${index}-${index2}`] = el)
+                              "
+                              :disabled="isCheckboxDisabled"
+                            />
+                          </template>
+                        </van-cell>
+                      </van-cell-group>
+                    </div>
+                    <div
+                      v-else
+                      class="handwrite-area"
+                      style="padding: 0.5rem 1rem"
+                    >
+                      <van-field
+                        v-model="handwriteInputs[index]"
+                        placeholder="请拼写对应的英文"
+                        input-align="left"
+                        clearable
+                        style="border-bottom: 1px solid #ccc"
+                        :disabled="handwriteDisabled"
+                      />
+                    </div>
                   </div>
                 </van-cell-group>
               </van-checkbox-group>
@@ -896,7 +989,11 @@ onMounted(async () => {
     </van-row>
 
     <!-- 按钮 -->
-    <van-row class="my-swipe-container" style="position: relative">
+    <van-row
+      class="my-swipe-container"
+      style="position: relative"
+      :style="{ marginTop: currentHeight - 360 + 'px' }"
+    >
       <van-col span="2"></van-col>
       <van-col span="14">
         <van-button
@@ -984,7 +1081,17 @@ onMounted(async () => {
           style="display: flex; justify-content: center"
           @click="speakWordEnglish(gridEnglish, gridChinese)"
         >
-          <div style="font-size: 21px">
+          <div v-if="gridException != '试题'" style="font-size: 21px">
+            {{ gridEnglish }}
+            <img
+              src="../assets/speaker.png"
+              style="width: 12px; height: auto"
+            />
+          </div>
+          <div
+            v-else
+            style="font-size: 14px; padding-left: 0.5rem; padding-right: 0.5rem"
+          >
             {{ gridEnglish }}
             <img
               src="../assets/speaker.png"
