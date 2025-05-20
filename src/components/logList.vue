@@ -85,14 +85,17 @@ function processData(res) {
         .replace(/it"s/g, "it's")
         .replace(/we"re/gi, "we're'")
         .replace(/You"re/gi, "you're'")
-        .replace(/they"re/gi, "they're'");
+        .replace(/they"re/gi, "they're'")
+        .replace(/doesn"t/gi, "doesn't")
+        .replace(/don"t/gi, "don't")
+        .replace(/I"ll/gi, "I'll")
+        .replace(/let"s/gi, "let's");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
       dataString = dataString
         .replace(/\bFalse\b/g, "false")
         .replace(/\bTrue\b/g, "true")
-        .replace(/\bNone\b/g, "null")
-        
+        .replace(/\bNone\b/g, "null");
 
       let parsedLog;
       try {
@@ -235,7 +238,7 @@ const filteredStudent = () => {
     return;
   }
   filterData().then((res) => {
-    console.log("res: ", res);
+    // console.log("res: ", res);
     let data = processData(res.data);
     filteredFiles.value = [...data];
     showFliterBox.value = false;
@@ -340,8 +343,14 @@ const isCorrectAnswer = (
   userChoices,
   answerString,
   correctAnswer,
-  is_spell
+  is_spell,
+  排除,
+  英文
 ) => {
+  if (排除 === '手写') {
+    const userChoicesString = userChoices.join("");
+    return userChoicesString === 英文;
+  }
   if (is_spell) {
     const userChoicesString = userChoices.join("");
     const correctAnswerString = correctAnswer.replace(/\s+/g, "");
@@ -606,17 +615,33 @@ const reloadPage = () => {
           <template #value>
             <div>
               <div style="color: black">
-                <div v-if="item.complement == 1" style="display: flex; justify-content: flex-end">
+                <div
+                  v-if="item.complement == 1"
+                  style="display: flex; justify-content: flex-end"
+                >
                   <van-tag type="primary" plain mark size="medium"
                     >{{ item.log.length - item.falseCount }} /
                     {{ item.log.length }}
                   </van-tag>
-                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''" style="margin-top: 0.2rem;">&nbsp;💎</div>
+                  <div
+                    v-if="
+                      item.diamondConsume != null && item.diamondConsume != ''
+                    "
+                    style="margin-top: 0.2rem"
+                  >
+                    &nbsp;💎
+                  </div>
                 </div>
                 <div v-else style="display: flex; justify-content: flex-end">
                   {{ item.log.length - item.falseCount }} /
                   {{ item.log.length }}
-                  <div v-if="item.diamondConsume != null  && item.diamondConsume != ''">&nbsp;💎</div>
+                  <div
+                    v-if="
+                      item.diamondConsume != null && item.diamondConsume != ''
+                    "
+                  >
+                    &nbsp;💎
+                  </div>
                 </div>
               </div>
               <div style="color: red">{{ item.username }}</div>
@@ -750,19 +775,34 @@ const reloadPage = () => {
             <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
             <div>答案:{{ numbershowanswer }}</div>
             <div>透视:{{ numbertransparent }}</div>
-            <div v-if="diamondConsume != null && diamondConsume != ''">💎{{ diamondConsume }}</div>
+            <div v-if="diamondConsume != null && diamondConsume != ''">
+              💎{{ diamondConsume }}
+            </div>
           </div>
-          <div v-if="diamondConsume != null && diamondConsume != '' && detailMode === '普通'" style="font-size: 13px;color: gray;margin: 5px 15px;">💎 {{ diamondConsume }}</div>
+          <div
+            v-if="
+              diamondConsume != null &&
+              diamondConsume != '' &&
+              detailMode === '普通'
+            "
+            style="font-size: 13px; color: gray; margin: 5px 15px"
+          >
+            💎 {{ diamondConsume }}
+          </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
           <van-cell
             :label="
-              item.is_spell ? `答案：${item.正确答案}` : `答案：${item.答案}`
+              item.排除 === '手写'
+                ? `答案：${item.英文}`
+                : item.is_spell
+                ? `答案：${item.正确答案}`
+                : `答案：${item.答案}`
             "
           >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
-                {{ item.英文 }}
+                {{ item.排除 === '手写' ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
@@ -775,13 +815,16 @@ const reloadPage = () => {
                     item.用户选择,
                     item.答案,
                     item.正确答案,
-                    item.is_spell
+                    item.is_spell,
+                    item.排除,
+                    item.英文
                   )
                     ? 'gray'
                     : 'red',
                 }"
               >
-                用户选择：{{ item.用户选择.join("/") }}
+              {{ item.排除 === '手写' ? '用户手写' : '用户选择' }}：
+              {{ item.用户选择.join('/') }}
               </div>
             </template>
           </van-cell>

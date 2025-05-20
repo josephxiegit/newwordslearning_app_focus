@@ -193,16 +193,20 @@ const searchLog = (item, index) => {
             .replace(/o"clock/g, "o'clock")
             .replace(/needn"t/g, "needn't")
             .replace(/o"clock/g, "o'clock")
-            // .replace(/"are/g, "'are'")
             .replace(/won"t/g, "won't")
             .replace(/it"s/g, "it's")
             .replace(/we"re/gi, "we're'")
             .replace(/You"re/gi, "you're'")
-            .replace(/they"re/gi, "they're'");
+            .replace(/they"re/gi, "they're'")
+            .replace(/doesn"t/gi, "doesn't")
+            .replace(/don"t/gi, "don't")
+            .replace(/I"ll/gi, "I'll")
+            .replace(/let"s/gi, "let's");
 
           dataString = dataString
             .replace(/\bFalse\b/g, "false")
-            .replace(/\bTrue\b/g, "true");
+            .replace(/\bTrue\b/g, "true")
+            .replace(/\bNone\b/g, "null");
 
           item.log = JSON.parse(dataString);
           // console.log("item: ", item);
@@ -289,8 +293,14 @@ const isCorrectAnswer = (
   userChoices,
   answerString,
   correctAnswer,
-  is_spell
+  is_spell,
+  排除,
+  英文
 ) => {
+  if (排除 === '手写') {
+    const userChoicesString = userChoices.join("");
+    return userChoicesString === 英文;
+  }
   if (is_spell) {
     const userChoicesString = userChoices.join("");
     const correctAnswerString = correctAnswer.replace(/\s+/g, "");
@@ -2039,10 +2049,18 @@ const reloadPage = () => {
           </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
-          <van-cell :label="`答案：${item.正确答案 || item.答案}`">
+          <van-cell             
+              :label="
+                item.排除 === '手写'
+                  ? `答案：${item.英文}`
+                  : item.is_spell
+                  ? `答案：${item.正确答案}`
+                  : `答案：${item.答案}`
+              "
+            >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
-                {{ item.英文 }}
+                {{ item.排除 === '手写' ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
@@ -2055,13 +2073,16 @@ const reloadPage = () => {
                     item.用户选择,
                     item.答案,
                     item.正确答案,
-                    item.is_spell
+                    item.is_spell,
+                    item.排除,
+                    item.英文
                   )
                     ? 'gray'
                     : 'red',
                 }"
               >
-                用户选择：{{ item.用户选择.join("/") }}
+              {{ item.排除 === '手写' ? '用户手写' : '用户选择' }}：
+              {{ item.用户选择.join('/') }}
               </div>
             </template>
           </van-cell>
