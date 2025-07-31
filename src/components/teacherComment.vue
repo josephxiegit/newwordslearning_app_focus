@@ -311,6 +311,8 @@ const searchLog = (item, index) => {
           .replace(/doesn"t/gi, "doesn't")
           .replace(/don"t/gi, "don't")
           .replace(/I"ll/gi, "I'll")
+          .replace(/you"ll/gi, "you'll")
+          .replace(/one"s/gi, "one's")
           .replace(/let"s/gi, "let's");
 
         dataString = dataString
@@ -693,8 +695,12 @@ const isCorrectAnswer = (
   英文
 ) => {
   if (排除 === '手写') {
-    const userChoicesString = userChoices.join("");
-    return userChoicesString === 英文;
+    // const userChoicesString = userChoices.join("");
+    const cleanString = (str) =>
+      (str || "").toLowerCase().replace(/[^a-z]/g, "");
+    const userChoicesString = cleanString(userChoices.join(""));
+    const target = cleanString(英文);
+    return userChoicesString === target;
   }
   if (is_spell) {
     const userChoicesString = userChoices.join("");
@@ -869,23 +875,9 @@ function processData(res) {
       is_review_required,
       review_time,
     } = item;
-    // let dataAnswers = answers.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
-    // dataAnswers = dataAnswers.replace(
-    //   /([{,]\s*)'([^']+?)'(\s*[:])/g,
-    //   '$1"$2"$3'
-    // );
-    // console.log('dataAnswers: ', dataAnswers);
-    // const parsedAnswers = JSON.parse(dataAnswers);
-    // console.log("answers", answers);
     let dataAnswers = JSON.stringify(answers);
     // console.log("dataAnswers: ", dataAnswers);
     const parsedAnswers = eval("(" + dataAnswers + ")");
-
-    // let dataSynonyms = synonyms.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
-    // dataSynonyms = dataSynonyms.replace(
-    //   /([{,]\s*)'([^']+?)'(\s*[:])/g,
-    //   '$1"$2"$3'
-    // );
     let dataSynonyms = JSON.stringify(synonyms);
     const parsedSynonyms = eval("(" + dataSynonyms + ")");
     // const parsedSynonyms = JSON.parse(dataSynonyms);
@@ -1112,6 +1104,81 @@ const reviseGroup = () => {
     return;
   });
 };
+
+// 全选功能
+const isAllSelected = computed(() => {
+  return filterXlsmData.value.length > 0 && 
+         selectedItems.value.length === filterXlsmData.value.length
+});
+
+const selectAll = () => {
+  if (selectedItems.value.length === filterXlsmData.value.length) {
+    // 如果已经全选，则取消全选
+    selectedItems.value = []
+  } else {
+    // 全选所有项目
+    selectedItems.value = filterXlsmData.value.map((_, index) => index)
+  }
+}
+
+const confirmDeleteInDialog = () => {
+  if (selectedItems.value.length === 0) {
+    showFailToast("请先选择要删除的项目")
+    return
+  }
+  
+  // 关闭修改分组对话框
+  showReviseGroup.value = false
+  
+  // 批量删除函数
+  async function DeleteMultipleUserData() {
+    let params = new URLSearchParams()
+    params.append("method", "DeleteMultiUserData")
+    
+    // 获取所有选中项目的nid
+    const selectedNids = selectedItems.value.map(
+      (index) => filterXlsmData.value[index].nid
+    )
+    
+    // 如果需要批量删除，可能需要传递数组或者循环删除
+    // 方案1：如果后端支持批量删除
+    params.append("nids", JSON.stringify(selectedNids))
+    
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data
+    })
+  }
+  
+  // 显示确认对话框
+  showConfirmDialog({
+    title: "Delete",
+    message: `是否确认删除选中的 ${selectedItems.value.length} 个项目?`,
+    theme: "round-button",
+  }).then(() => {
+    DeleteMultipleUserData().then((ret) => {
+      console.log("删除结果:", ret)
+      
+      // 清空选择
+      selectedItems.value = []
+      
+      // 检查是否处于筛选状态
+      if (
+        valueSearchStudent.value == "" &&
+        valueSearchXlsm.value == "" &&
+        valueSearchGroup.value == "" &&
+        valueGrade.value == "" &&
+        valueLocation.value == "" &&
+        valueSearchGroup.value == "" &&
+        dateCalendar.value == ""
+      ) {
+        reloadPage()
+      } else {
+        showSuccessToast("处于筛选状态")
+        filterData()
+      }
+    })
+  })
+}
 
 // 编辑数据
 const showReviseData = ref(false);
@@ -1481,9 +1548,9 @@ const reloadPage = () => {
     <div class="nav-bar-container">
       <van-nav-bar
         title="学生答题统计"
-        :right-text="isMultiSelectMode ? '取消' : '多选'"
+        :right-text="isMultiSelectMode ? (isAllSelected ? '取消全选' : '全选') : '多选'"
         :left-text="isMultiSelectMode ? '改分组' : '筛选'"
-        @click-right="toggleMultiSelectMode()"
+        @click-right="isMultiSelectMode ? selectAll() : toggleMultiSelectMode()"
         @click-left="isMultiSelectMode ? popReviseGroup() : showFilter()"
       />
     </div>
@@ -2146,6 +2213,17 @@ const reloadPage = () => {
           placeholder="请输入0或1"
         />
       </van-cell-group>
+        <!-- 删除按钮 -->
+  <div style="padding: 16px;">
+    <van-button 
+      type="danger" 
+      block 
+      @click="confirmDeleteInDialog"
+      :disabled="selectedItems.length === 0"
+    >
+      删除选中的 {{selectedItems.length}} 个项目
+    </van-button>
+  </div>
     </van-dialog>
 
     <!-- 修改数据 -->

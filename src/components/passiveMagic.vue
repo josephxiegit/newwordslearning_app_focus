@@ -1,8 +1,8 @@
 <template>
   <div v-if="visible" class="passive-magic-overlay">
     <div class="passive-magic">
-      <img :src="srcLeaf" alt="" style="width: auto; height: 50%;">
-      <img :src="srcTheme" alt="miss you">
+      <img :src="srcLeaf" alt="" style="width: auto; height: 50%;" @load="onImageLoad" v-if="srcLeaf">
+      <img :src="srcTheme" alt="miss you" @load="onImageLoad">
       <div style="font-weight: 700;font-size: larger;color:chocolate">做错了，重新选吧</div>
     </div>
   </div>
@@ -22,6 +22,7 @@ const srcLeaf = ref("");
 const visible = ref(false);
 
 function show() {
+  console.log(111);
   visible.value = true;
 }
 
@@ -30,6 +31,17 @@ function hide() {
 }
 
 const methods = { show, hide };
+const onImageLoad = () => {
+  // 触发一次重绘，确保图片尺寸正确
+  requestAnimationFrame(() => {
+    const container = document.querySelector('.passive-magic');
+    if (container) {
+      container.style.display = 'none';
+      void container.offsetHeight; // 强制重绘
+      container.style.display = '';
+    }
+  });
+};
 onMounted(() => {
   
   if (flagTheme.value == 1) {

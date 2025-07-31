@@ -108,7 +108,51 @@ const processedTitle = (title) => {
     console.error("处理标题时出错:", error);
     return title;
   }
+};
 
+const showDialogPassWord = ref(false);
+const passwordTeacher = ref("");
+const handlePassword = () => {
+  console.log("用户输入的密码是：", passwordTeacher.value);
+    if (passwordTeacher.value.trim()) {
+      async function verifyTeacherPassword() {
+        let params = new URLSearchParams();
+        params.append("method", "verifyTeacherPassword");
+        params.append("password", passwordTeacher.value.trim());
+        return await axios.post("words/", params).then((ret) => {
+          return ret.data;
+        });
+      }
+      verifyTeacherPassword().then((res) => {
+        // console.log("res: ", res);
+        if (res == "ok") {
+          localStorage.setItem(
+            "teacherPassword",
+            // Base64.encode(passwordTeacher.value)
+            passwordTeacher.value
+          );
+          showSuccessToast("密码正确");
+        } else {
+          showFailToast("密码错误");
+          localStorage.removeItem("teacherPassword");
+        }
+      });
+    } 
+};
+const resetPassword = () => {
+  showConfirmDialog({
+    title: "删除教师权限",
+    message: "确认删除吗？",
+    theme: "round-button",
+  }).then(() => {
+    localStorage.removeItem("teacherPassword");
+    showSuccessToast("已重置");
+  });
+  
+};
+
+const signInTeacher = () => {
+  showDialogPassWord.value = true;
 };
 onMounted(async () => {
   refreshData();
@@ -132,7 +176,9 @@ const reloadPage = () => {
       <van-nav-bar
         title="消费列表"
         right-text="刷新"
+        left-text="登陆"
         @click-right="reloadPage()"
+        @click-left="signInTeacher()"
       />
     </div>
 
@@ -182,11 +228,33 @@ const reloadPage = () => {
         >
           <template #label>
             <div>{{ item.create_time }}</div>
-            <div style="margin-top: 0.2rem;">{{ processedTitle(item.account_data__title) }}</div>
+            <div style="margin-top: 0.2rem">
+              {{ processedTitle(item.account_data__title) }}
+            </div>
           </template>
         </van-cell>
       </div>
     </van-cell-group>
+
+    <!-- 教师密码 -->
+    <van-dialog
+      v-model:show="showDialogPassWord"
+      title="教师权限"
+      show-cancel-button
+      closeOnClickOverlay
+      showCancelButton
+      cancelButtonText="重制"
+      @confirm="handlePassword"
+      @cancel="resetPassword"
+    >
+      <van-cell-group inset>
+        <van-field
+          v-model="passwordTeacher"
+          label="密码"
+          placeholder="请录入"
+          label-align="left"
+      /></van-cell-group>
+    </van-dialog>
   </div>
 </template>
 

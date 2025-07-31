@@ -3,6 +3,7 @@ import { ref, onMounted, inject } from "vue";
 import { useRouter } from "vue-router";
 import complete3starGoats from "../assets/complete3star.png";
 import complete3starBears from "../assets/Boonie Bears/complete3star.png";
+import happyending from "../assets/sound/happyending.mp3";
 const router = useRouter();
 const showSpeechBubble = ref(false);
 const valueUsername = ref("");
@@ -25,6 +26,8 @@ const gotoItemList = () => {
 };
 onMounted(() => {
   showSpeechBubble.value = true;
+  const audio = new Audio(happyending);
+  audio.play()
   // if (flagTheme.value == 1) {
   //   srcTheme.value = complete3starGoats;
   // }

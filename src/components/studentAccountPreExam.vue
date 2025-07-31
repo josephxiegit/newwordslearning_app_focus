@@ -2,6 +2,7 @@
 import {
   watch,
   onMounted,
+  onUnmounted,
   ref,
   getCurrentInstance,
   computed,
@@ -23,6 +24,13 @@ import { useRouter } from "vue-router";
 import preExamAnimation from "./preExam.vue";
 import chineseMeaningSrcGoatAndWolf from "../assets/chinese_meaning.png";
 import chineseMeaningSrcBears from "../assets/Boonie Bears/chinese_meaning.png";
+import successSound from "../assets/sound/success.mp3";
+import turnfailSound from "../assets/sound/turnfail.mp3";
+import woohooSound from "../assets/sound/woohoo.mp3";
+import swipeEncouragementSrcGoatAndWolf from "../assets/swipeEncouragement.gif";
+import swipeEncouragementSrcGoatAndWolf2 from "../assets/swipeEncouragement2.gif";
+import swipeEncouragementBears from "../assets/Boonie Bears/swipeEncouragement.gif";
+import swipeEncouragementBears2 from "../assets/Boonie Bears/swipeEncouragement.gif";
 const flagTheme = inject("flagTheme");
 const router = useRouter();
 const instance = getCurrentInstance();
@@ -57,7 +65,6 @@ const showGridMeaning = (index) => {
   speakWordEnglish(gridEnglish.value, gridChinese.value);
 };
 const speakWord = (english, answer) => {
-
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     english
   )}&type=1`;
@@ -170,6 +177,7 @@ const mergeAnswerAndSynonym = () => {
     obj["答案"] = synonymsOptions.value[i].答案;
     obj["正确答案"] = synonymsOptions.value[i].正确答案;
     obj["type"] = synonymsOptions.value[i].type;
+    obj["排除"] = synonymsOptions.value[i].排除;
     newList.push(obj);
   }
   // console.log("newList: ", newList);
@@ -239,6 +247,7 @@ const clickSubmitUser = async (action, done) => {
 // 手写模式
 const handwriteInputs = ref({});
 const handwriteDisabled = ref(false);
+const handwriteAnswers = ref([]);
 
 // 点击选项
 const resultDataTempt = ref([]);
@@ -386,12 +395,12 @@ const toggleCheckChinese = (index, index2) => {
   // 将中文用户选择和选项答案合并
   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
 
-  completeCount.value = resultDataTempt.value.reduce((count, item) => {
-    if (item.用户选择[0] !== "无") {
-      return count + 1;
-    }
-    return count;
-  }, 0);
+  // completeCount.value = resultDataTempt.value.reduce((count, item) => {
+  //   if (item.用户选择[0] !== "无") {
+  //     return count + 1;
+  //   }
+  //   return count;
+  // }, 0);
 };
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
@@ -422,6 +431,8 @@ const startCountdown = () => {
   }, 1000); // 每秒更新一次
 };
 
+const correctCount = ref(0);
+const rewardColor = ref("");
 const goToNext = async () => {
   // 获取当前轮播图的索引
   const currentSlideIndex = currentIndex.value;
@@ -430,6 +441,13 @@ const goToNext = async () => {
   const currentSlideSelections = Object.keys(selectedIndexes.value).filter(
     (key) => key.startsWith(`${currentSlideIndex}-`)
   );
+  // 第一个可能是手写
+  if (
+    currentSlideIndex == 0 &&
+    (!mergedData.value || Object.keys(mergedData.value).length === 0)
+  ) {
+    mergedData.value = mergeAnswerAndSynonym();
+  }
 
   const hasSelection = currentSlideSelections.some(
     (key) => selectedIndexes.value[key]
@@ -440,6 +458,12 @@ const goToNext = async () => {
       showFailToast("不能为空");
       return;
     }
+    handwriteAnswers.value.push({
+      序号: mergedData.value[currentSlideIndex]["序号"],
+      英文: input,
+    });
+
+    // console.log('handwriteAnswers: ', handwriteAnswers.value);
   } else {
     if (!hasSelection) {
       showFailToast("不能为空哦");
@@ -456,11 +480,6 @@ const goToNext = async () => {
       isCheckboxDisabled.value = true;
       handwriteDisabled.value = true;
       // 判断对错
-      // console.log(
-      //   "用户选择",
-      //   resultDataTempt.value[currentSlideIndex]["用户选择"]
-      // );
-      // console.log("正确答案", synonymsOptions.value[currentSlideIndex]["答案"]);
       let areEqual = false;
       if (synonymsOptions.value[currentSlideIndex]["排除"] == "手写") {
         const userSelection = handwriteInputs.value[currentSlideIndex];
@@ -496,9 +515,76 @@ const goToNext = async () => {
       }
 
       if (areEqual) {
+        correctCount.value += 1;
+        // console.log("correctCount: ", correctCount.value);
+
+        if (
+          (correctCount.value === 5 || correctCount.value === 10) &&
+          !encouragementShown.value[correctCount.value]
+        ) {
+          encouragementShown.value[correctCount.value] = true;
+
+          // 设置文字
+          pivotText.value = `对${correctCount.value}个了`;
+
+          // 播放鼓励音效，并在成功/失败后显示对应动画
+          const audio = new Audio(woohooSound);
+          audio
+            .play()
+            .then(() => {
+              // 播放成功后显示动画
+              if (correctCount.value === 10) {
+                showEncouragement2.value = true;
+                setTimeout(() => {
+                  showEncouragement2.value = false;
+                }, 1500);
+              } else {
+                showEncouragement.value = true;
+                setTimeout(() => {
+                  showEncouragement.value = false;
+                }, 1500);
+              }
+            })
+            .catch((err) => {
+              console.warn("鼓励音效播放失败：", err);
+              // 播放失败也照样显示动画
+              if (correctCount.value === 10) {
+                showEncouragement2.value = true;
+                setTimeout(() => {
+                  showEncouragement2.value = false;
+                }, 1500);
+              } else {
+                showEncouragement.value = true;
+                setTimeout(() => {
+                  showEncouragement.value = false;
+                }, 1500);
+              }
+            });
+
+          // 清除 pivot 显示
+          setTimeout(() => {
+            pivotText.value = "";
+          }, 3000);
+
+          // ✅ 设置奖励颜色（只设置一次）
+          if (correctCount.value === 5) {
+            rewardColor.value = "#DAA520"; // 深金色
+          } else if (correctCount.value === 10) {
+            rewardColor.value = "#FF3E00"; // 金红色
+          }
+        }
+
+        const audioSuccessPage = new Audio(successSound);
+        audioSuccessPage.play().catch((err) => {
+          console.warn("播放失败：", err);
+        });
         flagChoose.value = true;
         textColor.value = "green";
       } else {
+        const audioFailPage = new Audio(turnfailSound);
+        audioFailPage.play().catch((err) => {
+          console.warn("播放失败：", err);
+        });
         getVocabularyMeaning();
         startCountdown();
         flagChoose.value = false;
@@ -511,6 +597,7 @@ const goToNext = async () => {
       showAnimation_true();
     } else {
       // 进入下一个单词
+
       if (currentIndex.value < totalSlides.value - 1) {
         if (isButtonDisabled.value) return; // 如果正在动画中则直接返回
         isButtonDisabled.value = true;
@@ -520,7 +607,7 @@ const goToNext = async () => {
           currentIndex.value + 1
         );
         completeCount.value = (parseInt(completeCount.value) + 1).toString();
-        
+
         buttonTextType.value = "success";
         isCheckboxDisabled.value = false;
         handwriteDisabled.value = false;
@@ -536,17 +623,45 @@ const goToNext = async () => {
             synonymsOptions.value[currentIndex.value + 1].正确答案
           );
         }
-        try{
-          await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (error) {
-          console.error('动画执行出错:', error);
+          console.error("动画执行出错:", error);
         } finally {
           isButtonDisabled.value = false; // 动画结束后启用按钮
         }
-
-
       } else {
         // 到达最后一个轮播图，执行提交函数
+        function compareAndAddFlag(dictArray) {
+          return dictArray.map((item) => {
+            const { 排除, 英文, 序号 } = item;
+
+            if (排除 === "手写") {
+              if (
+                Array.isArray(handwriteAnswers.value) &&
+                handwriteAnswers.value.length > 0
+              ) {
+                const answerObj = handwriteAnswers.value.find(
+                  (ans) => ans.序号 === 序号
+                );
+                if (answerObj && answerObj.英文) {
+                  const cleanedInput = answerObj.英文
+                    .replace(/[^a-zA-Z]/g, "")
+                    .toLowerCase();
+                  const cleanedTarget =
+                    英文?.replace(/[^a-zA-Z]/g, "").toLowerCase() || "";
+
+                  item.用户选择 = [answerObj.英文];
+                  item.匹配结果 = cleanedInput === cleanedTarget;
+                }
+              }
+            }
+            return item;
+          });
+        }
+
+        resultDataTempt.value = compareAndAddFlag(resultDataTempt.value);
+        // console.log('resultDataTempt.value: ', resultDataTempt.value);
         updateAccountLog();
         popNavshow.value = true;
       }
@@ -696,6 +811,48 @@ const basicPreExam = ref("");
 const account_id_list = ref("");
 const srcTheme = ref("");
 
+// 做题进度
+const srcswipeEncouragement = ref("");
+const srcswipeEncouragement2 = ref("");
+const pivotText = ref("");
+const encouragementShown = ref({ 5: false, 10: false });
+const progressPercentage = computed(() => {
+  if (synonymsOptions.value.length === 0) return 0;
+  return Math.round((completeCount.value / synonymsOptions.value.length) * 100);
+});
+
+const progressColor = computed(() => {
+  return rewardColor.value || "#1989fa"; // 优先用奖励色，未触发时蓝色
+});
+
+const progressStyle = computed(() => {
+  if (rewardColor.value) {
+    return {
+      width: "80%",
+      margin: "0 auto",
+      boxShadow: `0 0 8px 4px ${rewardColor.value}88`, // 发光（加透明度）
+      transition: "box-shadow 0.3s ease",
+    };
+  } else {
+    return {
+      width: "80%",
+      margin: "0 auto",
+      boxShadow: "none",
+      transition: "box-shadow 0.3s ease",
+    };
+  }
+});
+const pivotFontStyle = computed(() => {
+  return {
+    whiteSpace: "nowrap",
+    fontSize: "14px",
+    fontWeight: "bold",
+  };
+});
+
+const showEncouragement = ref(false);
+const showEncouragement2 = ref(false);
+
 onBeforeUnmount(async () => {
   clearInterval(interval);
   // 在页面离开时执行的逻辑
@@ -704,13 +861,17 @@ onBeforeUnmount(async () => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
   // console.log("监测到离开");
 });
-const handleBeforeUnload = async (event) => {
+const handleBeforeUnload = (event) => {
   // 在页面刷新时执行的逻辑
   console.log("监测到刷新");
   isLoading.value = true;
   isLoading.value = false;
+  event.preventDefault();
   event.returnValue = ""; // 旧浏览器支持
 };
+onUnmounted(() => {
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+});
 const currentHeight = ref("");
 onMounted(async () => {
   nextTick(() => {
@@ -724,15 +885,21 @@ onMounted(async () => {
   });
   if (flagTheme.value == 1) {
     srcTheme.value = chineseMeaningSrcGoatAndWolf;
+    srcswipeEncouragement.value = swipeEncouragementSrcGoatAndWolf;
+    srcswipeEncouragement2.value = swipeEncouragementSrcGoatAndWolf2;
   }
   if (flagTheme.value == 2) {
     srcTheme.value = chineseMeaningSrcBears;
+    srcswipeEncouragement.value = swipeEncouragementBears;
+    srcswipeEncouragement2.value = swipeEncouragementBears2;
   }
   window.addEventListener("beforeunload", handleBeforeUnload);
   const initData = async () => {
     // 初始化数据
     synonymsOptions.value = JSON.parse(history.state.data);
-    // synonymsOptions.value = JSON.parse(history.state.data).reverse().slice(0 ,3);
+    // synonymsOptions.value = JSON.parse(history.state.data)
+    //   .reverse()
+    //   .slice(0, 5);
     // synonymsOptions.value = [JSON.parse(history.state.data).reverse()[0]];
     console.log("synonymsOptions: ", synonymsOptions.value);
 
@@ -769,6 +936,7 @@ onMounted(async () => {
 
     basicPreExam.value = history.state.basicPreExam;
     totalSlides.value = synonymsOptions.value.length;
+    console.log("totalSlides: ", totalSlides.value);
 
     submittoken.value = new Date().getTime();
     console.log("submittoken: ", submittoken.value);
@@ -795,7 +963,10 @@ onMounted(async () => {
       synonymsOptions.value[0]["排除"] !== "试题" &&
       synonymsOptions.value[0]["排除"] !== "手写"
     ) {
-      speakWord(synonymsOptions.value[0].英文, synonymsOptions.value[0].正确答案);
+      speakWord(
+        synonymsOptions.value[0].英文,
+        synonymsOptions.value[0].正确答案
+      );
     }
     flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
   };
@@ -816,6 +987,47 @@ onMounted(async () => {
         @click-right="shownavWords"
       >
       </van-nav-bar>
+    </div>
+
+    <!-- 做题进度 -->
+    <div style="margin-top: 3vh">
+      <van-progress
+        :pivot-text="pivotText"
+        :color="progressColor"
+        :percentage="progressPercentage"
+        :style="progressStyle"
+        :pivot-style="pivotFontStyle"
+      />
+      <img
+        v-if="showEncouragement"
+        :src="srcswipeEncouragement"
+        alt="鼓励动画"
+        style="
+          position: fixed; /* 关键：相对于整个屏幕定位 */
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 75vw;
+          max-width: 400px;
+          z-index: 1000; /* 保证浮在最前面 */
+          pointer-events: none; /* 避免点击时挡住操作 */
+        "
+      />
+      <img
+        v-if="showEncouragement2"
+        :src="srcswipeEncouragement2"
+        alt="鼓励动画"
+        style="
+          position: fixed; /* 关键：相对于整个屏幕定位 */
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 75vw;
+          max-width: 400px;
+          z-index: 1000; /* 保证浮在最前面 */
+          pointer-events: none; /* 避免点击时挡住操作 */
+        "
+      />
     </div>
 
     <!-- 单词主体 -->
@@ -1299,5 +1511,11 @@ html {
 .not-clickable {
   pointer-events: none; /* 禁止点击 */
   background-color: transparent; /* 背景保持透明 */
+}
+
+.glow-text {
+  color: #ffd700 !important;
+  text-shadow: 0 0 6px #ffd700, 0 0 12px #ffa500;
+  transition: all 0.3s ease;
 }
 </style>

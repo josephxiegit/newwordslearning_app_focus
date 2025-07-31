@@ -201,6 +201,8 @@ const searchLog = (item, index) => {
             .replace(/doesn"t/gi, "doesn't")
             .replace(/don"t/gi, "don't")
             .replace(/I"ll/gi, "I'll")
+            .replace(/you"ll/gi, "you'll")
+            .replace(/one"s/gi, "one's")
             .replace(/let"s/gi, "let's");
 
           dataString = dataString
@@ -298,8 +300,13 @@ const isCorrectAnswer = (
   英文
 ) => {
   if (排除 === '手写') {
-    const userChoicesString = userChoices.join("");
-    return userChoicesString === 英文;
+    // const userChoicesString = userChoices.join("");
+    // return userChoicesString === 英文;
+    const cleanString = (str) =>
+      (str || "").toLowerCase().replace(/[^a-z]/g, "");
+    const userChoicesString = cleanString(userChoices.join(""));
+    const target = cleanString(英文);
+    return userChoicesString === target;
   }
   if (is_spell) {
     const userChoicesString = userChoices.join("");

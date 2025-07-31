@@ -2,6 +2,7 @@
 import {
   watch,
   onMounted,
+  onUnmounted,
   ref,
   getCurrentInstance,
   onBeforeUnmount,
@@ -22,6 +23,8 @@ import WolfBack from "./wolfBack.vue";
 import VictorySheep from "./victorySheep.vue";
 import HalfTrue from "./HalfTrue.vue";
 import VideoList from "./videoList.vue";
+import success1 from "../assets/sound/success1.mp3";
+import fail1 from "../assets/sound/fail1.mp3";
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
@@ -45,43 +48,58 @@ const falseCount = computed(() => {
 });
 // 继续跳转做题
 const gotoNext = () => {
-  handleAnswerSheetClose();
-  async function refreshAccountData() {
-    // 重新查找用户数据
+  const toast1 = showLoadingToast({
+    message: "跳转中...",
+    forbidClick: true,
+    duration: 0,
+  });
+
+  let timeoutFlag = false;
+
+  // 设定 8 秒超时机制
+  const timeout = setTimeout(() => {
+    timeoutFlag = true;
+    toast1.close();
+    showToast("网络延迟，稍后尝试");
+  }, 8000);
+
+  // 并行执行两个异步任务
+  const task1 = handleAnswerSheetClose();
+  const task2 = (async function refreshAccountData() {
     let params = new URLSearchParams();
     params.append("method", "refreshUserData");
     params.append("nid", nid.value);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
+    const response = await axios.post("words/", params);
+    return response.data;
+  })();
+
+  Promise.all([task1, task2])
+    .then(([_, res]) => {
+      if (timeoutFlag) return; // 超时后不执行后续跳转
+      clearTimeout(timeout);
+      toast1.close();
+
+      const targetRoute =
+        rate.value >= 3 && RateOrigin.value < 3
+          ? "/complete3star"
+          : "/studentAccountList";
+
+      router.push({
+        path: targetRoute,
+        state: {
+          data: JSON.stringify(res.data),
+          unique_aliases: JSON.stringify(res.unique_aliases),
+          username: res.username,
+          flagRate: rate.value,
+        },
+      });
+    })
+    .catch((err) => {
+      console.error("跳转失败", err);
+      toast1.close();
+      clearTimeout(timeout);
+      showToast("发生错误，请稍后再试");
     });
-  }
-  refreshAccountData().then((res) => {
-    // console.log("res.username", res.username);
-    // console.log("flagRate", rate.value);
-    if (rate.value >= 3 && RateOrigin.value < 3) {
-      // 三星庆祝
-      router.push({
-        path: "/complete3star",
-        state: {
-          data: JSON.stringify(res.data),
-          unique_aliases: JSON.stringify(res.unique_aliases),
-          username: res.username,
-          flagRate: rate.value,
-        },
-      });
-    } else {
-      // 跳转主页
-      router.push({
-        path: "/studentAccountList",
-        state: {
-          data: JSON.stringify(res.data),
-          unique_aliases: JSON.stringify(res.unique_aliases),
-          username: res.username,
-          flagRate: rate.value,
-        },
-      });
-    }
-  });
 };
 
 // 切换显示
@@ -193,21 +211,7 @@ const showUncertainResult = () => {
 
 // 单词发音
 const speakWord = (english, answer) => {
-  // try {
-  //   let utterance;
-
-  //   if (!/[a-zA-Z]/.test(english)) {
-  //     utterance = new SpeechSynthesisUtterance(answer);
-  //     utterance.lang = "en-US";
-  //   } else {
-  //     utterance = new SpeechSynthesisUtterance(english);
-  //     utterance.lang = "en-US";
-  //   }
-  //   window.speechSynthesis.speak(utterance);
-  // } catch (error) {
-  //   showToast("此浏览器不支持发音，请更换chrome或edge");
-  // }
-  const word = /[a-zA-Z]/.test(english)? english:answer
+  const word = /[a-zA-Z]/.test(english) ? english : answer;
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     word
   )}&type=1`;
@@ -233,14 +237,12 @@ const account_data_id = ref(0);
 const account_log_id = ref(0);
 const complement = ref(0);
 const username = ref("");
-const handleAnswerSheetClose = () => {
-  // 关闭答案页面执行
+const handleAnswerSheetClose = async () => {
   const endTime = new Date();
   const timeDifference = endTime - createTimeAnswer.value;
   const minutes = Math.floor(timeDifference / 1000 / 60);
   const seconds = Math.floor((timeDifference / 1000) % 60);
   const formattedTimeDifference = `${minutes}分${seconds}秒`;
-  console.log("Time Difference:", formattedTimeDifference);
 
   const date = new Date(createTimeAnswer.value);
   const formattedDateStr = `${date.getFullYear()}年${(date.getMonth() + 1)
@@ -253,24 +255,18 @@ const handleAnswerSheetClose = () => {
     .toString()
     .padStart(2, "0")}秒`;
 
-  async function updateAnswerDuration() {
-    // 上传时间
-    let params = new URLSearchParams();
-    params.append("method", "updateAnswerDuration");
-    params.append("username", username.value);
-    params.append("account_data_id", account_data_id.value);
-    params.append("account_log_id", account_log_id.value);
-    params.append("type", "检查");
-    params.append("create_time", formattedDateStr);
-    params.append("duration", formattedTimeDifference);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  updateAnswerDuration().then((res) => {
-    console.log(res);
-  });
+  let params = new URLSearchParams();
+  params.append("method", "updateAnswerDuration");
+  params.append("username", username.value);
+  params.append("account_data_id", account_data_id.value);
+  params.append("account_log_id", account_log_id.value);
+  params.append("type", "检查");
+  params.append("create_time", formattedDateStr);
+  params.append("duration", formattedTimeDifference);
+  const res = await axios.post("words/", params);
+  return res.data;
 };
+
 async function updateUncertainDuration(formattedDateStr) {
   // 上传时间
   let params = new URLSearchParams();
@@ -318,10 +314,11 @@ const userDiamonds = ref("");
 
 const offsetDaily = ref({
   x: window.innerWidth - 67,
-  y: 70,
+  y: 90,
 });
 const handleConfirmResult = async () => {
   if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
+    // if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
     // console.log('补全单词');
     let toast1 = showLoadingToast({
       message: "查询中...",
@@ -343,6 +340,7 @@ const handleConfirmResult = async () => {
     userDiamonds.value = res.data.diamonds;
     console.log("userDiamonds: ", userDiamonds.value);
     if (userDiamonds.value >= 3) {
+      videoList.value = [];
       compareResult.value.forEach((item) => {
         if (item.flag !== "true" && item.排除 !== "试题") {
           const correctAnswer =
@@ -367,6 +365,7 @@ const handleConfirmResult = async () => {
         theme: "round-button",
         message: `当前账户💎${userDiamonds.value}\n看视频抵消背诵错误，消耗💎*3，\n是否确认？`,
       }).then(() => {
+        pauseAudio();
         showVideoPopup.value = true;
       });
     } else {
@@ -390,6 +389,9 @@ const handleConfirmResult = async () => {
 
 const onFinishedVideo = () => {
   showVideoPopup.value = false;
+  setTimeout(() => {
+    playAudio();
+  }, 1000);
   showVideoButton.value = false;
   showLoadingToast({
     message: "补全中...",
@@ -420,11 +422,17 @@ const onFinishedVideo = () => {
 
 const onExitVideo = () => {
   showVideoPopup.value = false;
+  setTimeout(() => {
+    playAudio();
+  }, 1000);
   showToast("人不在屏幕前，游戏结束");
 };
 
 const onExitVideo2 = () => {
   showVideoPopup.value = false;
+  setTimeout(() => {
+    playAudio();
+  }, 1000);
   showToast("点击次数过多，不够专心");
 };
 
@@ -472,6 +480,50 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", handlePageUnload);
   // window.removeEventListener("pagehide", handlePageUnload);
 });
+onUnmounted(() => {
+  if (audio) {
+    audio.pause();
+    audio.currentTime = 0;
+    audio = null;
+    isPlaying.value = false;
+  }
+});
+
+// 音乐播放
+let audio = null;
+const isPlaying = ref(false);
+const playAudio = () => {
+  if (!audio) {
+    audio = new Audio("/answerBGM.mp3");
+    audio.loop = true;
+    audio.volume = 0.3;
+  }
+
+  audio
+    .play()
+    .then(() => {
+      isPlaying.value = true;
+    })
+    .catch((err) => {
+      console.warn("播放失败：", err);
+    });
+};
+
+const pauseAudio = () => {
+  if (audio && isPlaying.value) {
+    audio.pause();
+    isPlaying.value = false;
+  }
+};
+
+const toggleAudio = () => {
+  if (isPlaying.value) {
+    pauseAudio();
+  } else {111
+    playAudio();
+  }
+};
+
 onMounted(async () => {
   window.addEventListener("beforeunload", handlePageUnload);
   createTimeAnswer.value = new Date();
@@ -527,14 +579,25 @@ onMounted(async () => {
     // console.log("uncertainResult", uncertainResult.value);
     // console.log('trueCount.value: ', trueCount.value);
     console.log("compareResult.value: ", compareResult.value);
-
     if (trueCount.value == compareResult.value.length) {
+      const audiosuccess1eSound = new Audio(success1);
+      audiosuccess1eSound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
       showAnimationShineVictory();
       showWelcomeAllTrue.value = true;
     } else if (halfTrue.value == 0.5) {
+      const audiofail1Sound = new Audio(fail1);
+      audiofail1Sound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
       showWelcomeHalf.value = true;
       showAnimationHalfTrue();
     } else {
+      const audiofail1Sound = new Audio(fail1);
+      audiofail1Sound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
       showWelcome.value = true;
       showAnimationShine();
     }
@@ -551,7 +614,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm=""
+      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">很遗憾！下次加油哦</div>
@@ -584,7 +647,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm=""
+      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">还不错！获得1/2奖励</div>
@@ -617,6 +680,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
+      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">恭喜，全对了！</div>
@@ -666,6 +730,14 @@ onMounted(async () => {
       </van-nav-bar>
     </div>
 
+    <!-- 音乐控制 -->
+    <div class="music-bar" @click="toggleAudio">
+      🎵 背景音乐控制
+      <button style="font-size: 12px">
+        {{ isPlaying ? "暂停" : "播放" }}
+      </button>
+    </div>
+
     <!-- 预览滚动 -->
     <van-floating-panel
       v-model:height="heightScroll"
@@ -700,7 +772,7 @@ onMounted(async () => {
       </van-cell-group>
     </van-floating-panel>
 
-    <!-- 视频 -->
+    <!-- 视频钻石 -->
     <div class="child">
       <van-floating-bubble
         v-if="showVideoButton"
@@ -820,7 +892,11 @@ onMounted(async () => {
     </van-popup>
 
     <!-- 列表 -->
-    <van-checkbox-group v-model="userSelected" class="checkbox-container">
+    <van-checkbox-group
+      v-model="userSelected"
+      class="checkbox-container"
+      style="padding-top: 32px"
+    >
       <van-cell-group>
         <div
           v-for="(item, index) in filteredCompareResult"
@@ -958,7 +1034,10 @@ onMounted(async () => {
               </van-cell>
             </van-cell-group>
           </div>
-          <div v-else style="margin: 0rem 0 0rem 0rem; font-size: 15px; color: black;">
+          <div
+            v-else
+            style="margin: 0rem 0 0rem 0rem; font-size: 15px; color: black"
+          >
             <van-cell-group>
               <van-cell>
                 <div style="text-align: left">
@@ -983,6 +1062,7 @@ onMounted(async () => {
       </van-cell-group>
     </van-checkbox-group>
     <div class="bottom-placeholder"></div>
+
     <!-- 星星动画容器 -->
     <!-- <div id="star-animation" class="star-container" v-if="showStar">★</div> -->
     <WolfBack ref="wolfBackRef" />
@@ -1123,5 +1203,17 @@ onMounted(async () => {
 .dailyFloat .van-floating-bubble__icon {
   margin: auto;
   font-size: 28px !important;
+}
+
+.music-bar {
+  font-size: 13px;
+  position: fixed;
+  top: 46px; /* 紧贴 nav-bar 底部，46px 是 van-nav-bar 高度 */
+  left: 0;
+  width: 100%;
+  background: #f8f8f8;
+  z-index: 999; /* 略低于 nav-bar */
+  padding: 0.3rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 </style>

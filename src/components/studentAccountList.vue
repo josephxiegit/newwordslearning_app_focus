@@ -1132,6 +1132,7 @@ const goToNextPage = (
                 (item) => item.trim() === removed
               );
               if (synonymIndex !== -1) {
+                let correctAnswers = answer.正确答案.split("；").map((s) => s.trim());
                 // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
                 let availableOptions = [...allChineseSet2]
                   .flatMap((ch) =>
@@ -1148,19 +1149,21 @@ const goToNextPage = (
                               .map((i) => i.trim())
                               .includes(ch)
                           : item.trim() === ch
-                      )
+                      ) &&
+                      // 新增条件：不与正确答案重复
+                      !correctAnswers.includes(ch.trim())
                   );
 
                 // 替换答案
                 // 更新答案的中文字段，将处理后的数组重新用 "；" 连接
-                // if (answer.英文 == "talk") {
-                //   console.log(
-                //     "synonymItem.中文[synonymIndex]",
-                //     synonymItem.中文[synonymIndex]
-                //   );
-                //   console.log("answer.中文", answer.中文);
-                //   console.log("-------------------");
-                // }
+                if (answer.英文 == "for + 时间段") {
+                  console.log(
+                    "synonymItem.中文[synonymIndex]",
+                    synonymItem.中文[synonymIndex]
+                  );
+                  console.log("answer.中文", answer.中文);
+                  console.log("-------------------");
+                }
                 // answer.中文 = parts.join("；");
 
                 // const regex = new RegExp(
@@ -1173,7 +1176,8 @@ const goToNextPage = (
 
                 const rawKeyword = synonymItem.中文[synonymIndex];
                 const keyword = escapeRegExp(rawKeyword);
-                const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
+                // const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
+                const regex = new RegExp(`(?:^|[；,]\\s*)${keyword}(?=\\s*[；,]|$)`, "g");
                 answer.中文 = answer.中文.replace(regex, "");
 
                 // 清理可能遗留的多余分隔符
@@ -1181,9 +1185,9 @@ const goToNextPage = (
                   .replace(/^[；,]\s*|\s*[；,]$/g, "")
                   .replace(/[；,]\s*[；,]/g, "；");
 
-                // if (answer.英文 == "talk") {
-                //   console.log("answer.中文2", answer.中文);
-                // }
+                if (answer.英文 == "for + 时间段") {
+                  console.log("answer.中文2", answer.中文);
+                }
 
                 if (availableOptions.length > 0) {
                   let randomReplacement =
@@ -1201,6 +1205,7 @@ const goToNextPage = (
       });
     } else {
       // 无拼接
+      // console.log(111111111)
       data.answers.forEach((answer, index) => {
         // 只有当 answer.中文 不为 "以上都不对"，且 answer.正确答案 中包含 "；" 时才处理
         if (
@@ -1215,7 +1220,7 @@ const goToNextPage = (
           let probabilities = {
             2: [0.3, 0.7],
             3: [0.3, 0.3, 0.4],
-            // 3: [0, 0.5, 0.5],
+            // 3: [0, 1, 0],
             4: [0.2, 0.2, 0.2, 0.4],
             5: [0.15, 0.15, 0.15, 0.15, 0.4],
           };
@@ -1248,9 +1253,11 @@ const goToNextPage = (
                 (item) => item.trim() === removed
               );
               if (synonymIndex !== -1) {
-                // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
+                let correctAnswers = answer.正确答案.split("；").map((s) => s.trim());
+                // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文和不与正确答案重复
                 let availableOptions = [...allChineseSet2].filter(
-                  (ch) => !synonymItem.中文.includes(ch)
+                  (ch) => !synonymItem.中文.includes(ch) &&
+                  !correctAnswers.includes(ch.trim())
                 );
                 if (availableOptions.length > 0) {
                   let randomReplacement =
@@ -1481,18 +1488,18 @@ const goToNextPage = (
       .then((data) => {
         data = getZhenduoxuan(data);
 
-        // data.answers.forEach((item) => {
-        //   if (item.英文 === "treatment") {
-        //     console.log("treatment");
-        //     console.log("答案", item.中文);
-        //     console.log("正确答案", item.正确答案);
-        //   }
-        // });
-        // data.synonyms.forEach((item) => {
-        //   if (item.英文 === "treatment") {
-        //     console.log("中文", item.中文);
-        //   }
-        // });
+        data.answers.forEach((item) => {
+          if (item.英文 === "for + 时间段") {
+            console.log("for + 时间段");
+            console.log("答案", item.中文);
+            console.log("正确答案", item.正确答案);
+          }
+        });
+        data.synonyms.forEach((item) => {
+          if (item.英文 === "for + 时间段") {
+            console.log("中文", item.中文);
+          }
+        });
         return data;
       })
       .then((data) => {
@@ -1586,7 +1593,22 @@ const goToNextPage = (
     data = replaceOptionInSynonyms(data);
 
     data = getZhenduoxuan(data);
-
+        data.answers.forEach((item) => {
+          if (item.英文 === "for + 时间段") {
+            console.log("for + 时间段");
+            console.log("答案", item.中文);
+            console.log("正确答案", item.正确答案);
+          }
+        });
+        data.synonyms.forEach((item) => {
+          if (item.英文 === "for + 时间段") {
+            // console.log("中文", item.中文);
+            console.log("---")
+            item.中文.forEach(item2 => {
+              console.log(item2);
+            });
+          }
+        });
     // 放回试题
     if (shiti_backup.length > 0) {
       insertBackupIntoData(data, shiti_backup);
@@ -3529,7 +3551,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="九年级开启手写模式...有bug联系老师"
+        text="暑期暂停更新，下学期：单词对对碰，社交和成就功能"
       />
     </div>
     <van-toast

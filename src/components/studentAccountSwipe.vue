@@ -2,6 +2,7 @@
 import {
   watch,
   onMounted,
+  onUnmounted,
   ref,
   getCurrentInstance,
   computed,
@@ -23,6 +24,17 @@ import swipeHelp from "./swipeHelp.vue";
 import submitloading from "./submitloading.vue";
 import passiveMagic from "./passiveMagic.vue";
 import passiveMagic2 from "./passiveMagic2.vue";
+import shouxieSrcGoatAndWolf from "../assets/test.gif";
+import shouxieBears from "../assets/Boonie Bears/test.gif";
+import woohooSound from "../assets/sound/woohoo.mp3";
+
+import surpriseSound from "../assets/sound/surprise.mp3";
+import swipeEncouragementSrcGoatAndWolf from "../assets/swipeEncouragement.gif";
+import swipeEncouragementSrcGoatAndWolf2 from "../assets/swipeEncouragement2.gif";
+import swipeEncouragementBears from "../assets/Boonie Bears/swipeEncouragement.gif";
+import swipeEncouragementBears2 from "../assets/Boonie Bears/swipeEncouragement2.gif";
+
+const flagTheme = inject("flagTheme");
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -127,7 +139,7 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
 };
 
 const compareAndAddFlag = (dictArray) => {
-  console.log("dictArray: ", dictArray);
+  // console.log("dictArray: ", dictArray);
   return dictArray.map((item) => {
     const { 答案, 用户选择, 正确答案, is_spell, 排除, 英文, 序号 } = item;
 
@@ -303,7 +315,9 @@ const clickSubmitUser = async (action, done) => {
         const hasEnglishComma = str.includes(",");
         return hasChineseSemicolon || hasEnglishComma;
       }
-
+      function isPureEnglish(text) {
+        return /^[A-Za-z]+$/.test(text);
+      }
       compareResult.forEach((item) => {
         let english = item.英文;
         let correctAnswer = item.正确答案;
@@ -319,12 +333,14 @@ const clickSubmitUser = async (action, done) => {
           }
         }
         // console.log(english, correctAnswer)
-
+        // console.log('item:', item);
         if (
           item.flag !== "true" &&
           !addedEnglishSet.has(english) &&
           !isPhrase(english) &&
-          !containsChineseSemicolon(correctAnswer)
+          typeof correctAnswer === "string" && // 如果“手写”错了item.flag !== "true"就符合要求了
+          !containsChineseSemicolon(correctAnswer) &&
+          isPureEnglish(english)
         ) {
           // console.log(english);
           spellVocabularyResult.push({
@@ -356,7 +372,8 @@ const clickSubmitUser = async (action, done) => {
           item.type.includes(",") &&
           item.is_spell === false &&
           !addedEnglishSet.has(english) &&
-          !isPhrase(english)
+          !isPhrase(english) &&
+          isPureEnglish(english)
         ) {
           spellVocabularyResult.push({
             英文: english,
@@ -575,7 +592,9 @@ const clickSubmitUser = async (action, done) => {
 // 手写模式
 const handwriteInputs = ref({});
 const handwriteAnswers = ref([]);
-
+const onEnter = (event) => {
+  event.target.blur(); // 收起移动端输入法
+};
 // 点击选项
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
@@ -823,19 +842,20 @@ const toggleCheckChinese = (index, index2) => {
 
   // 将中文用户选择和选项答案合并
   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-  completeCount.value = resultDataTempt.value.reduce((count, item) => {
-    if (item.用户选择[0] !== "无") {
-      return count + 1;
-    }
-    return count;
-  }, 0);
+  // console.log("resultDataTempt.value: ", resultDataTempt.value);
+  // completeCount.value = resultDataTempt.value.reduce((count, item) => {
+  //   if (item.用户选择[0] !== "无") {
+  //     return count + 1;
+  //   }
+  //   return count;
+  // }, 0);
+  // console.log('completeCount.value: ', completeCount.value);
 };
 
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
 }
 function speakWord(word) {
-
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     word
   )}&type=1`;
@@ -905,7 +925,6 @@ function isSelectionTrue(currentSlideIndex) {
 const goToNext = () => {
   // 获取当前轮播图的索引
   const currentSlideIndex = currentIndex.value;
-  
 
   // 检查当前轮播图中的选中项
   const currentSlideSelections = Object.keys(selectedIndexes.value).filter(
@@ -913,8 +932,11 @@ const goToNext = () => {
   );
 
   let hasSelection = null;
-  if(currentSlideIndex == 0 && (!mergedData.value || Object.keys(mergedData.value).length === 0)) {
-    mergedData.value = mergeAnswerAndSynonym()
+  if (
+    currentSlideIndex == 0 &&
+    (!mergedData.value || Object.keys(mergedData.value).length === 0)
+  ) {
+    mergedData.value = mergeAnswerAndSynonym();
   }
   if (mergedData.value[currentSlideIndex]["排除"] == "手写") {
     const input = (handwriteInputs.value[currentSlideIndex] || "").trim();
@@ -926,6 +948,8 @@ const goToNext = () => {
       序号: mergedData.value[currentSlideIndex]["序号"],
       英文: input,
     });
+    console.log("handwriteAnswers: ", handwriteAnswers.value);
+    // console.log("mergedData.value: ", mergedData.value);
     hasSelection = true;
   } else {
     hasSelection = currentSlideSelections.some(
@@ -943,6 +967,11 @@ const goToNext = () => {
   if (!areEqual && flagPassiveMagic.value) {
     const randomChance = Math.random();
     if (randomChance < 0.7) {
+      // if (randomChance < 2) {
+      const audiosurpriseSound = new Audio(surpriseSound);
+      audiosurpriseSound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
       showAnimationPassiveMagic();
       pause();
       setTimeout(() => {
@@ -1410,8 +1439,8 @@ const gotoPreHelp = (flag) => {
     return;
   }
 
-  console.log(synonymsOptions.value);
-  console.log("currentIndex - 1", currentIndex.value - 1);
+  // console.log(synonymsOptions.value);
+  // console.log("currentIndex", currentIndex.value);
   //加入迟疑库
   if (
     !synonymsOptions.value[currentIndex.value - 1].is_spell &&
@@ -1420,6 +1449,15 @@ const gotoPreHelp = (flag) => {
   ) {
     addUncertain(currentIndex.value, "回溯");
   }
+
+  console.log("currentIndex: ", currentIndex.value);
+  console.log("synonymsOptions", synonymsOptions.value);
+  if (synonymsOptions.value[currentIndex.value - 1].排除 == "手写") {
+    handwriteAnswers.value = handwriteAnswers.value.filter(
+      (item) => Number(item.序号) !== Number(currentIndex.value)
+    );
+  }
+  console.log("handwriteAnswers: ", handwriteAnswers.value);
 
   flagSingleOrMultiChoice.value = getSingeOrMultiChoice(currentIndex.value - 1);
   handleButtonClick("gotoPre");
@@ -1450,10 +1488,16 @@ function showAnimationPassiveMagic() {
     synonymsOptions.value[currentIndex.value].排除 !== "试题" &&
     synonymsOptions.value[currentIndex.value].排除 !== "手写"
   ) {
-    // console.log("currentIndex.value: ", currentIndex.value);
     addUncertain(currentIndex.value, "被动魔法");
   }
 
+  // console.log("currentIndex.value: ", currentIndex.value);
+  if (synonymsOptions.value[currentIndex.value].排除 == "手写") {
+    handwriteAnswers.value = handwriteAnswers.value.filter(
+      (item) => Number(item.序号) !== Number(currentIndex.value + 1)
+    );
+  }
+  // console.log('handwriteAnswers: ', handwriteAnswers.value);
   passiveMagicRef.value.show();
   setTimeout(() => {
     passiveMagicRef.value.hide();
@@ -1463,6 +1507,8 @@ function showAnimationPassiveMagic() {
     }, 1500);
   }, 1800);
 }
+
+const srcTheme = ref();
 
 // 计时器
 const timerRate = ref(0);
@@ -1475,6 +1521,16 @@ const currentIndex = ref(0);
 const totalSlides = ref(25); // 假设总共有5个轮播图项
 const isButtonDisabled = ref(false);
 const remainingSeconds = ref(0);
+const circleColor = ref("#1989fa");
+// const circleColor = computed(() => {
+//   if (remainingCount.value <= 5) {
+//     return '#ee0a24'; // 红色 - 当剩余5个时
+//   } else if (timerRate.value <= 50) {
+//     return '#ffd21e'; // 黄色 - 当进度过半时
+//   } else {
+//     return '#1989fa'; // 蓝色 - 默认状态
+//   }
+// });
 // 使用computed计算属性来确定按钮的文本
 const textButtonNext = computed(() => {
   if (currentIndex.value === 0) {
@@ -1536,6 +1592,10 @@ const resetTimer = () => {
     if (!areEqual && flagPassiveMagic.value) {
       const randomChance = Math.random();
       if (randomChance < 0.7) {
+        const audiosurpriseSound = new Audio(surpriseSound);
+        audiosurpriseSound.play().catch((err) => {
+          console.warn("播放失败：", err);
+        });
         showAnimationPassiveMagic();
         pause();
         setTimeout(() => {
@@ -1550,10 +1610,23 @@ const resetTimer = () => {
 
     if (currentIndex.value < totalSlides.value - 1) {
       swipeRef.value.next();
+
       setTimeout(() => {
         flagSingleOrMultiChoice.value = getSingeOrMultiChoice(
           currentIndex.value + 1
         );
+
+        // console.log("currentIndex", currentIndex.value);
+        if (synonymsOptions.value[currentIndex.value].排除 == "手写") {
+          const input = (
+            handwriteInputs.value[currentIndex.value] || ""
+          ).trim();
+          handwriteAnswers.value.push({
+            序号: mergedData.value[currentIndex.value]["序号"],
+            英文: input,
+          });
+        }
+        // console.log('handwriteAnswers.value: ', handwriteAnswers.value);
 
         lastClickTime.value = now;
         currentRate.value = 100;
@@ -1596,7 +1669,87 @@ const handleTimerRate = () => {
     executedWords.add(currentWordIndex);
   }
 };
+// 做题目进度条
+const srcswipeEncouragement = ref("");
+const srcswipeEncouragement2 = ref("");
+const totalCount = computed(() => synonymsOptions.value.length);
+const progressPercentage = computed(() => {
+  if (synonymsOptions.value.length === 0) return 0;
+  return Math.round((completeCount.value / synonymsOptions.value.length) * 100);
+});
 
+const isOverHalf = computed(() => completeCount.value >= totalCount.value / 2); // 判断是否过半
+const remainingCount = computed(() => totalCount.value - completeCount.value);
+
+const progressColor = computed(() => {
+  if (remainingCount.value <= 5) {
+    return "#FF3E00"; // 金红色
+  } else if (isOverHalf.value) {
+    return "#DAA520"; // 深金色
+  } else {
+    return "#1989fa"; // 蓝色
+  }
+});
+
+const progressStyle = computed(() => {
+  return {
+    width: "80%",
+    margin: "0 auto",
+    boxShadow: isOverHalf.value
+      ? "0 0 8px 4px rgba(218, 165, 32, 0.6)"
+      : "none",
+    transition: "box-shadow 0.3s ease",
+  };
+});
+const pivotFontStyle = computed(() => {
+  const text = `${completeCount.value} / ${totalCount.value}`;
+  return {
+    whiteSpace: "nowrap",
+    fontSize: text.length > 7 ? "8px" : "12px",
+  };
+});
+
+const showEncouragement = ref(false);
+const showEncouragement2 = ref(false);
+
+let hasShownEncouragement = false;
+let hasShownEncouragement2 = false;
+const isExtended = ref(false);
+watch(isOverHalf, (newVal) => {
+  if (newVal && !hasShownEncouragement) {
+    hasShownEncouragement = true;
+    isExtended.value = true;
+    circleColor.value = "#ffd21e";
+
+    const audio = new Audio(woohooSound);
+    audio.play().catch((err) => {
+      console.warn("播放失败：", err);
+    });
+
+    showEncouragement.value = true;
+
+    console.log("autoplay2: ", autoplay2.value);
+    setTimeout(() => {
+      showEncouragement.value = false;
+    }, 1500);
+  }
+});
+watch(remainingCount, (newVal) => {
+  if (newVal <= 5 && !hasShownEncouragement2) {
+    hasShownEncouragement2 = true;
+    isExtended.value = true;
+    circleColor.value = "#ee0a24";
+    const audio = new Audio(woohooSound);
+    audio.play().catch((err) => {
+      console.warn("播放失败：", err);
+    });
+
+    showEncouragement2.value = true;
+    setTimeout(() => {
+      showEncouragement2.value = false;
+    }, 1500);
+  }
+});
 watch(currentIndex, () => {
   resetExecutionForNewWord();
 });
@@ -1624,7 +1777,15 @@ const { pause, resume } = useIntervalFn(
   { immediate: false }
 );
 const currentHeight = ref("");
+const rowMarginTop = ref(0);
 const handleSwipeChange = (index) => {
+  if (index === currentIndex.value) {
+    console.log(111);
+    return;
+  }
+  window.speechSynthesis.cancel();
+
+  // 到下一个页面自动触发
   nextTick(() => {
     const el = swipeRef.value?.$el?.querySelector(
       `.van-swipe-item:nth-child(${index + 1}) .card`
@@ -1634,15 +1795,32 @@ const handleSwipeChange = (index) => {
       // console.log('当前 swipe-item 高度：', currentHeight.value);
     }
   });
-  if (synonymsOptions.value[index].is_spell) {
-    autoplay2.value = autoplayInit.value + 17000;
-  } else if (
-    synonymsOptions.value[index].排除 === "试题" ||
-    synonymsOptions.value[index].排除 === "手写"
-  ) {
-    autoplay2.value = autoplayInit.value + 27000;
+  if (!isExtended.value) {
+    if (synonymsOptions.value[index].is_spell) {
+      autoplay2.value = autoplayInit.value + 17000;
+    } else if (
+      synonymsOptions.value[index].排除 === "试题" ||
+      synonymsOptions.value[index].排除 === "手写"
+    ) {
+      autoplay2.value = autoplayInit.value + 27000;
+      // autoplay2.value = autoplayInit.value
+    } else {
+      autoplay2.value = autoplayInit.value;
+    }
   } else {
-    autoplay2.value = autoplayInit.value;
+    // woohoo后增加2秒
+    if (synonymsOptions.value[index].is_spell) {
+      autoplay2.value = autoplayInit.value + 19000;
+    } else if (
+      synonymsOptions.value[index].排除 === "试题" ||
+      synonymsOptions.value[index].排除 === "手写"
+    ) {
+      autoplay2.value = autoplayInit.value + 29000;
+      // autoplay2.value = autoplayInit.value
+    } else {
+      autoplay2.value = autoplayInit.value + 2000;
+    }
+    isExtended.value = false;
   }
 
   // console.log(autoplay2.value);
@@ -1651,11 +1829,36 @@ const handleSwipeChange = (index) => {
       synonymsOptions.value[index]["排除"] !== "试题" &&
       synonymsOptions.value[index]["排除"] !== "手写"
     ) {
-      speakWord(synonymsOptions.value[index]["英文"]);
+      const word = synonymsOptions.value[index]["英文"];
+
+      if (completeCount.value === totalCount.value / 2) {
+        setTimeout(() => {
+          speakWord(word);
+        }, 2500); // 延迟2秒
+      } else {
+        speakWord(word); // 立即执行
+      }
     }
   } catch (error) {
     console.error("Error speaking word:", error);
   }
+  //   nextTick(() => {
+  //   setTimeout(() => {
+  //     // 再次验证状态一致性
+  //     if (currentIndex.value === index && synonymsOptions.value[index]) {
+  //       try {
+  //         if (
+  //           synonymsOptions.value[index]["排除"] !== "试题" &&
+  //           synonymsOptions.value[index]["排除"] !== "手写"
+  //         ) {
+  //           speakWord(synonymsOptions.value[index]["英文"]);
+  //         }
+  //       } catch (error) {
+  //         console.error("发音错误:", error);
+  //       }
+  //     }
+  //   }, 100); // 给DOM更新足够时间
+  // });
   showAnswerIsSpell.value = "";
   // selectedItems.value = [];
   currentIndex.value = index;
@@ -1702,7 +1905,25 @@ const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
+onUnmounted(() => {
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+function handleBeforeUnload(event) {
+  event.preventDefault();
+  event.returnValue = ""; // 显示浏览器默认的“离开页面”确认对话框
+}
 onMounted(async () => {
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  if (flagTheme.value == 1) {
+    srcTheme.value = shouxieSrcGoatAndWolf;
+    srcswipeEncouragement.value = swipeEncouragementSrcGoatAndWolf;
+    srcswipeEncouragement2.value = swipeEncouragementSrcGoatAndWolf2;
+  }
+  if (flagTheme.value == 2) {
+    srcTheme.value = shouxieBears;
+    srcswipeEncouragement.value = swipeEncouragementBears;
+    srcswipeEncouragement2.value = swipeEncouragementBears2;
+  }
   nextTick(() => {
     const el = swipeRef.value?.$el?.querySelector(
       ".van-swipe-item:nth-child(1) .card"
@@ -1774,7 +1995,7 @@ onMounted(async () => {
     remainingSeconds.value = (autoplay2.value / 1000).toString();
     totalSlides.value = data.answers.length;
 
-    // console.log('totalSlides', totalSlides.value);
+    console.log("totalSlides", totalSlides.value);
     alias.value = data.alias;
     lock_spell.value = history.state.lock_spell;
     if (lock_spell.value) {
@@ -1805,6 +2026,14 @@ onMounted(async () => {
     synonymsOptions.value = data.synonyms;
 
     console.log("synonymsOptions: ", synonymsOptions.value);
+    const len = synonymsOptions.value[0]?.["中文"]?.length || 0;
+    if (len === 7) {
+      rowMarginTop.value = 340;
+    } else if (len === 6) {
+      rowMarginTop.value = 310;
+    } else {
+      rowMarginTop.value = 340; // 默认值，可调整
+    }
     try {
       if (
         synonymsOptions.value[0]["排除"] !== "试题" &&
@@ -2007,8 +2236,49 @@ onMounted(async () => {
       </div>
     </van-overlay>
 
+    <!-- 做题进度 -->
+    <div style="margin-top: 3vh">
+      <van-progress
+        :pivot-text="`${completeCount} / ${totalCount}`"
+        :color="progressColor"
+        :percentage="progressPercentage"
+        :style="progressStyle"
+        :pivot-style="pivotFontStyle"
+      />
+      <img
+        v-if="showEncouragement"
+        :src="srcswipeEncouragement"
+        alt="鼓励动画"
+        style="
+          position: fixed; /* 关键：相对于整个屏幕定位 */
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 75vw;
+          max-width: 400px;
+          z-index: 1000; /* 保证浮在最前面 */
+          pointer-events: none; /* 避免点击时挡住操作 */
+        "
+      />
+      <img
+        v-if="showEncouragement2"
+        :src="srcswipeEncouragement2"
+        alt="鼓励动画"
+        style="
+          position: fixed; /* 关键：相对于整个屏幕定位 */
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: 75vw;
+          max-width: 400px;
+          z-index: 1000; /* 保证浮在最前面 */
+          pointer-events: none; /* 避免点击时挡住操作 */
+        "
+      />
+    </div>
+
     <van-row justify="center">
-      <van-col span="23" style="margin-top: -10px">
+      <van-col span="23" style="margin-top: px">
         <van-swipe
           class="my-swipe"
           :show-indicators="false"
@@ -2019,11 +2289,7 @@ onMounted(async () => {
         >
           <van-swipe-item v-for="(item, index) in synonymsOptions" :key="index">
             <div class="card">
-              <van-checkbox-group
-                class="checkbox-container"
-                v-model="synonymsSelected"
-                ref="checkboxRefs"
-              >
+              <van-checkbox-group v-model="synonymsSelected" ref="checkboxRefs">
                 <van-cell-group>
                   <div class="custom-cell-group">
                     <van-cell clickable class="bold-title2 border-cell">
@@ -2131,6 +2397,7 @@ onMounted(async () => {
                         input-align="left"
                         clearable
                         style="border-bottom: 1px solid #ccc"
+                        @keydown.enter.prevent="onEnter"
                       />
                     </div>
                   </div>
@@ -2145,7 +2412,7 @@ onMounted(async () => {
     <van-row
       class="my-swipe-container"
       justify="space-between"
-      :style="{ marginTop: currentHeight - 305 + 'px' }"
+      :style="{ marginTop: currentHeight - rowMarginTop + 'px' }"
     >
       <van-col span="20" offset="">
         <van-row>
@@ -2160,6 +2427,7 @@ onMounted(async () => {
               >{{ textButtonNext }}</van-button
             >
           </van-col>
+          <!-- span="4" -->
           <van-col
             span="14"
             style="
@@ -2173,6 +2441,7 @@ onMounted(async () => {
           >
             {{ showAnswerIsSpell }}
           </van-col>
+          <!-- <van-col span="8"><img :src="srcTheme" alt="swipeHelp" v-show="showShouxie"></van-col> -->
           <van-col span="2" offset="">
             <van-circle
               v-model:current-rate="currentRate"
@@ -2180,7 +2449,7 @@ onMounted(async () => {
               :speed="0"
               stroke-width="120"
               layer-color="#ebedf0"
-              color="red"
+              :color="circleColor"
               size="50"
               class="time-circle"
             >
@@ -2414,5 +2683,9 @@ html {
   bottom: 25%; /* 距离屏幕底部 25% */
   transform: translateX(-50%); /* 修正水平居中时的偏移 */
   width: 80%; /* 设置进度条的宽度，根据需要调整 */
+}
+
+.van-progress__pivot {
+  white-space: nowrap !important;
 }
 </style>

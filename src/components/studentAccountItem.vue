@@ -2,6 +2,7 @@
 import {
   watch,
   onMounted,
+  onUnmounted,
   ref,
   getCurrentInstance,
   onBeforeUpdate,
@@ -23,6 +24,7 @@ import encouragement from "./encouragement.vue";
 import helpforgood from "./helpforgood.vue";
 import helpforbad from "./helpforbad.vue";
 import submitloading from "./submitloading.vue";
+import happyhalf from "../assets/sound/happyhalf.mp3";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -120,7 +122,6 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
     }
   });
   if (handwriteAnswers.value.length > 0) {
-
     handwriteAnswers.value.forEach(({ 序号, 英文 }) => {
       if (!英文?.trim()) return;
       const current = resultMap.get(序号);
@@ -173,7 +174,8 @@ const compareAndAddFlag = (dictArray) => {
         flag = "false";
       }
     } else if (排除 == "手写") {
-      const cleanString = (str) => (str || "").toLowerCase().replace(/[^a-z]/g, "");
+      const cleanString = (str) =>
+        (str || "").toLowerCase().replace(/[^a-z]/g, "");
       const userInput = cleanString(用户选择[0]);
       const target = cleanString(英文);
 
@@ -298,7 +300,9 @@ const clickSubmitUser = async (action, done) => {
           const hasEnglishComma = str.includes(",");
           return hasChineseSemicolon || hasEnglishComma;
         }
-
+        function isPureEnglish(text) {
+          return /^[A-Za-z]+$/.test(text);
+        }
         compareResult.forEach((item) => {
           let english = item.英文;
           let correctAnswer = item.正确答案;
@@ -318,7 +322,9 @@ const clickSubmitUser = async (action, done) => {
             item.flag !== "true" &&
             !addedEnglishSet.has(english) &&
             !isPhrase(english) &&
-            !containsChineseSemicolon(correctAnswer)
+            typeof correctAnswer === "string" &&
+            !containsChineseSemicolon(correctAnswer) &&
+            isPureEnglish(english)
           ) {
             // console.log(english);
             spellVocabularyResult.push({
@@ -350,7 +356,8 @@ const clickSubmitUser = async (action, done) => {
             item.type.includes(",") &&
             item.is_spell === false &&
             !addedEnglishSet.has(english) &&
-            !isPhrase(english)
+            !isPhrase(english) &&
+            isPureEnglish(english)
           ) {
             spellVocabularyResult.push({
               英文: english,
@@ -1046,7 +1053,8 @@ const toggleCheckChinese = (index, index2) => {
 
   // 判断是否超过一半的选项被选中
   const halfOptions = Math.ceil(synonymsOptions.value.length / 2);
-  if (completeCount.value == halfOptions) {
+  if (completeCount.value == halfOptions && flagHalfEncouragement.value) {
+    flagHalfEncouragement.value = false;
     showAnimationShineEncouragement(); // 调用动画显示方法
   }
 };
@@ -1091,7 +1099,7 @@ const startAnimation = () => {
 const flagHelp = ref(true);
 const totalCoins = ref(0);
 const helpOutside = () => {
-  flagHelp.value = true;
+  // flagHelp.value = true;
   if (flagHelp.value) {
     showConfirmDialog({
       title: "场外支援",
@@ -1193,7 +1201,6 @@ const helpOutside = () => {
 };
 // 单词发音
 const speakWord = (word) => {
-
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     word
   )}&type=1`;
@@ -1220,9 +1227,11 @@ const helpforgoodRef = ref(null);
 const animationVisible_help = ref(false);
 
 const helpforbadRef = ref(null);
-const animationVisible_help2 = ref(false);
+const flagHalfEncouragement = ref(true);
 
 function showAnimationShineEncouragement() {
+  const audio = new Audio(happyhalf);
+  audio.play()
   if (encouragementRef.value.visible) {
     encouragementRef.value.hide();
   } else {
@@ -1261,7 +1270,15 @@ const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
+onUnmounted(() => {
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+function handleBeforeUnload(event) {
+  event.preventDefault();
+  event.returnValue = ""; // 显示浏览器默认的“离开页面”确认对话框
+}
 onMounted(async () => {
+  window.addEventListener("beforeunload", handleBeforeUnload);
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
   showAnswerMagic.value = JSON.parse(sessionStorage.getItem("showAnswerMagic"));
@@ -1503,7 +1520,11 @@ onMounted(async () => {
         <van-cell
           @click="scrollToItem(item.序号 - 1)"
           is-link
-          :title="item.序号 + '. ' + item.英文"
+          :title="
+            item.排除 === '手写'
+              ? item.序号 + '. ' + answers[index].中文
+              : item.序号 + '. ' + item.英文
+          "
           size="large"
           :style="{
             color:

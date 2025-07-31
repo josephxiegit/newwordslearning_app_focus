@@ -2,6 +2,7 @@
 import {
   watch,
   onMounted,
+  onUnmounted,
   ref,
   getCurrentInstance,
   computed,
@@ -746,12 +747,12 @@ const toggleCheckChinese = (index, index2) => {
 
   // 将中文用户选择和选项答案合并
   resultDataTempt.value = mergeSynonymAndSelections(synonymsSelectedChinese);
-  completeCount.value = resultDataTempt.value.reduce((count, item) => {
-    if (item.用户选择[0] !== "无") {
-      return count + 1;
-    }
-    return count;
-  }, 0);
+  // completeCount.value = resultDataTempt.value.reduce((count, item) => {
+  //   if (item.用户选择[0] !== "无") {
+  //     return count + 1;
+  //   }
+  //   return count;
+  // }, 0);
 };
 function isSelected(index, index2) {
   return selectedIndexes.value[`${index}-${index2}`];
@@ -765,7 +766,14 @@ const goToNext = () => {
   const currentSlideSelections = Object.keys(selectedIndexes.value).filter(
     (key) => key.startsWith(`${currentSlideIndex}-`)
   );
-
+  // 第一个可能是手写
+  if (
+    currentSlideIndex == 0 &&
+    (!mergedData.value || Object.keys(mergedData.value).length === 0)
+  ) {
+    mergedData.value = mergeAnswerAndSynonym();
+  }
+  
   const hasSelection = currentSlideSelections.some(
     (key) => selectedIndexes.value[key]
   );
@@ -1320,7 +1328,15 @@ const checkedSpell = ref(false);
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
+onUnmounted(() => {
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+});
+function handleBeforeUnload(event) {
+  event.preventDefault();
+  event.returnValue = ""; // 显示浏览器默认的“离开页面”确认对话框
+}
 onMounted(async () => {
+  window.addEventListener("beforeunload", handleBeforeUnload);
   checkedNoneOfAbove.value = history.state.checkedNoneOfAbove;
   checkedSpell.value = history.state.checkedSpell;
   showAnimationTest();

@@ -89,6 +89,8 @@ function processData(res) {
         .replace(/doesn"t/gi, "doesn't")
         .replace(/don"t/gi, "don't")
         .replace(/I"ll/gi, "I'll")
+        .replace(/you"ll/gi, "you'll")
+        .replace(/one"s/gi, "one's")
         .replace(/let"s/gi, "let's");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
@@ -121,11 +123,23 @@ function processData(res) {
           userSelection.sort();
 
           // 比较两个列表并设置 flag
-          logItem.flag =
-            correctAnswerList.length === userSelection.length &&
-            correctAnswerList.join(",") === userSelection.join(",")
-              ? "true"
-              : "false";
+          if (logItem.排除 === "手写") {
+            const correctAnswer_2 = logItem.英文;
+            const cleanString = (str) => (str || "").toLowerCase().replace(/[^a-z]/g, "");
+            const userInput = cleanString(userSelection.join(","));
+            const target = cleanString(correctAnswer_2);
+            if (userInput && target && userInput === target) {
+              return true;
+            } else {
+              return false;
+            }
+          } else {
+            logItem.flag =
+              correctAnswerList.length === userSelection.length &&
+              correctAnswerList.join(",") === userSelection.join(",")
+                ? "true"
+                : "false";
+          }
         });
       }
 
@@ -347,9 +361,14 @@ const isCorrectAnswer = (
   排除,
   英文
 ) => {
-  if (排除 === '手写') {
-    const userChoicesString = userChoices.join("");
-    return userChoicesString === 英文;
+  if (排除 === "手写") {
+    // const userChoicesString = userChoices.join("");
+    // return userChoicesString === 英文;
+    const cleanString = (str) =>
+      (str || "").toLowerCase().replace(/[^a-z]/g, "");
+    const userChoicesString = cleanString(userChoices.join(""));
+    const target = cleanString(英文);
+    return userChoicesString === target;
   }
   if (is_spell) {
     const userChoicesString = userChoices.join("");
@@ -802,7 +821,7 @@ const reloadPage = () => {
           >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
-                {{ item.排除 === '手写' ? item.答案 : item.英文 }}
+                {{ item.排除 === "手写" ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
@@ -823,8 +842,8 @@ const reloadPage = () => {
                     : 'red',
                 }"
               >
-              {{ item.排除 === '手写' ? '用户手写' : '用户选择' }}：
-              {{ item.用户选择.join('/') }}
+                {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
+                {{ item.用户选择.join("/") }}
               </div>
             </template>
           </van-cell>

@@ -624,7 +624,6 @@ onUnmounted(() => {
     <van-floating-bubble axis="xy" magnetic="x" icon="chat" @click="showHell" />
     <!-- closeable -->
     <van-popup
-    
       v-model:show="showAccountPop"
       position="bottom"
       :style="{ height: '100%' }"
@@ -654,7 +653,6 @@ onUnmounted(() => {
             ♠ Designed by xie ♠
           </div>
         </div>
-        <!-- <div class="student-version">学生版</div> -->
       </div>
 
       <div style="position: fixed; bottom: 0; width: 100%">
@@ -864,10 +862,12 @@ onUnmounted(() => {
   }
 }
 .logo {
-  font-size: 20px;
+  font-size: clamp(16px, 2.5vw, 32px);
   font-family: "SourceHanSansCN-Bold" !important;
   font-weight: 700;
   color: #222;
+  /* position: fixed;
+  bottom: 60%; */
   position: fixed;
   bottom: 60%;
   width: 100%;
@@ -876,8 +876,30 @@ onUnmounted(() => {
   justify-content: center; /* Flexbox 水平居中所有内容 */
   overflow: hidden; /* 防止超出内容影响布局 */
 }
+/* 中等屏幕优化 */
+/* @media (min-width: 768px) {
+  .logo {
+    font-size: clamp(18px, 2vw, 32px);
+  }
+} */
 
+/* 大屏幕优化 */
+/* @media (min-width: 1200px) {
+  .logo {
+    font-size: clamp(20px, 1.8vw, 36px);
+  }
+} */
+
+/* 超大屏幕限制最大尺寸 */
+/* @media (min-width: 1920px) {
+  .logo {
+    font-size: 36px;
+  }
+} */
 .logo::after {
+  /* font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;  */
   content: attr(data-text);
   position: absolute;
   top: 50%; /* 修改为垂直居中 */
