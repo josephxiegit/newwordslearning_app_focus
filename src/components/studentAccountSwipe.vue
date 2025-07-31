@@ -1779,11 +1779,6 @@ const { pause, resume } = useIntervalFn(
 const currentHeight = ref("");
 const rowMarginTop = ref(0);
 const handleSwipeChange = (index) => {
-  if (index === currentIndex.value) {
-    console.log(111);
-    return;
-  }
-  window.speechSynthesis.cancel();
 
   // 到下一个页面自动触发
   nextTick(() => {
