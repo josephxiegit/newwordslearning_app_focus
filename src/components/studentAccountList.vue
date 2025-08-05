@@ -228,9 +228,9 @@ const goToNextPage = (
         allChineseSet.delete(synonym.选项.trim());
       }
       // console.log('correctChineseAnswers', correctChineseAnswers);
-      // 处理带 / 的选项
+      // 处理带 ; 的选项
       if (synonym.选项) {
-        // 拆分 / 并移除每个部分
+        // 拆分 ; 并移除每个部分
         synonym.选项.split("；").forEach((opt) => {
           const trimmedOpt = opt.trim();
           if (trimmedOpt) {
@@ -238,18 +238,44 @@ const goToNextPage = (
           }
         });
       }
+      // // 构建当前 synonym 可用的选项
+      // let finalOptions = new Set(correctChineseAnswers);
+      // if (synonym.选项) {
+      //   synonym.选项.split("；").forEach((option) => {
+      //     const trimmedOption = option.trim();
+      //     if (trimmedOption) {
+      //       finalOptions.add(trimmedOption);
+      //     }
+      //   });
+      // }
+
+      // // 随机填充选项，确保 `选项` 不会错位
+      // let remainingChinese = shuffle(Array.from(allChineseSet));
+      // remainingChinese.forEach((word) => {
+      //   if (finalOptions.size < numberOption) {
+      //     finalOptions.add(word);
+      //   }
+      // });
+
       // 构建当前 synonym 可用的选项
       let finalOptions = new Set(correctChineseAnswers);
-      if (synonym.选项) {
-        synonym.选项.split("；").forEach((option) => {
-          const trimmedOption = option.trim();
-          if (trimmedOption) {
-            finalOptions.add(trimmedOption);
-          }
+
+      // 计算还能添加多少个选项
+      const remainingSlots = numberOption - finalOptions.size;
+
+      // 只有在还有空位时才添加额外选项
+      if (synonym.选项 && remainingSlots > 0) {
+        const extraOptions = synonym.选项.split("；")
+          .map(opt => opt.trim())
+          .filter(opt => opt && !finalOptions.has(opt))
+          .slice(0, remainingSlots); // 限制数量
+        
+        extraOptions.forEach(option => {
+          finalOptions.add(option);
         });
       }
 
-      // 随机填充选项，确保 `选项` 不会错位
+      // 随机填充选项，确保不超过 numberOption
       let remainingChinese = shuffle(Array.from(allChineseSet));
       remainingChinese.forEach((word) => {
         if (finalOptions.size < numberOption) {

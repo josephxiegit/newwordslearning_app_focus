@@ -31,7 +31,7 @@ import woohooSound from "../assets/sound/woohoo.mp3";
 import swipeEncouragementSrcGoatAndWolf from "../assets/swipeEncouragement.gif";
 import swipeEncouragementSrcGoatAndWolf2 from "../assets/swipeEncouragement2.gif";
 import swipeEncouragementBears from "../assets/Boonie Bears/swipeEncouragement.gif";
-import swipeEncouragementBears2 from "../assets/Boonie Bears/swipeEncouragement.gif";
+import swipeEncouragementBears2 from "../assets/Boonie Bears/swipeEncouragement2.gif";
 const flagTheme = inject("flagTheme");
 const router = useRouter();
 const instance = getCurrentInstance();
