@@ -658,6 +658,8 @@ async function refreshtLastDaysDailyTask() {
   params.append("method", "getLastDaysDailyTask");
   params.append("user", dailyUser.value);
   let res = await axios.post("words/", params);
+  console.log('res: ', res);
+  
   LastDaysDailyTask.value = res.data.logs_daily;
   LastDaysReview.value = res.data.logs_review;
   listDailyAndReview.value = [
@@ -760,6 +762,8 @@ function getNewSidesNames() {
   }
 
   filteredSidesName.unshift({ username: "全部", total_reviews: 0 });
+  console.log('filteredSidesName: ', filteredSidesName);
+  
   return filteredSidesName;
 }
 
@@ -1626,7 +1630,7 @@ const reloadPage = () => {
           "
         >
           <div style="font-size: 20px; color: black; margin-top: 1rem">
-            周长复习日志
+            复习日志
           </div>
           <div
             v-if="dateDaily == ''"

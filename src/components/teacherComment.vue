@@ -1800,13 +1800,13 @@ const reloadPage = () => {
           >更新复习</van-button
         >
 
-        <van-button
+        <!-- <van-button
           @click="updateDaily()"
           type="warning"
           block
           style="margin-top: 0.2rem"
           >更新周长</van-button
-        >
+        > -->
       </van-cell-group>
     </van-popup>
 

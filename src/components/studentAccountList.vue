@@ -36,7 +36,11 @@ import chooseModelSrcGoatAndWolfReview from "../assets/review.png";
 import chooseModelSrcBears from "../assets/Boonie Bears/choose.gif";
 import chooseModelSrcBearsReview from "../assets/Boonie Bears/review.gif";
 import reviewCompleteSrcGoatAndWolf from "../assets/review_complete.png";
+import reviewFirstSrcGoatAndWolf from "../assets/swipeHelp2.webp";
+
 import reviewCompleteSrcBears from "../assets/Boonie Bears/review_complete.png";
+import reviewFirstSrcBears from "../assets/Boonie Bears/swipeHelp2.webp";
+
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
 const srcTheme = ref("");
@@ -265,12 +269,13 @@ const goToNextPage = (
 
       // 只有在还有空位时才添加额外选项
       if (synonym.选项 && remainingSlots > 0) {
-        const extraOptions = synonym.选项.split("；")
-          .map(opt => opt.trim())
-          .filter(opt => opt && !finalOptions.has(opt))
+        const extraOptions = synonym.选项
+          .split("；")
+          .map((opt) => opt.trim())
+          .filter((opt) => opt && !finalOptions.has(opt))
           .slice(0, remainingSlots); // 限制数量
-        
-        extraOptions.forEach(option => {
+
+        extraOptions.forEach((option) => {
           finalOptions.add(option);
         });
       }
@@ -1158,7 +1163,9 @@ const goToNextPage = (
                 (item) => item.trim() === removed
               );
               if (synonymIndex !== -1) {
-                let correctAnswers = answer.正确答案.split("；").map((s) => s.trim());
+                let correctAnswers = answer.正确答案
+                  .split("；")
+                  .map((s) => s.trim());
                 // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
                 let availableOptions = [...allChineseSet2]
                   .flatMap((ch) =>
@@ -1203,7 +1210,10 @@ const goToNextPage = (
                 const rawKeyword = synonymItem.中文[synonymIndex];
                 const keyword = escapeRegExp(rawKeyword);
                 // const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
-                const regex = new RegExp(`(?:^|[；,]\\s*)${keyword}(?=\\s*[；,]|$)`, "g");
+                const regex = new RegExp(
+                  `(?:^|[；,]\\s*)${keyword}(?=\\s*[；,]|$)`,
+                  "g"
+                );
                 answer.中文 = answer.中文.replace(regex, "");
 
                 // 清理可能遗留的多余分隔符
@@ -1279,11 +1289,14 @@ const goToNextPage = (
                 (item) => item.trim() === removed
               );
               if (synonymIndex !== -1) {
-                let correctAnswers = answer.正确答案.split("；").map((s) => s.trim());
+                let correctAnswers = answer.正确答案
+                  .split("；")
+                  .map((s) => s.trim());
                 // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文和不与正确答案重复
                 let availableOptions = [...allChineseSet2].filter(
-                  (ch) => !synonymItem.中文.includes(ch) &&
-                  !correctAnswers.includes(ch.trim())
+                  (ch) =>
+                    !synonymItem.中文.includes(ch) &&
+                    !correctAnswers.includes(ch.trim())
                 );
                 if (availableOptions.length > 0) {
                   let randomReplacement =
@@ -1619,22 +1632,22 @@ const goToNextPage = (
     data = replaceOptionInSynonyms(data);
 
     data = getZhenduoxuan(data);
-        data.answers.forEach((item) => {
-          if (item.英文 === "for + 时间段") {
-            console.log("for + 时间段");
-            console.log("答案", item.中文);
-            console.log("正确答案", item.正确答案);
-          }
+    data.answers.forEach((item) => {
+      if (item.英文 === "for + 时间段") {
+        console.log("for + 时间段");
+        console.log("答案", item.中文);
+        console.log("正确答案", item.正确答案);
+      }
+    });
+    data.synonyms.forEach((item) => {
+      if (item.英文 === "for + 时间段") {
+        // console.log("中文", item.中文);
+        console.log("---");
+        item.中文.forEach((item2) => {
+          console.log(item2);
         });
-        data.synonyms.forEach((item) => {
-          if (item.英文 === "for + 时间段") {
-            // console.log("中文", item.中文);
-            console.log("---")
-            item.中文.forEach(item2 => {
-              console.log(item2);
-            });
-          }
-        });
+      }
+    });
     // 放回试题
     if (shiti_backup.length > 0) {
       insertBackupIntoData(data, shiti_backup);
@@ -1942,8 +1955,10 @@ const flagReview = ref(false);
 const dataReview = ref([]);
 const dataReview2 = ref([]);
 const srcReview = ref("");
+const srcReview_first = ref("");
 const flagReviewList = ref(true);
 const nidReview = ref("");
+const reviewRequired = ref(0);
 const handleReviewMode = () => {
   reviewShow.value = true;
   // console.log("flagReviewList", flagReviewList.value);
@@ -1954,7 +1969,9 @@ const handleReviewMode = () => {
   } else {
     // console.log("弹出列表");
   }
-
+  reviewRequired.value =
+    reviewList.value[indexAnswer.value]["is_review_required"];
+  // console.log('reviewRequired: ', reviewRequired.value);
   let resultData = [];
   // console.log("dataReview:", dataReview.value);
   for (let i = 0; i < dataReview.value.length; i++) {
@@ -1977,7 +1994,7 @@ const handleReviewMode = () => {
     resultData.push(obj);
   }
   console.log("resultData", resultData);
-  // console.log("nidReview", nidReview.value);
+
   const countShiti = resultData.filter((item) => item.排除 != "试题").length;
   if (countShiti == 0) {
     showToast("试题组不提供预习\n请直接挑战");
@@ -1988,13 +2005,25 @@ const handleReviewMode = () => {
 const startReview = () => {
   // console.log("dataPreExam: ", dataPreExam.value);
 
+  // router.push({
+  //   path: "/studentAccountPreExam",
+  //   state: {
+  //     data: JSON.stringify(dataPreExam.value),
+  //     username: username.value,
+  //     account_id_list: nidReview.value,
+  //     basicPreExam: basicPreExam.value,
+  //   },
+  // });
+  console.log("reviewRequired: ", reviewRequired.value);
+
   router.push({
-    path: "/studentAccountPreExam",
+    path: "/studentAccountDaily",
     state: {
       data: JSON.stringify(dataPreExam.value),
       username: username.value,
       account_id_list: nidReview.value,
       basicPreExam: basicPreExam.value,
+      reviewRequired: reviewRequired.value,
     },
   });
 };
@@ -2021,6 +2050,86 @@ const loadingReviewData = ref(false);
 const finishedReviewData = ref(false);
 const pageIndexReviewData = ref(0);
 const reviewListLength = ref(0);
+const reviewList_first = ref(1);
+// const onLoadReviewData = async (title = "全部") => {
+//   if (loadingReviewData.value || finishedReviewData.value) {
+//     return;
+//   }
+//   loadingReviewData.value = true;
+//   isLoading.value = true;
+//   try {
+//     const params = new URLSearchParams();
+//     params.append("method", "getUserReviewPage");
+//     params.append("user", username.value);
+//     params.append("page", pageIndexReviewData.value + 1);
+//     params.append("page_size", 20);
+
+//     const response = await axios.post("words/", params);
+//     let moreData = response.data.data;
+//     console.log("reviewListData: ", moreData);
+//     moreData = moreData.map((item) => {
+//       const progress = Math.min(Math.floor((item.coins / 2000) * 100), 100);
+//       return { ...item, progressPercentage: progress };
+//     });
+
+//     if (moreData.length) {
+//       moreData.sort(
+//         (a, b) => new Date(b.create_time) - new Date(a.create_time)
+//       );
+//       moreData.forEach((item) => {
+//         const answers = JSON.parse(item.answers);
+//         const synonyms = JSON.parse(item.synonyms);
+//         // 解析日期并格式化
+//         const date = new Date(item.create_time);
+//         const viewDate = new Date(item.view_time);
+//         const formatter = new Intl.DateTimeFormat("zh-CN", {
+//           year: "numeric",
+//           month: "long",
+//           day: "numeric",
+//           hour: "numeric",
+//           minute: "numeric",
+//           hour12: false,
+//         });
+//         const formattedCreateTime = formatter.format(date);
+//         const formattedViewTime = formatter.format(viewDate);
+//         const newItem = {
+//           ...item,
+//           answers: answers,
+//           synonyms: synonyms,
+//           create_time: formattedCreateTime,
+//           view_time: formattedViewTime,
+//         };
+//         reviewList.value.push(newItem);
+//       });
+//       if (reviewList.value.length > 0) {
+//         flagReview.value = true;
+//         reviewListLength.value = reviewList.value.length;
+//       } else {
+//         reviewListLength.value = 0;
+//       }
+
+//       if (reviewList.value.length == 0) {
+//         if (flagTheme.value == 1) {
+//           srcReview.value = reviewCompleteSrcGoatAndWolf;
+//         }
+//         if (flagTheme.value == 2) {
+//           srcReview.value = reviewCompleteSrcBears;
+//         }
+//       }
+//       pageIndexReviewData.value++;
+//     }
+//     finishedReviewData.value = !response.data.has_more;
+//   } catch (error) {
+//     console.error("Failed to fetch data:", error);
+//   }
+//   loadingReviewData.value = false;
+//   isLoading.value = false;
+//   console.log("reviewList", reviewList.value);
+//   return reviewList.value;
+// };
+
+// 日常任务
+
 const onLoadReviewData = async (title = "全部") => {
   if (loadingReviewData.value || finishedReviewData.value) {
     return;
@@ -2043,9 +2152,16 @@ const onLoadReviewData = async (title = "全部") => {
     });
 
     if (moreData.length) {
-      moreData.sort(
-        (a, b) => new Date(b.create_time) - new Date(a.create_time)
-      );
+      // 综合排序：先按 is_review_required 从小到大，再按创建时间从新到旧
+      moreData.sort((a, b) => {
+        // 首先按 is_review_required 从小到大排序
+        if (a.is_review_required !== b.is_review_required) {
+          return a.is_review_required - b.is_review_required;
+        }
+        // 如果 is_review_required 相同，再按创建时间从新到旧排序
+        return new Date(b.create_time) - new Date(a.create_time);
+      });
+
       moreData.forEach((item) => {
         const answers = JSON.parse(item.answers);
         const synonyms = JSON.parse(item.synonyms);
@@ -2073,6 +2189,9 @@ const onLoadReviewData = async (title = "全部") => {
       });
       if (reviewList.value.length > 0) {
         flagReview.value = true;
+        reviewList_first.value = reviewList.value.filter(
+          (item) => item.is_review_required === 1
+        ).length;
         reviewListLength.value = reviewList.value.length;
       } else {
         reviewListLength.value = 0;
@@ -2081,9 +2200,11 @@ const onLoadReviewData = async (title = "全部") => {
       if (reviewList.value.length == 0) {
         if (flagTheme.value == 1) {
           srcReview.value = reviewCompleteSrcGoatAndWolf;
+          srcReview_first.value = reviewFirstSrcGoatAndWolf;
         }
         if (flagTheme.value == 2) {
           srcReview.value = reviewCompleteSrcBears;
+          srcReview_first.value = reviewFirstSrcBears;
         }
       }
       pageIndexReviewData.value++;
@@ -2098,7 +2219,6 @@ const onLoadReviewData = async (title = "全部") => {
   return reviewList.value;
 };
 
-// 日常任务
 const flagDaily = ref(true);
 const showDailyList = ref(false);
 const dailyTimes = ref(0);
@@ -3373,40 +3493,51 @@ onMounted(async () => {
     }
 
     getFlagReview().then((response) => {
-      // console.log("response: ", response);
+      console.log("response: ", response);
+      reviewList_first.value = response.filter(
+        (item) => item.is_review_required === 1
+      ).length;
       if (response.length > 0) {
         flagReview.value = true;
         reviewListLength.value = response.length;
+        if (flagTheme.value == 1) {
+          srcReview_first.value = reviewFirstSrcGoatAndWolf;
+        }
+        if (flagTheme.value == 2) {
+          srcReview_first.value = reviewFirstSrcBears;
+        }
       } else {
         flagReview.value = false;
         if (flagTheme.value == 1) {
           srcReview.value = reviewCompleteSrcGoatAndWolf;
+          srcReview_first.value = reviewFirstSrcGoatAndWolf;
         }
         if (flagTheme.value == 2) {
           srcReview.value = reviewCompleteSrcBears;
+          srcReview_first.value = reviewFirstSrcBears;
         }
       }
     });
     return "ok";
   });
-  res = res.then(() => {
-    // 得到每日任务信息
-    async function getFlagReview() {
-      const params = new URLSearchParams();
-      params.append("method", "getUserDaily");
-      params.append("user", username.value);
+  // res = res.then(() => {
+  //   // 得到每日任务信息
+  //   async function getFlagReview() {
+  //     const params = new URLSearchParams();
+  //     params.append("method", "getUserDaily");
+  //     params.append("user", username.value);
 
-      return await axios.post("words/", params).then((ret) => {
-        return ret.data;
-      });
-    }
-    getFlagReview().then((res) => {
-      if (res == 0) {
-        flagDaily.value = false;
-      }
-      dailyTimes.value = res;
-    });
-  });
+  //     return await axios.post("words/", params).then((ret) => {
+  //       return ret.data;
+  //     });
+  //   }
+  //   getFlagReview().then((res) => {
+  //     if (res == 0) {
+  //       flagDaily.value = false;
+  //     }
+  //     dailyTimes.value = res;
+  //   });
+  // });
 });
 </script>
 
@@ -3497,8 +3628,11 @@ onMounted(async () => {
             style="display: flex; margin-top: 0.9rem"
             class="flashing-icon"
           >
-            <van-badge :content="reviewListLength" style="margin-left: -0.7rem">
-              <div class="child">
+            <div style="display: flex; align-items: center; position: relative">
+              <van-badge
+                :content="reviewList_first || ''" 
+                style="margin-left: -0.7rem"
+              >
                 <van-button
                   block
                   plain
@@ -3509,8 +3643,20 @@ onMounted(async () => {
                 >
                   ⚡️ 待复习
                 </van-button>
-              </div>
-            </van-badge>
+              </van-badge>
+              <img
+                :src="srcReview_first"
+                style="
+                  width: auto;
+                  height: 40px;
+                  position: absolute;
+                  left: calc(100% + 15px);
+                  top: 38%;
+                  transform: translateY(-50%);
+                  z-index: 10;
+                "
+              />
+            </div>
           </div>
           <div v-else>
             <img
@@ -3577,7 +3723,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="暑期暂停更新，下学期：单词对对碰，社交和成就功能"
+        text="复习功能更新"
       />
     </div>
     <van-toast
@@ -4659,7 +4805,7 @@ onMounted(async () => {
     </div>
 
     <!-- 日常周常任务 -->
-    <van-badge
+    <!-- <van-badge
       v-if="flagDaily"
       :content="dailyTimes"
       :style="badgeStyle"
@@ -4676,7 +4822,7 @@ onMounted(async () => {
           @click="popupDaily()"
         />
       </div>
-    </van-badge>
+    </van-badge> -->
 
     <!-- 单词表textbook -->
     <van-floating-bubble
@@ -5111,7 +5257,7 @@ onMounted(async () => {
       round=""
       v-model:show="showReviewList"
       position="bottom"
-      :style="{ height: '90%' }"
+      :style="{ height: '95%' }"
     >
       <div style="display: flex">
         <div
@@ -5122,9 +5268,14 @@ onMounted(async () => {
         <div
           style="font-size: 11px; color: #8b0000; margin: 1.5rem 0 0rem 0.5rem"
         >
-          💎 每组获得1钻石
+          <div style="display: flex; gap: 1rem">
+            <div style="color: #ff0000">红色获得1钻石</div>
+            <div style="color: #ff8c00">橙色获得2钻石</div>
+            <div style="color: #0000ff">蓝获得2钻石</div>
+          </div>
         </div>
       </div>
+
       <div
         style="
           display: flex;
@@ -5151,7 +5302,7 @@ onMounted(async () => {
             </template>
             <template #title>
               <div
-                v-if="item.swipe == 0"
+                v-if="item.is_review_required == 1"
                 style="display: flex; align-items: flex-start; width: 160%"
               >
                 <div
@@ -5160,14 +5311,14 @@ onMounted(async () => {
                   {{ processedTitle(item.title) }}
                 </div>
                 <van-badge
-                  content="Game"
-                  color="lightgray"
+                  content="一次复习"
+                  color="#FF0000"
                   style="margin-left: -20px"
                 />
               </div>
 
               <div
-                v-else
+                v-if="item.is_review_required == 2"
                 style="display: flex; align-items: flex-start; width: 160%"
               >
                 <div
@@ -5176,8 +5327,24 @@ onMounted(async () => {
                   {{ processedTitle(item.title) }}
                 </div>
                 <van-badge
-                  content="Game"
-                  color="lightgray"
+                  content="二次复习"
+                  color="#FF8C00"
+                  style="margin-left: -20px"
+                />
+              </div>
+
+              <div
+                v-if="item.is_review_required == 3"
+                style="display: flex; align-items: flex-start; width: 160%"
+              >
+                <div
+                  style="margin-bottom: 7px; font-weight: 700; color: lightgray"
+                >
+                  {{ processedTitle(item.title) }}
+                </div>
+                <van-badge
+                  content="三次复习"
+                  color="#0000FF"
                   style="margin-left: -20px"
                 />
               </div>

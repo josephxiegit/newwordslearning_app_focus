@@ -22,6 +22,7 @@ import {
 } from "vant";
 
 import { useRouter } from "vue-router";
+import preExamAnimation from "./preExam.vue";
 import dailyAnimation from "./dailyAnimation.vue";
 import chineseMeaningSrcGoatAndWolf from "../assets/chinese_meaning.png";
 import chineseMeaningSrcBears from "../assets/Boonie Bears/chinese_meaning.png";
@@ -182,6 +183,7 @@ const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
 const flagSingleOrMultiChoice = ref("单选");
 const flagChoose = ref(true);
+const flagChoose2 = ref(true);
 
 let originalChinese = "";
 const toggleCheckChinese = (index, index2) => {
@@ -339,6 +341,29 @@ const closeMeaning = () => {
   startAnimation();
 };
 
+
+const countdownMeaningClose = ref(5);
+const isDisabledMeaningClose = ref(true);
+const buttonTextMeaningClose = ref(`关闭 (${countdownMeaningClose.value}s)`);
+let interval;
+const startCountdown = () => {
+  clearInterval(interval);
+  countdownMeaningClose.value = 5; // 555555
+  // countdownMeaningClose.value = 0;
+  isDisabledMeaningClose.value = true;
+  buttonTextMeaningClose.value = `${countdownMeaningClose.value}`;
+  interval = setInterval(() => {
+    if (countdownMeaningClose.value > 1) {
+      countdownMeaningClose.value -= 1;
+      buttonTextMeaningClose.value = `关闭 (${countdownMeaningClose.value}s)`;
+    } else {
+      clearInterval(interval); // 清除定时器
+      isDisabledMeaningClose.value = false; // 启用按钮
+      buttonTextMeaningClose.value = "关闭"; // 更新按钮文本
+    }
+  }, 1000); // 每秒更新一次
+};
+
 const correctCount = ref(0);
 const rewardColor = ref("");
 const goToNext = async () => {
@@ -386,6 +411,7 @@ const goToNext = async () => {
       answerShow.value = true;
       buttonText.value = "下一个";
       buttonTextType.value = "warning";
+      
       isCheckboxDisabled.value = true;
       // 判断对错
       let areEqual = false;
@@ -422,6 +448,7 @@ const goToNext = async () => {
           correctArray.every((item) => userArray.includes(item));
       }
       if (areEqual) {
+        flagChoose2.value = true;
         correctCount.value += 1;
         // console.log("correctCount: ", correctCount.value);
 
@@ -488,6 +515,7 @@ const goToNext = async () => {
         flagChoose.value = true;
         textColor.value = "green";
       } else {
+        flagChoose2.value = false;
         const audioFailPage = new Audio(turnfailSound);
         audioFailPage.play().catch((err) => {
           console.warn("播放失败：", err);
@@ -496,9 +524,11 @@ const goToNext = async () => {
         // console.log("mistakesList:", mistakesList.value);
 
         getVocabularyMeaning();
+        startCountdown();
         flagChoose.value = false;
         textColor.value = "red";
       }
+      showAnimation_true2();
       if (currentIndex.value === totalSlides.value - 1) {
         buttonText.value = "任务完成";
         buttonTextType.value = "danger";
@@ -569,12 +599,17 @@ const goToNext = async () => {
             });
           }
           submitList.value = compareAndAddFlag(submitList.value);
-          showSuccessToast("恭喜！💎数量增加+2");
+          if (reviewRequired.value === 1) {
+            showSuccessToast("恭喜！💎数量增加+1");
+          } else {
+            showSuccessToast("恭喜！💎数量增加+2");
+          }
           router.push({
             path: "/studentAccountList",
             state: {
               username: username.value,
               data: basicPreExam.value,
+              reviewRequired: reviewRequired.value
             },
           });
           updateAccountLog();
@@ -774,8 +809,12 @@ const getVocabularyMeaning = () => {
 
 // 动画喜洋洋
 const preExamAnimationRef = ref(null);
+const preExamAnimationRef2 = ref(null);
 function showAnimation_true() {
   preExamAnimationRef.value.show();
+}
+function showAnimation_true2() {
+  preExamAnimationRef2.value.show();
 }
 
 const swipeRef = ref(null);
@@ -830,7 +869,8 @@ async function updateAccountLog() {
   params.append("username", username.value);
   params.append("submittoken", submittoken.value);
   params.append("account_id_list", account_id_list.value);
-  params.append("flagReview", "周常任务");
+  params.append("flagReview", "复习任务");
+  params.append("reviewRequired", reviewRequired.value);
   // params.append("log", JSON.stringify(resultDataTempt.value));
   params.append("log", JSON.stringify(submitList.value));
   return await axios.post("words/", params).then((ret) => {
@@ -892,6 +932,7 @@ const selectedResults = ref({});
 const submittoken = ref("");
 const username = ref("");
 const basicPreExam = ref("");
+const reviewRequired = ref(1);
 const account_id_list = ref("");
 const srcTheme = ref("");
 
@@ -957,6 +998,7 @@ onMounted(async () => {
     });
 
     basicPreExam.value = history.state.basicPreExam;
+    reviewRequired.value = history.state.reviewRequired;
     totalSlides.value = synonymsOptions.value.length;
 
     submittoken.value = new Date().getTime();
@@ -1089,6 +1131,21 @@ onMounted(async () => {
                           </div>
                           <div v-else>
                             <div>{{ item.序号 + ". " + item.正确答案 }}</div>
+                          </div>
+                                                    <div
+                            v-if="item.排除 !== '手写'"
+                            style="font-size: 13px; color: red"
+                          >
+                            {{ flagSingleOrMultiChoice }}
+                            <img
+                              src="../assets/speaker.png"
+                              style="
+                                width: 12px;
+                                height: auto;
+                                margin-left: 0.2rem;
+                                margin-top: 0rem;
+                              "
+                            />
                           </div>
                         </div>
                         <div
@@ -1299,17 +1356,27 @@ onMounted(async () => {
         <Divider></Divider>
       </div>
 
-      <van-button
+      <!-- <van-button
         block
         type="primary"
         @click="closeMeaning"
         style="margin-top: 1rem"
       >
         关闭
+      </van-button> -->
+      <van-button
+        block
+        :disabled="isDisabledMeaningClose"
+        type="primary"
+        @click="closeMeaning"
+        style="margin-top: 1rem"
+      >
+        {{ buttonTextMeaningClose }}
       </van-button>
     </van-popup>
 
     <dailyAnimation ref="preExamAnimationRef" />
+    <preExamAnimation ref="preExamAnimationRef2" :flagChoose="flagChoose2" />
     <loading v-if="isLoading" />
   </div>
 </template>
