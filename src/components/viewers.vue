@@ -595,30 +595,74 @@ const dateDaily = ref("");
 const minDateDaily = ref(new Date(2025, 0, 1));
 const formatDate = (date) =>
   `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-const onConfirmDailyRange = async (values) => {
-  let toast1 = showLoadingToast({
-    message: "查询中...",
-    forbidClick: true,
-  });
-  const [start, end] = values;
-  showDailyRange.value = false;
-  dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;
-  LastDaysDailyTask.value = [];
-  LastDaysReview.value = [];
-  listDailyAndReview.value = [];
-  let params = new URLSearchParams();
-  params.append("method", "getLastDaysDailyTask");
-  params.append("user", dailyUser.value);
-  params.append("dateRange", dateDaily.value);
-  let res = await axios.post("words/", params);
-  console.log("res: ", res.data);
-  listDailyAndReview.value = [
-    ...res.data.logs_daily,
-    ...res.data.logs_review,
-  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-  toast1.close();
+// const onConfirmDailyRange = async (values) => {
+//   let toast1 = showLoadingToast({
+//     message: "查询中...",
+//     forbidClick: true,
+//   });
+//   const [start, end] = values;
+//   showDailyRange.value = false;
+//   dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;
+//   LastDaysDailyTask.value = [];
+//   LastDaysReview.value = [];
+//   listDailyAndReview.value = [];
+//   let params = new URLSearchParams();
+//   params.append("method", "getLastDaysDailyTask");
+//   params.append("user", dailyUser.value);
+//   params.append("dateRange", dateDaily.value);
+//   let res = await axios.post("words/", params);
+//   console.log("res: ", res.data);
+//   listDailyAndReview.value = [
+//     ...res.data.logs_daily,
+//     ...res.data.logs_review,
+//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+//   toast1.close();
+// };
+const onConfirmDailyRange = async (values) => {   
+  let toast1 = showLoadingToast({     
+    message: "查询中...",     
+    forbidClick: true,   
+  });   
+  
+  const [start, end] = values;   
+  showDailyRange.value = false;   
+  dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;   
+  
+  LastDaysDailyTask.value = [];   
+  LastDaysReview.value = [];   
+  listDailyAndReview.value = [];   
+  
+  let params = new URLSearchParams();   
+  params.append("method", "getLastDaysDailyTask");   
+  params.append("user", dailyUser.value);   
+  params.append("dateRange", dateDaily.value);   
+  
+  let res = await axios.post("words/", params);   
+  console.log("res: ", res.data);   
+  
+  // 合并 logs_daily 到 logs_review
+  if (res.data.logs_daily && res.data.logs_daily.length > 0) {
+    // 将 logs_daily 的内容合并到 logs_review
+    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
+    
+    // 按时间排序合并后的数据
+    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+    
+    // 清空 logs_daily
+    LastDaysDailyTask.value = [];
+    
+    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+  } else {
+    // 如果没有 logs_daily 数据，直接使用 logs_review
+    LastDaysReview.value = res.data.logs_review || [];
+    LastDaysDailyTask.value = [];
+  }
+  
+  // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
+  listDailyAndReview.value = [...LastDaysReview.value];
+  
+  toast1.close(); 
 };
-
 // 复习细节
 const LastDaysReview = ref([]);
 
@@ -631,43 +675,119 @@ const LastDaysDailyTask = ref([]);
 const listDailyAndReview = ref([]);
 const showLastDaysDailyTask = ref(false);
 
-async function getLastDaysDailyTask(username) {
-  dailyUser.value = username;
-  let params = new URLSearchParams();
-  params.append("method", "getLastDaysDailyTask");
-  params.append("user", username);
-  let res = await axios.post("words/", params);
-  console.log("res: ", res.data);
-  LastDaysDailyTask.value = res.data.logs_daily;
-  LastDaysReview.value = res.data.logs_review;
-  listDailyAndReview.value = [
-    ...LastDaysDailyTask.value,
-    ...LastDaysReview.value,
-  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-}
-async function refreshtLastDaysDailyTask() {
-  let toast1 = showLoadingToast({
-    message: "查询中...",
-    forbidClick: true,
-  });
-  LastDaysDailyTask.value = [];
-  LastDaysReview.value = [];
-  listDailyAndReview.value = [];
-  dateDaily.value = "";
-  let params = new URLSearchParams();
-  params.append("method", "getLastDaysDailyTask");
-  params.append("user", dailyUser.value);
-  let res = await axios.post("words/", params);
-  console.log('res: ', res);
+// async function getLastDaysDailyTask(username) {
+//   dailyUser.value = username;
+//   let params = new URLSearchParams();
+//   params.append("method", "getLastDaysDailyTask");
+//   params.append("user", username);
+//   let res = await axios.post("words/", params);
+//   console.log("res: ", res.data);
+//   LastDaysDailyTask.value = res.data.logs_daily;
+//   LastDaysReview.value = res.data.logs_review;
+//   listDailyAndReview.value = [
+//     ...LastDaysDailyTask.value,
+//     ...LastDaysReview.value,
+//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+// }
+
+async function getLastDaysDailyTask(username) {   
+  dailyUser.value = username;   
   
-  LastDaysDailyTask.value = res.data.logs_daily;
-  LastDaysReview.value = res.data.logs_review;
-  listDailyAndReview.value = [
-    ...LastDaysDailyTask.value,
-    ...LastDaysReview.value,
-  ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-  toast1.close();
+  let params = new URLSearchParams();   
+  params.append("method", "getLastDaysDailyTask");   
+  params.append("user", username);   
+  
+  let res = await axios.post("words/", params);   
+  console.log("res: ", res.data);   
+  
+  // 合并 logs_daily 到 logs_review
+  if (res.data.logs_daily && res.data.logs_daily.length > 0) {
+    // 将 logs_daily 的内容合并到 logs_review
+    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
+    
+    // 按时间排序合并后的数据
+    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+    
+    // 清空 logs_daily
+    LastDaysDailyTask.value = [];
+    
+    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+  } else {
+    // 如果没有 logs_daily 数据，直接使用 logs_review
+    LastDaysReview.value = res.data.logs_review || [];
+    LastDaysDailyTask.value = [];
+  }
+  
+  // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
+  listDailyAndReview.value = [...LastDaysReview.value];
 }
+
+// async function refreshtLastDaysDailyTask() {
+//   let toast1 = showLoadingToast({
+//     message: "查询中...",
+//     forbidClick: true,
+//   });
+//   LastDaysDailyTask.value = [];
+//   LastDaysReview.value = [];
+//   listDailyAndReview.value = [];
+//   dateDaily.value = "";
+//   let params = new URLSearchParams();
+//   params.append("method", "getLastDaysDailyTask");
+//   params.append("user", dailyUser.value);
+//   let res = await axios.post("words/", params);
+//   console.log('res: ', res);
+  
+//   LastDaysDailyTask.value = res.data.logs_daily;
+//   LastDaysReview.value = res.data.logs_review;
+//   listDailyAndReview.value = [
+//     ...LastDaysDailyTask.value,
+//     ...LastDaysReview.value,
+//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+//   toast1.close();
+// }
+
+async function refreshtLastDaysDailyTask() {   
+  let toast1 = showLoadingToast({     
+    message: "查询中...",     
+    forbidClick: true,   
+  });   
+  
+  LastDaysDailyTask.value = [];   
+  LastDaysReview.value = [];   
+  listDailyAndReview.value = [];   
+  dateDaily.value = "";   
+  
+  let params = new URLSearchParams();   
+  params.append("method", "getLastDaysDailyTask");   
+  params.append("user", dailyUser.value);   
+  
+  let res = await axios.post("words/", params);   
+  console.log('res: ', res);      
+  
+  // 合并 logs_daily 到 logs_review
+  if (res.data.logs_daily && res.data.logs_daily.length > 0) {
+    // 将 logs_daily 的内容合并到 logs_review
+    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
+    
+    // 按时间排序合并后的数据
+    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
+    
+    // 清空 logs_daily
+    LastDaysDailyTask.value = [];
+    
+    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+  } else {
+    // 如果没有 logs_daily 数据，直接使用 logs_review
+    LastDaysReview.value = res.data.logs_review || [];
+    LastDaysDailyTask.value = [];
+  }
+  
+  // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
+  listDailyAndReview.value = [...LastDaysReview.value];
+  
+  toast1.close(); 
+}
+
 const onChangeSidebar = async (index) => {
   showLastDaysDailyTask.value = sidesName.value[index].username !== "全部";
   getLastDaysDailyTask(sidesName.value[index]["username"]);
@@ -984,8 +1104,7 @@ const reloadPage = () => {
             >
               <template #title>
                 <div style="margin-bottom: 0.5rem; font-weight: 400">
-                  最近十五天周长 {{ LastDaysDailyTask.length }} 次，复习
-                  {{ LastDaysReview.length }} 次
+                  最近十五天复习 {{ LastDaysReview.length }} 次
                 </div>
               </template>
             </van-cell>
@@ -1684,8 +1803,8 @@ const reloadPage = () => {
               </div>
             </template>
             <template #value>
-              <div v-if="item.swipe == '周长'" style="color: blue">
-                {{ item.swipe }}
+              <div v-if="item.swipe == '周长'" style="color: red">
+                复习
               </div>
               <div v-if="item.swipe == '复习'" style="color: red">
                 {{ item.swipe }}

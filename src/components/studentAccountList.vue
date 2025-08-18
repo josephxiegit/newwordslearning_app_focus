@@ -37,9 +37,11 @@ import chooseModelSrcBears from "../assets/Boonie Bears/choose.gif";
 import chooseModelSrcBearsReview from "../assets/Boonie Bears/review.gif";
 import reviewCompleteSrcGoatAndWolf from "../assets/review_complete.png";
 import reviewFirstSrcGoatAndWolf from "../assets/swipeHelp2.webp";
+import reviewFirstSrcGoatAndWolf2 from "../assets/sheep_3.gif";
 
 import reviewCompleteSrcBears from "../assets/Boonie Bears/review_complete.png";
 import reviewFirstSrcBears from "../assets/Boonie Bears/swipeHelp2.webp";
+import reviewFirstSrcBears2 from "../assets/Boonie Bears/sheep_3.gif";
 
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
@@ -1956,6 +1958,7 @@ const dataReview = ref([]);
 const dataReview2 = ref([]);
 const srcReview = ref("");
 const srcReview_first = ref("");
+const srcReview_first2 = ref("");
 const flagReviewList = ref(true);
 const nidReview = ref("");
 const reviewRequired = ref(0);
@@ -2201,10 +2204,12 @@ const onLoadReviewData = async (title = "全部") => {
         if (flagTheme.value == 1) {
           srcReview.value = reviewCompleteSrcGoatAndWolf;
           srcReview_first.value = reviewFirstSrcGoatAndWolf;
+          srcReview_first2.value = reviewFirstSrcGoatAndWolf2;
         }
         if (flagTheme.value == 2) {
           srcReview.value = reviewCompleteSrcBears;
           srcReview_first.value = reviewFirstSrcBears;
+          srcReview_first2.value = reviewFirstSrcBears2;
         }
       }
       pageIndexReviewData.value++;
@@ -3502,19 +3507,23 @@ onMounted(async () => {
         reviewListLength.value = response.length;
         if (flagTheme.value == 1) {
           srcReview_first.value = reviewFirstSrcGoatAndWolf;
+          srcReview_first2.value = reviewFirstSrcGoatAndWolf2;
         }
         if (flagTheme.value == 2) {
           srcReview_first.value = reviewFirstSrcBears;
+          srcReview_first2.value = reviewFirstSrcBears2;
         }
       } else {
         flagReview.value = false;
         if (flagTheme.value == 1) {
           srcReview.value = reviewCompleteSrcGoatAndWolf;
           srcReview_first.value = reviewFirstSrcGoatAndWolf;
+          srcReview_first2.value = reviewFirstSrcGoatAndWolf2;
         }
         if (flagTheme.value == 2) {
           srcReview.value = reviewCompleteSrcBears;
           srcReview_first.value = reviewFirstSrcBears;
+          srcReview_first2.value = reviewFirstSrcBears2;
         }
       }
     });
@@ -3645,7 +3654,8 @@ onMounted(async () => {
                 </van-button>
               </van-badge>
               <img
-                :src="srcReview_first"
+
+                :src="reviewList_first === 0 ? srcReview_first2 : srcReview_first"
                 style="
                   width: auto;
                   height: 40px;

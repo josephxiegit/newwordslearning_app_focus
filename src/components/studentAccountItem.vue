@@ -761,10 +761,11 @@ const purchaseConfirm = async () => {
     isLoading.value = false;
     isabledPurchase.value = true;
     yesornotShowAnswer.value = true;
-
+    // console.log('compareResultFalse', compareResultFalse);
     setTimeout(() => {
       showAnswerMagic.value = true;
       showMagic.value = false;
+
     }, 2000);
   }
   // }
@@ -1231,7 +1232,7 @@ const flagHalfEncouragement = ref(true);
 
 function showAnimationShineEncouragement() {
   const audio = new Audio(happyhalf);
-  audio.play()
+  audio.play();
   if (encouragementRef.value.visible) {
     encouragementRef.value.hide();
   } else {
@@ -1480,8 +1481,13 @@ onMounted(async () => {
             >
               <van-cell-group>
                 <div v-for="(item, index) in compareResultFalse" :key="index">
+                  <!-- :title="`${item.序号}. ${item.英文}`" -->
                   <van-cell
-                    :title="`${item.序号}. ${item.英文}`"
+                    :title="
+                      item.排除 === '手写'
+                        ? item.序号 + '. ' + answers[index].中文
+                        : item.序号 + '. ' + item.英文
+                    "
                     :value="item.用户选择.join('，')"
                     @click="scrollToItem(item.序号 - 1)"
                     is-link=""
