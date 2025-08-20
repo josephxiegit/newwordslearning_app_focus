@@ -5,6 +5,7 @@ import userinfor1 from "../assets/userinfor1.png";
 import attemptPurchase from "../assets/attemptPurchase.png";
 import profileUsershop from "../assets/Boonie Bears/profile_usershop.png";
 import profileUsershopPassiveMagic from "../assets/usershop_passive_magic.png";
+import profileRemoveBarrage from "../assets/barrage.png";
 import viewPurchase from "../assets/viewPurchase.png";
 import { useRouter } from "vue-router";
 import loading from "./loading.vue";
@@ -109,6 +110,7 @@ const clickOrderList = () => {
 const isLoading = ref(false);
 const priceBears = ref(20000);
 const pricePassiveMagic = ref(25000);
+const priceRemoveBarrage = ref(1200);
 const priceStar = ref(4500);
 const priceAttempt = ref(800);
 const priceView = ref(800);
@@ -116,7 +118,9 @@ const showPurchaseList = ref(false);
 const showSkinBoonieBear = ref(false);
 const methodPurchase = ref(null);
 const getPurchaseList = (method) => {
-  if (method == "不灭意志") {
+  if (method == "弹幕消除") {
+    showRemoveBarrage.value = true;
+  } else if (method == "不灭意志") {
     showPassiveMagic.value = true;
   } else if (method == "皮肤购买") {
     showSkinBoonieBear.value = true;
@@ -505,6 +509,60 @@ const purchasePassive = () => {
   });
 };
 
+// 弹幕消除
+const showRemoveBarrage = ref(false);
+const purchaseRemoveBarrage = () => {
+  const storedList = localStorage.getItem("listBarrage");
+  console.log("storedList: ", storedList);
+  // 判断是否有弹幕
+  if (storedList == null) {
+    showToast("无弹幕，无需购买");
+    return;
+  }
+
+  // 判断是否到三天
+  const parsed = JSON.parse(storedList);
+  const timestamp = new Date(parsed.timestamp); // 转为 Date 对象
+  const now = new Date();
+  const diff = now - timestamp;
+  const threeDays = 3 * 24 * 60 * 60 * 1000;
+
+  if (diff < threeDays) {
+    const remaining = threeDays - diff; // 还差多少毫秒
+
+    const remainDays = Math.floor(remaining / (1000 * 60 * 60 * 24));
+    const remainHours = Math.floor(
+      (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+    );
+
+    showToast(`还需要 ${remainDays} 天 ${remainHours} 小时才能购买`);
+    return;
+  }
+
+  showConfirmDialog({
+    title: "弹幕消除",
+    message: `确认花费${priceRemoveBarrage.value}金币消除弹幕吗？`,
+  }).then(async () => {
+    if (usercoins.value < 1200) {
+      showFailToast("金币不足，无法购买");
+      return;
+    }
+    isLoading.value = true;
+    const params = new URLSearchParams({
+      method: "purchaseRemoveBarrage",
+      priceRemoveBarrage: priceRemoveBarrage.value,
+      username: username.value,
+    });
+    const response = await axios.post("words/", params);
+    console.log("res: ", response.data);
+    localStorage.removeItem("listBarrage");
+    const userCoinsResponse = await getUserCoins();
+    usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
+    isLoading.value = false;
+    showToast("删除成功");
+  });
+};
+
 // 钻石换金币
 const showExchange = ref(false);
 const valueDiamonds = ref("1");
@@ -512,7 +570,7 @@ const valueCoins = computed(() => {
   return Number(valueDiamonds.value) * 70;
 });
 const exchangeDiamonds = () => {
-  if(userdiamonds.value <= 0){  
+  if (userdiamonds.value <= 0) {
     showFailToast("钻石不足，无法交易");
     return;
   }
@@ -538,11 +596,10 @@ const confirmExchange = () => {
     const userCoinsResponse = await getUserCoins();
     usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
     userdiamonds.value = userCoinsResponse["data_coins"][0]["diamonds"];
-    
-    toast1.close();
-    showSuccessToast('交易完成');
-    showExchange.value = false;
 
+    toast1.close();
+    showSuccessToast("交易完成");
+    showExchange.value = false;
   });
 };
 
@@ -775,11 +832,57 @@ onMounted(async () => {
         style="width: 100%; height: auto; margin-right: 0.5rem"
       />
       <template #title>
-        <div style="margin-bottom: rem; font-size: larger">不灭意志</div>
-        <div
+        <div style="margin-bottom: 0.5rem; font-size: larger">不灭意志</div>
+        <!-- <div
           style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
         >
           期末考试后开放购买
+        </div> -->
+      </template>
+    </van-dialog>
+
+    <!-- 弹幕消除 -->
+    <van-card desc="首页弹幕" title="弹幕消除" class="custom-cell">
+      <template #thumb>
+        <img
+          :src="profileRemoveBarrage"
+          class="custom-thumb-image"
+          alt="thumbnail"
+        />
+      </template>
+      <template #price>
+        <div class="price-container">
+          <span class="price-text">价格：{{ priceRemoveBarrage }}金币</span>
+        </div>
+      </template>
+      <template #footer>
+        <div class="button-purchase">
+          <van-button
+            size="mini"
+            type="primary"
+            class="buy-button"
+            @click="getPurchaseList('弹幕消除')"
+            >购买</van-button
+          >
+        </div>
+      </template>
+    </van-card>
+    <van-dialog
+      v-model:show="showRemoveBarrage"
+      title="弹幕消除"
+      show-cancel-button
+      @confirm="purchaseRemoveBarrage"
+    >
+      <img
+        src="../assets/barrage.png"
+        style="width: 100%; height: auto; margin-right: 0.5rem"
+      />
+      <template #title>
+        <div style="margin-bottom: 0rem; font-size: larger">弹幕消除</div>
+        <div
+          style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+        >
+          弹幕生成后三天才能消除
         </div>
       </template>
     </van-dialog>
@@ -1045,11 +1148,12 @@ onMounted(async () => {
           </template>
         </van-cell>
 
-        <van-cell
-          title="金币增加"
-          :value="valueCoins"
-        />
-        <van-button type="warning" block @click="confirmExchange" style="margin-top: 2rem;"
+        <van-cell title="金币增加" :value="valueCoins" />
+        <van-button
+          type="warning"
+          block
+          @click="confirmExchange"
+          style="margin-top: 2rem"
           >确认交易</van-button
         >
       </van-cell-group>

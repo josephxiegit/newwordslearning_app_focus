@@ -330,7 +330,10 @@ const handleScreenClick = () => {
 };
 
 onMounted(async () => {
-  localStorage.setItem("listBarrage", JSON.stringify(props.words));
+  localStorage.setItem("listBarrage", JSON.stringify({
+    words: props.words,
+    timestamp: new Date().toISOString()
+  }));
   window.addEventListener("click", handleScreenClick);
 
   await nextTick();

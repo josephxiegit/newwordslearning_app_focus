@@ -3282,10 +3282,32 @@ setTimeout(() => {
 // 主题
 onMounted(async () => {
   // 弹幕单词
+  // 检查并清理旧格式的数据
   const storedList = localStorage.getItem("listBarrage");
-
   if (storedList && storedList !== "null" && storedList !== "undefined") {
-    listVideo.value = JSON.parse(storedList);
+    try {
+      const parsedData = JSON.parse(storedList);
+      // 如果解析的数据没有timestamp属性，说明是旧格式，删除它
+      if (!parsedData.timestamp) {
+        localStorage.removeItem("listBarrage");
+        console.log("删除了旧格式的listBarrage数据");
+      }
+    } catch (error) {
+      // 如果JSON解析失败，也删除这个数据
+      localStorage.removeItem("listBarrage");
+      console.log("删除了无效的listBarrage数据");
+    }
+  }
+
+  // 弹幕单词
+  const storedListAfterCheck = localStorage.getItem("listBarrage");
+  if (
+    storedListAfterCheck &&
+    storedListAfterCheck !== "null" &&
+    storedListAfterCheck !== "undefined"
+  ) {
+    const parsedData = JSON.parse(storedListAfterCheck);
+    listVideo.value = parsedData.words; // 取出words部分
     // console.log("listVideo: ", listVideo.value);
   } else {
     console.log("listBarrage 不存在或为空");
@@ -3639,7 +3661,7 @@ onMounted(async () => {
           >
             <div style="display: flex; align-items: center; position: relative">
               <van-badge
-                :content="reviewList_first || ''" 
+                :content="reviewList_first || ''"
                 style="margin-left: -0.7rem"
               >
                 <van-button
@@ -3654,8 +3676,9 @@ onMounted(async () => {
                 </van-button>
               </van-badge>
               <img
-
-                :src="reviewList_first === 0 ? srcReview_first2 : srcReview_first"
+                :src="
+                  reviewList_first === 0 ? srcReview_first2 : srcReview_first
+                "
                 style="
                   width: auto;
                   height: 40px;
@@ -3733,7 +3756,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="复习功能更新"
+        text="复习功能更新，商场上架新商品"
       />
     </div>
     <van-toast

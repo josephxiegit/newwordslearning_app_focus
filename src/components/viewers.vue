@@ -824,7 +824,7 @@ const checkedGridLocation = ref(false);
 const locationitems = ref([
   { icon: "wap-home-o", text: "王串场" },
   { icon: "wap-home-o", text: "小树林" },
-  { icon: "wap-home-o", text: "张鑫" },
+  // { icon: "wap-home-o", text: "张鑫" },
   { icon: "wap-home-o", text: "上门" },
   { icon: "wap-home-o", text: "南楼" },
 ]);
@@ -1044,7 +1044,7 @@ const reloadPage = () => {
       direction="horizontal"
       clickable
       icon-size="10"
-      :column-num="5"
+      :column-num="4"
     >
       <van-grid-item
         v-for="(item, index) in locationitems"
@@ -1423,8 +1423,7 @@ const reloadPage = () => {
               >
                 <template #title>
                   <div style="margin-bottom: 0.5rem; font-weight: 400">
-                    最近十五天周长 {{ LastDaysDailyTask.length }} 次，复习
-                    {{ LastDaysReview.length }} 次
+                    最近十五天复习 {{ LastDaysReview.length }} 次
                   </div>
                 </template>
               </van-cell>
