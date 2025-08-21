@@ -527,17 +527,17 @@ const purchaseRemoveBarrage = () => {
   const diff = now - timestamp;
   const threeDays = 3 * 24 * 60 * 60 * 1000;
 
-  if (diff < threeDays) {
-    const remaining = threeDays - diff; // 还差多少毫秒
+  // if (diff < threeDays) {
+  //   const remaining = threeDays - diff; // 还差多少毫秒
 
-    const remainDays = Math.floor(remaining / (1000 * 60 * 60 * 24));
-    const remainHours = Math.floor(
-      (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-    );
+  //   const remainDays = Math.floor(remaining / (1000 * 60 * 60 * 24));
+  //   const remainHours = Math.floor(
+  //     (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+  //   );
 
-    showToast(`还需要 ${remainDays} 天 ${remainHours} 小时才能购买`);
-    return;
-  }
+  //   showToast(`还需要 ${remainDays} 天 ${remainHours} 小时才能购买`);
+  //   return;
+  // }
 
   showConfirmDialog({
     title: "弹幕消除",
@@ -832,12 +832,12 @@ onMounted(async () => {
         style="width: 100%; height: auto; margin-right: 0.5rem"
       />
       <template #title>
-        <div style="margin-bottom: 0.5rem; font-size: larger">不灭意志</div>
-        <!-- <div
+        <div style="margin-bottom: 0rem; font-size: larger">不灭意志</div>
+        <div
           style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
         >
-          期末考试后开放购买
-        </div> -->
+          仅在游戏模式中生效
+        </div>
       </template>
     </van-dialog>
 
@@ -871,7 +871,7 @@ onMounted(async () => {
       v-model:show="showRemoveBarrage"
       title="弹幕消除"
       show-cancel-button
-      @confirm="purchaseRemoveBarrage"
+      @confirm="purchaseRemoveBarrage()"
     >
       <img
         src="../assets/barrage.png"

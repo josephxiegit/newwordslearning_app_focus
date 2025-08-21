@@ -3756,7 +3756,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="复习功能更新，商场上架新商品"
+        text="复习功能更新，商城上架新商品"
       />
     </div>
     <van-toast
