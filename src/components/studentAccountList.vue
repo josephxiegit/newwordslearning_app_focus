@@ -15,6 +15,7 @@ import "vant/lib/index.css"; // 确保引入样式
 import cover3500Image from "../assets/3500_cover_2025.png";
 import angryWolf from "./angryWolf.vue";
 import missyou from "./missyou.vue";
+import challengeConfirm from "./challengeConfirm.vue";
 import threeStar from "./threeStar.vue";
 import { useRouter } from "vue-router";
 import loading from "./loading.vue";
@@ -1011,6 +1012,7 @@ const goToNextPage = (
         return "";
       }
     }
+
     if (mode == 0) {
       const message = getStatusMessage(
         checkedSpell.value,
@@ -1096,6 +1098,37 @@ const goToNextPage = (
           usercoins: usercoins.value,
           isRewardEligible: isRewardEligible,
           lock_spell: lock_spell.value,
+        },
+      });
+    }
+    if (mode == 4) {
+      const message = getStatusMessage(
+        checkedSpell.value,
+        checkedNoneOfAbove.value
+      );
+      if (message) {
+        showToast({
+          duration: 3000,
+          closeOnClick: true,
+          closeOnClickOverlay: true,
+          message: message,
+        });
+      }
+      router.push({
+        path: "/studentAccountChallenge",
+        state: {
+          data: JSON.stringify(data),
+          nid: originalData.value[index].nid,
+          title: data["title"],
+          type: data["type"],
+          username: data["username"],
+          usercoins: usercoins.value,
+          isRewardEligible: isRewardEligible,
+          autoplay2: autoplay2,
+          lock_spell: lock_spell.value,
+          checkedNoneOfAbove: checkedNoneOfAbove.value,
+          checkedSpell: checkedSpell.value,
+          RateOrigin: data["rate"],
         },
       });
     }
@@ -2844,9 +2877,9 @@ const onLoadOriginalData = async (title = "全部") => {
 
     const response = await axios.post("words/", params);
     let moreData = response.data.data;
-    // moreData.forEach(item => {
-    //       console.log(item.title);
-    //   });
+    // moreData.forEach((item) => {
+    //   console.log(item.apply_challenge);
+    // });
 
     moreData = moreData.map((item) => {
       const progress = Math.min(Math.floor((item.coins / 2000) * 100), 100);
@@ -3279,6 +3312,70 @@ setTimeout(() => {
   clearInterval(intervalId); // 停止 setInterval
   console.log("弹幕停止，已持续15秒");
 }, 15000); // 10秒后停止
+
+// 挑战赛
+const result = ref("");
+const challengeConfirmRef = ref(null);
+function showChallenge() {
+  challengeConfirmRef.value.show();
+}
+async function handleConfirmChallenge() {
+  const applyitem = originalData.value[indexAnswer.value];
+  console.log("applyitem: ", applyitem);
+  let params = new URLSearchParams();
+  params.append("method", "applyforChallenge");
+  params.append("nid", applyitem["nid"]);
+  const res = await axios.post("words/", params);
+  console.log("res: ", res.data);
+  if (res.data == "申请失败") {
+    showFailToast("申请失败，联系老师");
+  } else {
+    goToNextPage(
+      indexAnswer.value,
+      originalData.value[indexAnswer.value],
+      4,
+      0,
+      1,
+      0,
+      0
+    );
+  }
+}
+
+function handleCancelChallenge() {
+  challengeConfirmRef.value.hide();
+}
+
+const applyforChallenge = () => {
+  showChallenge();
+  // showConfirmDialog({
+  //   title: "确定向老师申请挑战赛吗",
+  //   message: "获胜可赢得金色标志",
+  //   theme: "round-button",
+  //   allowHtml: true,
+  // }).then(async () => {
+
+  //   let params = new URLSearchParams();
+  //   params.append("method", "applyforChallenge");
+  //   params.append("nid", applyitem["nid"]);
+  //   const res = await axios.post("words/", params);
+  //   console.log("res: ", res.data);
+  //   if (res.data == "申请失败") {
+  //     showFailToast("申请失败，联系老师");
+  //   } else {
+  //     goToNextPage(
+  //       indexAnswer.value,
+  //       originalData.value[indexAnswer.value],
+  //       4,
+  //       0,
+  //       1,
+  //       0,
+  //       0
+  //     );
+  //   }
+  // });
+};
+
 // 主题
 onMounted(async () => {
   // 弹幕单词
@@ -3756,7 +3853,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="复习功能更新，商城上架新商品"
+        text="挑战模式更新，新动画 新音效 新创意。发音功能持续优化中..."
       />
     </div>
     <van-toast
@@ -3774,6 +3871,7 @@ onMounted(async () => {
       </template>
     </van-toast>
 
+    <!-- 任务列表 -->
     <van-tabs
       v-model:active="activeTabs"
       @click-tab="onClickTab"
@@ -3983,7 +4081,20 @@ onMounted(async () => {
                 <template #label>
                   <div style="display: flex">
                     <van-rate
-                      v-if="item.is_review_required == 1"
+                      v-if="item.apply_challenge == 2"
+                      v-model="item.rate"
+                      :size="22"
+                      color="#CD853F"
+                      void-icon="good-job"
+                      icon="good-job"
+                      void-color="#eee"
+                      :count="3"
+                      readonly
+                      allow-half
+                    >
+                    </van-rate>
+                    <van-rate
+                      v-else-if="item.is_review_required == 1"
                       v-model="item.rate"
                       :size="20"
                       color="#DBC8AF"
@@ -5038,6 +5149,17 @@ onMounted(async () => {
                 />
               </div>
             </div>
+            <div style="width: 90%; margin-left: 1rem">
+              <van-field
+                v-model="result"
+                is-link
+                readonly
+                name="picker"
+                label="挑战赛"
+                placeholder="需要老师开启"
+                @click="applyforChallenge()"
+              />
+            </div>
 
             <van-progress
               style="margin-top: 0.5rem"
@@ -5563,6 +5685,11 @@ onMounted(async () => {
 
     <angryWolf ref="wolfBackRef" :dialogPosition="dialogPosition" />
     <missyou ref="missyouRef" :days="missDays" />
+    <challengeConfirm
+      ref="challengeConfirmRef"
+      @confirm="handleConfirmChallenge"
+      @cancel="handleCancelChallenge"
+    />
     <threeStar ref="threeStarRef" />
     <loading v-if="isLoading" />
     <getPassive

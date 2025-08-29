@@ -104,7 +104,9 @@ function processData(res) {
         parsedLog = JSON.parse(dataString);
       } catch (error) {
         console.error("JSON parsing error:", error);
-        return null;
+        console.log("原始log数据:", log);
+        // 如果JSON解析失败，直接使用原始log数据
+        parsedLog = log;
       }
 
       const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
@@ -125,7 +127,8 @@ function processData(res) {
           // 比较两个列表并设置 flag
           if (logItem.排除 === "手写") {
             const correctAnswer_2 = logItem.英文;
-            const cleanString = (str) => (str || "").toLowerCase().replace(/[^a-z]/g, "");
+            const cleanString = (str) =>
+              (str || "").toLowerCase().replace(/[^a-z]/g, "");
             const userInput = cleanString(userSelection.join(","));
             const target = cleanString(correctAnswer_2);
             if (userInput && target && userInput === target) {
@@ -274,6 +277,7 @@ const generateTitle = (item) => {
 };
 // 日志详情
 const showDetail = ref(false);
+const detailChallenge = ref(false);
 const detailName = ref("");
 const detailAlias = ref("");
 const detailDate = ref("");
@@ -286,6 +290,7 @@ const numberprev = ref(0);
 const numbershowanswer = ref(0);
 const numbertransparent = ref(0);
 const diamondConsume = ref("");
+
 // 延迟库
 async function getUncertain(nid) {
   loadingUncertain.value = true;
@@ -300,7 +305,8 @@ async function getUncertain(nid) {
 }
 const getUncertainVocabulary = () => {
   getUncertain(detailNid.value).then((res) => {
-    res.value.sort((a, b) => {
+    console.log("res: ", res);
+    res.sort((a, b) => {
       const importantTypes = ["点金", "透视", "回溯"];
 
       const aHasImportantType = importantTypes.some((type) =>
@@ -325,7 +331,7 @@ const getUncertainVocabulary = () => {
   });
 };
 
-const toggleDetail = (index) => {
+const toggleDetail = async (index) => {
   const detail = filteredFiles.value[index];
   detailMode.value = detail["swipe"];
   detailName.value = detail["username"];
@@ -343,14 +349,45 @@ const toggleDetail = (index) => {
   detailRate.value =
     detail["log"].length - detail["falseCount"] + "/" + detail["log"].length;
   detailList.value = detail["log"];
-  console.log("detail: ", detail);
   showDetail.value = true;
+  if (detailMode.value == "挑战") {
+    const params = new URLSearchParams();
+    params.append("method", "getAccountApplyChallenge");
+    params.append("log_nid", detailNid.value);
 
-  getUncertain(detail["nid"]).then((res) => {
-    if (res) {
-      uncertainResult.value = res;
+    const response = await axios.post("words/", params);
+    console.log("response.data", response.data);
+    detailChallenge.value = response.data.apply_challenge;
+    checkedChallenge.value = !detailChallenge.value;
+
+    // console.log("teacher_mark", response.data.teacher_mark);
+
+    // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
+    const teacherMarkedWords = new Set();
+    if (response.data.teacher_mark.length > 0) {
+      const challengeData = JSON.parse(response.data.teacher_mark);
+      challengeData.forEach((item) => {
+        if (item.teacherMark === true && item.英文) {
+          teacherMarkedWords.add(item.英文);
+        }
+      });
     }
-  });
+
+    // 更新 detailList 中每个项目的 teacher_mark 状态
+    detailList.value.forEach((item) => {
+      if (teacherMarkedWords.has(item.英文)) {
+        item.teacherMark = true;
+      } else {
+        item.teacherMark = false;
+      }
+    });
+  } else {
+    getUncertain(detail["nid"]).then((res) => {
+      if (res) {
+        uncertainResult.value = res;
+      }
+    });
+  }
 };
 
 const isCorrectAnswer = (
@@ -427,7 +464,6 @@ const answerLogResult = ref([]);
 const answerUsername = ref("");
 const answerAttempt = ref("");
 const answerSwipe = ref("");
-const answerLens = ref("");
 const answerRate = ref("");
 const answerTitle = ref("");
 const answerTureRate = ref("");
@@ -468,7 +504,64 @@ const showUncertainResult = () => {
   showUncertain.value = true;
 };
 
-// 搜索
+// 挑战模式
+const checkboxRefs3 = ref({});
+const checkboxStates = ref({});
+const checkedChallenge = ref(true);
+const changeSwitchChallenge = () => {
+  if(checkedChallenge.value) {
+    // 打开点击自动上传
+    showToast("点击就上传");
+  } else {
+    // 只能使用刷新按钮上传
+    showToast("按钮才会上传");
+  }
+}
+const toggleCheckChallenge = (index) => {
+  if (detailChallenge.value) return;
+  // 切换选中状态
+  checkboxStates.value[index] = !checkboxStates.value[index];
+  if (detailList.value[index]) {
+    if (checkboxStates.value[index]) {
+      detailList.value[index].teacherMark = true;
+    } else {
+      delete detailList.value[index].teacherMark;
+    }
+  }
+  console.log("checkedChallenge", checkedChallenge.value);
+  if(checkedChallenge.value) {
+    refreshDataChallenge();
+  }
+};
+const refreshDataChallenge = async () => {
+  try {
+    const response = await axios.post(
+      "words/",
+      {
+        method: "refreshTeacherChallenge",
+        nid: detailNid.value,
+        teacher_mark: JSON.stringify(detailList.value),
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log("response: ", response);
+
+    if (response.data.success) {
+      showSuccessToast("教师标记更新成功");
+    } else {
+      showFailToast("更新失败：" + (response.data.message || "未知错误"));
+    }
+  } catch (error) {
+    console.error("提交教师标记失败:", error);
+    showFailToast("提交失败，请检查网络连接");
+  }
+};
+
 onMounted(async () => {});
 
 // 刷新页面
@@ -755,15 +848,20 @@ const reloadPage = () => {
                 display: flex;
               "
             >
-              {{ detailRate }}
-              <div style="display: flex; margin-top: -0.1rem">
+              <div style="margin-top: 0.1rem;">{{ detailRate }}</div>
+
+              <div
+                v-if="detailMode !== '挑战'"
+                style="display: flex; margin-top: -0.1rem"
+              >
                 <span
-                  style="margin-left: 1rem; color: blueviolet"
+                  style="margin-left: 1rem; color: blueviolet; margin-top: 0.1rem;"
                   @click="showUncertainResult"
                   >迟疑库 {{ uncertainResult.length }}</span
                 >
                 <div style="display: flex; margin-top: 0.1rem">
                   <van-icon
+                  style="margin-top: 0.1rem;"
                     name="replay"
                     v-show="!loadingUncertain"
                     @click="getUncertainVocabulary()"
@@ -775,10 +873,35 @@ const reloadPage = () => {
                   />
                 </div>
               </div>
+              <div v-else>
+                <div
+                  style="display: flex; margin-top: 0.1rem; margin-left: 2rem"
+                >
+                  <div @click="refreshDataChallenge" style="font-size: 12px;">上传标记</div>
+                  <van-icon
+                    style="margin-top: 0.1rem"
+                    name="replay"
+                    color="#8B0000"
+                    v-show="!loadingUncertain"
+                    @click="refreshDataChallenge()"
+                  />
+                  <van-loading
+                    size="14"
+                    v-show="loadingUncertain"
+                    style="margin-left: 0.3rem"
+                  />
+                  <van-switch
+                    style="margin-left: 1rem"
+                    v-model="checkedChallenge"
+                    size="15px"
+                    @change="changeSwitchChallenge()"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div style="margin-right: 0rem; color: gray">
-              {{ detailXlsmName }}
+            <div style="margin-top: 0.1rem; color: gray">
+              {{ detailXlsmName.slice(0, -5) }}
             </div>
           </div>
           <div
@@ -811,6 +934,11 @@ const reloadPage = () => {
         </div>
         <div v-for="(item, index) in detailList" :key="index">
           <van-cell
+            :class="{
+              'selected-cell': checkboxStates[index] && !detailChallenge,
+              'disabled-cell': detailChallenge,
+            }"
+            @click="!detailChallenge ? toggleCheckChallenge(index) : null"
             :label="
               item.排除 === '手写'
                 ? `答案：${item.英文}`
@@ -822,10 +950,21 @@ const reloadPage = () => {
             <template #title>
               <div style="font-size: larger; font-weight: 700">
                 {{ item.排除 === "手写" ? item.答案 : item.英文 }}
+
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>
+                <img
+                  v-if="item.teacherMark"
+                  src="../assets/getPassive.gif"
+                  style="
+                    width: 20px;
+                    height: auto;
+                    margin-left: 0.5rem;
+                    margin-right: 0.5rem;
+                  "
+                />
               </div>
               <div
                 style="margin-top: 0.5rem"
@@ -845,6 +984,20 @@ const reloadPage = () => {
                 {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
                 {{ item.用户选择.join("/") }}
               </div>
+            </template>
+
+            <!-- 挑战模式下显示多选框 -->
+            <template
+              #right-icon
+              v-if="detailMode === '挑战' && !detailChallenge"
+            >
+              <van-checkbox
+                :name="`${index + 1}`"
+                v-model="checkboxStates[index]"
+                :ref="(el) => (checkboxRefs3[`${index}`] = el)"
+                :disabled="detailChallenge"
+                @click.stop.prevent="toggleCheckChallenge(index)"
+              />
             </template>
           </van-cell>
         </div>
@@ -920,5 +1073,10 @@ const reloadPage = () => {
 }
 .van-checkbox {
   margin-left: 16px;
+}
+
+.selected-cell {
+  background-color: #f0f8ff; /* 浅蓝色背景 */
+  border-left: 3px solid #1989fa; /* 左侧蓝色边框 */
 }
 </style>

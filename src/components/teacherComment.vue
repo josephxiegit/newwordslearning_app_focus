@@ -67,6 +67,7 @@ function processDatetime(res) {
       is_pinned,
       is_review_required,
       review_time,
+      apply_challenge,
     } = item;
 
     const formattedCreateTime = formatDateString(create_time);
@@ -128,6 +129,7 @@ function processDatetime(res) {
       is_pinned,
       is_review_required,
       review_time: formattedReviewTime,
+      apply_challenge,
     };
   });
 }
@@ -142,7 +144,7 @@ async function queryData() {
 
 function getListData() {
   queryData().then((res) => {
-    // console.log('res: ', res);
+    console.log("res: ", res);
     res = processDatetime(res);
     originalData.value = [...res];
     filterXlsmData.value = [...res];
@@ -694,7 +696,7 @@ const isCorrectAnswer = (
   排除,
   英文
 ) => {
-  if (排除 === '手写') {
+  if (排除 === "手写") {
     // const userChoicesString = userChoices.join("");
     const cleanString = (str) =>
       (str || "").toLowerCase().replace(/[^a-z]/g, "");
@@ -750,14 +752,55 @@ async function getUncertain(nid) {
     return res;
   });
 }
-const toggleDetail = (item, index) => {
+
+const detailChallenge = ref(false);
+const toggleDetail = async (item, index) => {
   // const detail = answerLogList.value[index];
   // console.log('item: ', item);
   detailMode.value = item["swipe"];
+  detailNid.value = item["nid"];
+  detailList.value = item["log"];
+  if (detailMode.value == "挑战") {
+    const params = new URLSearchParams();
+    params.append("method", "getAccountApplyChallenge");
+    params.append("log_nid", detailNid.value);
+
+    const response = await axios.post("words/", params);
+    console.log("response.data", response.data);
+    detailChallenge.value = response.data.apply_challenge;
+
+    // console.log("teacher_mark", response.data.teacher_mark);
+
+    // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
+    const teacherMarkedWords = new Set();
+    
+    if (response.data.teacher_mark.length > 0) {
+      const challengeData = JSON.parse(response.data.teacher_mark);
+      challengeData.forEach((item) => {
+        if (item.teacherMark === true && item.英文) {
+          teacherMarkedWords.add(item.英文);
+        }
+      });
+    }
+
+    console.log('teacherMarkedWords: ', teacherMarkedWords);
+    // 更新 detailList 中每个项目的 teacher_mark 状态
+    detailList.value.forEach((item) => {
+      if (teacherMarkedWords.has(item.英文)) {
+        item.teacherMark = true;
+      } else {
+        item.teacherMark = false;
+      }
+    });
+    console.log("detailList.value: ", detailList.value);
+  }
+
+
+
   detailName.value = item["username"];
   detailDate.value = item["create_time"];
   detailXlsmName.value = item["title"];
-  detailNid.value = item["nid"];
+  
 
   numberprev.value = item["numberprev"];
   numbershowanswer.value = item["numbershowanswer"];
@@ -765,7 +808,6 @@ const toggleDetail = (item, index) => {
   diamondConsume.value = item["diamondConsume"];
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
-  detailList.value = item["log"];
   showDetail.value = true;
 
   getUncertain(item["nid"]).then((res) => {
@@ -874,6 +916,7 @@ function processData(res) {
       is_pinned,
       is_review_required,
       review_time,
+      apply_challenge,
     } = item;
     let dataAnswers = JSON.stringify(answers);
     // console.log("dataAnswers: ", dataAnswers);
@@ -914,6 +957,7 @@ function processData(res) {
       is_pinned,
       is_review_required,
       review_time,
+      apply_challenge,
     };
   });
 }
@@ -1107,48 +1151,50 @@ const reviseGroup = () => {
 
 // 全选功能
 const isAllSelected = computed(() => {
-  return filterXlsmData.value.length > 0 && 
-         selectedItems.value.length === filterXlsmData.value.length
+  return (
+    filterXlsmData.value.length > 0 &&
+    selectedItems.value.length === filterXlsmData.value.length
+  );
 });
 
 const selectAll = () => {
   if (selectedItems.value.length === filterXlsmData.value.length) {
     // 如果已经全选，则取消全选
-    selectedItems.value = []
+    selectedItems.value = [];
   } else {
     // 全选所有项目
-    selectedItems.value = filterXlsmData.value.map((_, index) => index)
+    selectedItems.value = filterXlsmData.value.map((_, index) => index);
   }
-}
+};
 
 const confirmDeleteInDialog = () => {
   if (selectedItems.value.length === 0) {
-    showFailToast("请先选择要删除的项目")
-    return
+    showFailToast("请先选择要删除的项目");
+    return;
   }
-  
+
   // 关闭修改分组对话框
-  showReviseGroup.value = false
-  
+  showReviseGroup.value = false;
+
   // 批量删除函数
   async function DeleteMultipleUserData() {
-    let params = new URLSearchParams()
-    params.append("method", "DeleteMultiUserData")
-    
+    let params = new URLSearchParams();
+    params.append("method", "DeleteMultiUserData");
+
     // 获取所有选中项目的nid
     const selectedNids = selectedItems.value.map(
       (index) => filterXlsmData.value[index].nid
-    )
-    
+    );
+
     // 如果需要批量删除，可能需要传递数组或者循环删除
     // 方案1：如果后端支持批量删除
-    params.append("nids", JSON.stringify(selectedNids))
-    
+    params.append("nids", JSON.stringify(selectedNids));
+
     return await axios.post("words/", params).then((ret) => {
-      return ret.data
-    })
+      return ret.data;
+    });
   }
-  
+
   // 显示确认对话框
   showConfirmDialog({
     title: "Delete",
@@ -1156,11 +1202,11 @@ const confirmDeleteInDialog = () => {
     theme: "round-button",
   }).then(() => {
     DeleteMultipleUserData().then((ret) => {
-      console.log("删除结果:", ret)
-      
+      console.log("删除结果:", ret);
+
       // 清空选择
-      selectedItems.value = []
-      
+      selectedItems.value = [];
+
       // 检查是否处于筛选状态
       if (
         valueSearchStudent.value == "" &&
@@ -1171,14 +1217,14 @@ const confirmDeleteInDialog = () => {
         valueSearchGroup.value == "" &&
         dateCalendar.value == ""
       ) {
-        reloadPage()
+        reloadPage();
       } else {
-        showSuccessToast("处于筛选状态")
-        filterData()
+        showSuccessToast("处于筛选状态");
+        filterData();
       }
-    })
-  })
-}
+    });
+  });
+};
 
 // 编辑数据
 const showReviseData = ref(false);
@@ -1199,6 +1245,7 @@ const valueIsPinned = ref("");
 const valueNid = ref("");
 const valueIsSpell = ref(3);
 const valueIsReviewRequired = ref(0);
+const valueChallenge = ref(0);
 const valueReviewTime = ref("");
 const editData = (index) => {
   itemEdit.value = filterXlsmData.value[index];
@@ -1317,20 +1364,6 @@ const showSpellVocabulary = async () => {
 
   showSelectSpellVocabulary.value = true;
   showReviseData.value = false;
-
-  // getSpellVocabulary().then((res) => {
-  //   if (res.length > 0) {
-  //     let dataString = res[0].data_words.replace(/(\W)'|'(\W)/g, '$1"$2');
-  //     spellExistVocabulary.value = JSON.parse(
-  //       dataString.replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
-  //     );
-  //     lock_spell_status.value = res[0].lock_spell;
-  //     console.log("spellExistVocabulary:", spellExistVocabulary.value);
-  //     showSpellExist.value = true;
-  //   } else {
-  //     showFailToast("无数据");
-  //   }
-  // });
 };
 
 const showSelectSpellVocabulary = ref(false);
@@ -1352,6 +1385,7 @@ async function reviseUserData() {
   params.append("is_pinned", valueIsPinned.value);
   params.append("is_review_required", valueIsReviewRequired.value);
   params.append("is_spell_number", valueIsSpell.value);
+  params.append("apply_challenge", valueChallenge.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
   });
@@ -1489,12 +1523,12 @@ const lockSelectVocabulary = () => {
   // console.log('synonymsSelected: ', synonymsSelected.value);
   // console.log('selectSpellVocabulary: ', selectSpellVocabulary.value);
   const selectedVocabulary = synonymsSelected.value.map((selected) => {
-    console.log('selected: ', selected);
+    console.log("selected: ", selected);
     // 找到序号对应的对象
     const item = selectSpellVocabulary.value.find(
       (vocab) => parseInt(vocab.序号) === parseInt(selected)
     );
-    console.log('item: ', item);
+    console.log("item: ", item);
     // 返回只包含中文和英文的对象
     return { 中文: item.中文, 英文: item.英文 };
   });
@@ -1523,6 +1557,22 @@ const showRatePlus = computed(() => {
   return filterXlsmData.value.map((item) => item.rate > 3);
 });
 
+// 挑战模式
+const showChallenge = ref(false);
+const synonymsSelected2 = ref([]);
+const selectChallengeVocabulary = ref([]);
+const checkboxRefs3 = ref({});
+const challengeItem = ref("");
+const toggleCheckChallenge = (index) => {
+  const key = `${index}`;
+  const checkboxRef = checkboxRefs3.value[key];
+  if (checkboxRef) {
+    checkboxRef.toggle();
+  }
+  console.log(synonymsSelected.value);
+};
+
+
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
     getListData();
@@ -1548,7 +1598,9 @@ const reloadPage = () => {
     <div class="nav-bar-container">
       <van-nav-bar
         title="学生答题统计"
-        :right-text="isMultiSelectMode ? (isAllSelected ? '取消全选' : '全选') : '多选'"
+        :right-text="
+          isMultiSelectMode ? (isAllSelected ? '取消全选' : '全选') : '多选'
+        "
         :left-text="isMultiSelectMode ? '改分组' : '筛选'"
         @click-right="isMultiSelectMode ? selectAll() : toggleMultiSelectMode()"
         @click-left="isMultiSelectMode ? popReviseGroup() : showFilter()"
@@ -1680,15 +1732,31 @@ const reloadPage = () => {
                 <div v-else>{{ item.swipe }}</div>
 
                 <div style="margin-top: 0.3rem">
-                  <div v-if="item.complement == 1" style="display: flex; justify-content: flex-end">
+                  <div
+                    v-if="item.complement == 1"
+                    style="display: flex; justify-content: flex-end"
+                  >
                     <van-tag type="primary" plain mark size="medium">
                       {{ item.true_length }} / {{ item.log.length }}
                     </van-tag>
-                    <div v-if="item.diamondConsume != null && item.diamondConsume != ''" style="margin-top: 0.2rem;">&nbsp;💎</div>
+                    <div
+                      v-if="
+                        item.diamondConsume != null && item.diamondConsume != ''
+                      "
+                      style="margin-top: 0.2rem"
+                    >
+                      &nbsp;💎
+                    </div>
                   </div>
                   <div v-else style="display: flex; justify-content: flex-end">
                     {{ item.true_length }} / {{ item.log.length }}
-                    <div v-if="item.diamondConsume != null && item.diamondConsume != ''">&nbsp;💎</div>
+                    <div
+                      v-if="
+                        item.diamondConsume != null && item.diamondConsume != ''
+                      "
+                    >
+                      &nbsp;💎
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1893,27 +1961,44 @@ const reloadPage = () => {
             <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
             <div>答案:{{ numbershowanswer }}</div>
             <div>透视:{{ numbertransparent }}</div>
-            <div v-if="diamondConsume != null && diamondConsume != ''">💎 {{ diamondConsume }}</div>
+            <div v-if="diamondConsume != null && diamondConsume != ''">
+              💎 {{ diamondConsume }}
+            </div>
           </div>
-          <div v-if="diamondConsume != null && diamondConsume != ''" style="font-size: 13px;color: gray;margin: 5px 15px;">💎 {{ diamondConsume }}</div>
+          <div
+            v-if="diamondConsume != null && diamondConsume != ''"
+            style="font-size: 13px; color: gray; margin: 5px 15px"
+          >
+            💎 {{ diamondConsume }}
+          </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
-          <van-cell             
-              :label="
-                item.排除 === '手写'
-                  ? `答案：${item.英文}`
-                  : item.is_spell
-                  ? `答案：${item.正确答案}`
-                  : `答案：${item.答案}`
-              "
-            >
+          <van-cell
+            :label="
+              item.排除 === '手写'
+                ? `答案：${item.英文}`
+                : item.is_spell
+                ? `答案：${item.正确答案}`
+                : `答案：${item.答案}`
+            "
+          >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
-                {{ item.排除 === '手写' ? item.答案 : item.英文 }}
+                {{ item.排除 === "手写" ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>
+                <img
+                  v-if="item.teacherMark"
+                  src="../assets/getPassive.gif"
+                  style="
+                    width: 20px;
+                    height: auto;
+                    margin-left: 0.5rem;
+                    margin-right: 0.5rem;
+                  "
+                />
               </div>
               <div
                 style="margin-top: 0.5rem"
@@ -1930,8 +2015,8 @@ const reloadPage = () => {
                     : 'red',
                 }"
               >
-                {{ item.排除 === '手写' ? '用户手写' : '用户选择' }}：
-                {{ item.用户选择.join('/') }}
+                {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
+                {{ item.用户选择.join("/") }}
               </div>
             </template>
           </van-cell>
@@ -2213,28 +2298,34 @@ const reloadPage = () => {
           placeholder="请输入0或1"
         />
       </van-cell-group>
-        <!-- 删除按钮 -->
-  <div style="padding: 16px;">
-    <van-button 
-      type="danger" 
-      block 
-      @click="confirmDeleteInDialog"
-      :disabled="selectedItems.length === 0"
-    >
-      删除选中的 {{selectedItems.length}} 个项目
-    </van-button>
-  </div>
+      <!-- 删除按钮 -->
+      <div style="padding: 16px">
+        <van-button
+          type="danger"
+          block
+          @click="confirmDeleteInDialog"
+          :disabled="selectedItems.length === 0"
+        >
+          删除选中的 {{ selectedItems.length }} 个项目
+        </van-button>
+      </div>
     </van-dialog>
 
     <!-- 修改数据 -->
     <van-popup
       v-model:show="showReviseData"
       position="bottom"
-      :style="{ height: '95%' }"
+      :style="{ height: '100%' }"
       closeable
     >
       <van-cell-group inset style="">
-        <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+        <div
+          style="
+            font-size: 18px;
+            font-weight: 700;
+            margin: 1rem 1rem 0.2rem 1rem;
+          "
+        >
           {{ itemEdit.username }}
         </div>
         <van-field v-model="valueAlias" label="分组" placeholder="请输入组名" />
@@ -2312,6 +2403,14 @@ const reloadPage = () => {
         />
         <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
           复习时间: {{ valueReviewTime }}
+        </div>
+        <van-field
+          v-model="valueChallenge"
+          label="挑战"
+          placeholder="0(停止挑战)1(开启挑战)2(挑战成功)"
+        />
+        <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
+          0（停止挑战）｜1（开启挑战）｜2（挑战成功）
         </div>
         <van-field
           v-model="valueIsSpell"
@@ -2449,6 +2548,82 @@ const reloadPage = () => {
         block
         style="margin-top: 0.2rem; margin-bottom: 2rem"
         @click="showSelectSpellVocabulary = false"
+        >关闭</van-button
+      >
+    </van-popup>
+
+    <!-- 挑战模式 -->
+    <van-popup
+      v-model:show="showChallenge"
+      position="bottom"
+      :style="{ height: '95%' }"
+      closeable
+    >
+      <van-cell-group inset style="position: sticky; top: 0; z-index: 10">
+        <div
+          style="
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+          "
+        >
+          挑战
+          {{ challengeItem.username }} | {{ challengeItem.title }} |
+          {{ selectChallengeVocabulary.length }}词
+        </div>
+      </van-cell-group>
+
+      <van-checkbox-group
+        class="checkbox-container"
+        v-model="synonymsSelected2"
+        ref="checkboxRefs2"
+      >
+        <van-cell-group>
+          <div
+            class="custom-cell-group"
+            v-for="(item, index) in selectChallengeVocabulary"
+            :key="index"
+          >
+            <van-cell
+              clickable
+              @click="toggleCheckChallenge(index)"
+              :value="item.中文"
+            >
+              <template #title>
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                  "
+                >
+                  <div>{{ item.序号 + ". " + item.英文 }}</div>
+                </div>
+              </template>
+              <template #right-icon>
+                <van-checkbox
+                  :name="`${index + 1}`"
+                  :ref="(el) => (checkboxRefs3[`${index}`] = el)"
+                  @click.stop.prevent="toggleCheckChallenge(index)"
+                />
+              </template>
+            </van-cell>
+          </div>
+        </van-cell-group>
+      </van-checkbox-group>
+      <van-button
+        type="danger"
+        block
+        style="margin-top: 1rem; margin-bottom: 0rem"
+        @click="confirmChallengeVocabulary"
+        >确认选择</van-button
+      >
+      <van-button
+        type="primary"
+        block
+        style="margin-top: 0.2rem; margin-bottom: 2rem"
+        @click="showChallenge = false"
         >关闭</van-button
       >
     </van-popup>

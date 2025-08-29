@@ -299,7 +299,7 @@ const isCorrectAnswer = (
   排除,
   英文
 ) => {
-  if (排除 === '手写') {
+  if (排除 === "手写") {
     // const userChoicesString = userChoices.join("");
     // return userChoicesString === 英文;
     const cleanString = (str) =>
@@ -356,14 +356,52 @@ async function getUncertain(nid) {
     return res;
   });
 }
-const toggleDetail = (item, index) => {
+
+const detailChallenge = ref(false);
+const toggleDetail = async (item, index) => {
   // const detail = answerLogList.value[index];
-  // console.log('item: ', item);
+  console.log("item: ", item);
   detailMode.value = item["swipe"];
+  detailNid.value = item["nid"];
+  detailList.value = item["log"];
+  
+  if (detailMode.value == "挑战") {
+    const params = new URLSearchParams();
+    params.append("method", "getAccountApplyChallenge");
+    params.append("log_nid", detailNid.value);
+
+    const response = await axios.post("words/", params);
+    console.log("response.data", response.data);
+    detailChallenge.value = response.data.apply_challenge;
+
+    // console.log("teacher_mark", response.data.teacher_mark);
+
+    // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
+    const teacherMarkedWords = new Set();
+    
+    if (response.data.teacher_mark.length > 0) {
+      const challengeData = JSON.parse(response.data.teacher_mark);
+      challengeData.forEach((item) => {
+        if (item.teacherMark === true && item.英文) {
+          teacherMarkedWords.add(item.英文);
+        }
+      });
+    }
+
+    console.log('teacherMarkedWords: ', teacherMarkedWords);
+    // 更新 detailList 中每个项目的 teacher_mark 状态
+    detailList.value.forEach((item) => {
+      if (teacherMarkedWords.has(item.英文)) {
+        item.teacherMark = true;
+      } else {
+        item.teacherMark = false;
+      }
+    });
+    console.log("detailList.value: ", detailList.value);
+  }
   detailName.value = item["username"];
   detailDate.value = item["create_time"];
   detailXlsmName.value = item["title"];
-  detailNid.value = item["nid"];
 
   numberprev.value = item["numberprev"];
   numbershowanswer.value = item["numbershowanswer"];
@@ -371,7 +409,7 @@ const toggleDetail = (item, index) => {
   diamondConsume.value = item["diamondConsume"];
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
-  detailList.value = item["log"];
+  
   showDetail.value = true;
 
   getUncertain(item["nid"]).then((res) => {
@@ -618,50 +656,57 @@ const formatDate = (date) =>
 //   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
 //   toast1.close();
 // };
-const onConfirmDailyRange = async (values) => {   
-  let toast1 = showLoadingToast({     
-    message: "查询中...",     
-    forbidClick: true,   
-  });   
-  
-  const [start, end] = values;   
-  showDailyRange.value = false;   
-  dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;   
-  
-  LastDaysDailyTask.value = [];   
-  LastDaysReview.value = [];   
-  listDailyAndReview.value = [];   
-  
-  let params = new URLSearchParams();   
-  params.append("method", "getLastDaysDailyTask");   
-  params.append("user", dailyUser.value);   
-  params.append("dateRange", dateDaily.value);   
-  
-  let res = await axios.post("words/", params);   
-  console.log("res: ", res.data);   
-  
+const onConfirmDailyRange = async (values) => {
+  let toast1 = showLoadingToast({
+    message: "查询中...",
+    forbidClick: true,
+  });
+
+  const [start, end] = values;
+  showDailyRange.value = false;
+  dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;
+
+  LastDaysDailyTask.value = [];
+  LastDaysReview.value = [];
+  listDailyAndReview.value = [];
+
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", dailyUser.value);
+  params.append("dateRange", dateDaily.value);
+
+  let res = await axios.post("words/", params);
+  console.log("res: ", res.data);
+
   // 合并 logs_daily 到 logs_review
   if (res.data.logs_daily && res.data.logs_daily.length > 0) {
     // 将 logs_daily 的内容合并到 logs_review
-    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
-    
+    const mergedReview = [
+      ...(res.data.logs_review || []),
+      ...res.data.logs_daily,
+    ];
+
     // 按时间排序合并后的数据
-    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-    
+    LastDaysReview.value = mergedReview.sort(
+      (a, b) => new Date(b.create_time) - new Date(a.create_time)
+    );
+
     // 清空 logs_daily
     LastDaysDailyTask.value = [];
-    
-    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+
+    console.log(
+      `已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`
+    );
   } else {
     // 如果没有 logs_daily 数据，直接使用 logs_review
     LastDaysReview.value = res.data.logs_review || [];
     LastDaysDailyTask.value = [];
   }
-  
+
   // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
   listDailyAndReview.value = [...LastDaysReview.value];
-  
-  toast1.close(); 
+
+  toast1.close();
 };
 // 复习细节
 const LastDaysReview = ref([]);
@@ -690,34 +735,41 @@ const showLastDaysDailyTask = ref(false);
 //   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
 // }
 
-async function getLastDaysDailyTask(username) {   
-  dailyUser.value = username;   
-  
-  let params = new URLSearchParams();   
-  params.append("method", "getLastDaysDailyTask");   
-  params.append("user", username);   
-  
-  let res = await axios.post("words/", params);   
-  console.log("res: ", res.data);   
-  
+async function getLastDaysDailyTask(username) {
+  dailyUser.value = username;
+
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", username);
+
+  let res = await axios.post("words/", params);
+  console.log("res: ", res.data);
+
   // 合并 logs_daily 到 logs_review
   if (res.data.logs_daily && res.data.logs_daily.length > 0) {
     // 将 logs_daily 的内容合并到 logs_review
-    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
-    
+    const mergedReview = [
+      ...(res.data.logs_review || []),
+      ...res.data.logs_daily,
+    ];
+
     // 按时间排序合并后的数据
-    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-    
+    LastDaysReview.value = mergedReview.sort(
+      (a, b) => new Date(b.create_time) - new Date(a.create_time)
+    );
+
     // 清空 logs_daily
     LastDaysDailyTask.value = [];
-    
-    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+
+    console.log(
+      `已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`
+    );
   } else {
     // 如果没有 logs_daily 数据，直接使用 logs_review
     LastDaysReview.value = res.data.logs_review || [];
     LastDaysDailyTask.value = [];
   }
-  
+
   // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
   listDailyAndReview.value = [...LastDaysReview.value];
 }
@@ -736,7 +788,7 @@ async function getLastDaysDailyTask(username) {
 //   params.append("user", dailyUser.value);
 //   let res = await axios.post("words/", params);
 //   console.log('res: ', res);
-  
+
 //   LastDaysDailyTask.value = res.data.logs_daily;
 //   LastDaysReview.value = res.data.logs_review;
 //   listDailyAndReview.value = [
@@ -746,46 +798,53 @@ async function getLastDaysDailyTask(username) {
 //   toast1.close();
 // }
 
-async function refreshtLastDaysDailyTask() {   
-  let toast1 = showLoadingToast({     
-    message: "查询中...",     
-    forbidClick: true,   
-  });   
-  
-  LastDaysDailyTask.value = [];   
-  LastDaysReview.value = [];   
-  listDailyAndReview.value = [];   
-  dateDaily.value = "";   
-  
-  let params = new URLSearchParams();   
-  params.append("method", "getLastDaysDailyTask");   
-  params.append("user", dailyUser.value);   
-  
-  let res = await axios.post("words/", params);   
-  console.log('res: ', res);      
-  
+async function refreshtLastDaysDailyTask() {
+  let toast1 = showLoadingToast({
+    message: "查询中...",
+    forbidClick: true,
+  });
+
+  LastDaysDailyTask.value = [];
+  LastDaysReview.value = [];
+  listDailyAndReview.value = [];
+  dateDaily.value = "";
+
+  let params = new URLSearchParams();
+  params.append("method", "getLastDaysDailyTask");
+  params.append("user", dailyUser.value);
+
+  let res = await axios.post("words/", params);
+  console.log("res: ", res);
+
   // 合并 logs_daily 到 logs_review
   if (res.data.logs_daily && res.data.logs_daily.length > 0) {
     // 将 logs_daily 的内容合并到 logs_review
-    const mergedReview = [...(res.data.logs_review || []), ...res.data.logs_daily];
-    
+    const mergedReview = [
+      ...(res.data.logs_review || []),
+      ...res.data.logs_daily,
+    ];
+
     // 按时间排序合并后的数据
-    LastDaysReview.value = mergedReview.sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-    
+    LastDaysReview.value = mergedReview.sort(
+      (a, b) => new Date(b.create_time) - new Date(a.create_time)
+    );
+
     // 清空 logs_daily
     LastDaysDailyTask.value = [];
-    
-    console.log(`已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`);
+
+    console.log(
+      `已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`
+    );
   } else {
     // 如果没有 logs_daily 数据，直接使用 logs_review
     LastDaysReview.value = res.data.logs_review || [];
     LastDaysDailyTask.value = [];
   }
-  
+
   // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
   listDailyAndReview.value = [...LastDaysReview.value];
-  
-  toast1.close(); 
+
+  toast1.close();
 }
 
 const onChangeSidebar = async (index) => {
@@ -882,8 +941,8 @@ function getNewSidesNames() {
   }
 
   filteredSidesName.unshift({ username: "全部", total_reviews: 0 });
-  console.log('filteredSidesName: ', filteredSidesName);
-  
+  console.log("filteredSidesName: ", filteredSidesName);
+
   return filteredSidesName;
 }
 
@@ -1802,9 +1861,7 @@ const reloadPage = () => {
               </div>
             </template>
             <template #value>
-              <div v-if="item.swipe == '周长'" style="color: red">
-                复习
-              </div>
+              <div v-if="item.swipe == '周长'" style="color: red">复习</div>
               <div v-if="item.swipe == '复习'" style="color: red">
                 {{ item.swipe }}
               </div>
@@ -1999,15 +2056,31 @@ const reloadPage = () => {
           <div v-for="(item, index) in answerLogList" :key="index">
             <van-cell is-link @click="toggleDetail(item, index)">
               <template #label>
-                <div v-if="item.complement == 1" style="display: flex; justify-content: flex-start">
+                <div
+                  v-if="item.complement == 1"
+                  style="display: flex; justify-content: flex-start"
+                >
                   <van-tag type="primary" plain mark size="medium">
                     正确率{{ item.true_length }} / {{ item.log.length }}
                   </van-tag>
-                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''" style="margin-top: 0.2rem;">&nbsp;💎</div>
+                  <div
+                    v-if="
+                      item.diamondConsume != null && item.diamondConsume != ''
+                    "
+                    style="margin-top: 0.2rem"
+                  >
+                    &nbsp;💎
+                  </div>
                 </div>
                 <div v-else style="display: flex; justify-content: flex-start">
                   正确率{{ item.true_length }} / {{ item.log.length }}
-                  <div v-if="item.diamondConsume != null && item.diamondConsume != ''">&nbsp;💎</div>
+                  <div
+                    v-if="
+                      item.diamondConsume != null && item.diamondConsume != ''
+                    "
+                  >
+                    &nbsp;💎
+                  </div>
                 </div>
               </template>
               <template #title>
@@ -2171,29 +2244,48 @@ const reloadPage = () => {
             <div style="margin-left: 1rem">回溯:{{ numberprev }}</div>
             <div>答案:{{ numbershowanswer }}</div>
             <div>透视:{{ numbertransparent }}</div>
-            <div v-if="diamondConsume != null && diamondConsume != ''">💎 {{ diamondConsume }}</div>
+            <div v-if="diamondConsume != null && diamondConsume != ''">
+              💎 {{ diamondConsume }}
+            </div>
           </div>
-          <div v-if="diamondConsume != null && diamondConsume != '' && detailMode === '普通'" style="font-size: 13px;color: gray;margin: 5px 10px;">
+          <div
+            v-if="
+              diamondConsume != null &&
+              diamondConsume != '' &&
+              detailMode === '普通'
+            "
+            style="font-size: 13px; color: gray; margin: 5px 10px"
+          >
             💎 {{ diamondConsume }}
           </div>
         </div>
         <div v-for="(item, index) in detailList" :key="index">
-          <van-cell             
-              :label="
-                item.排除 === '手写'
-                  ? `答案：${item.英文}`
-                  : item.is_spell
-                  ? `答案：${item.正确答案}`
-                  : `答案：${item.答案}`
-              "
-            >
+          <van-cell
+            :label="
+              item.排除 === '手写'
+                ? `答案：${item.英文}`
+                : item.is_spell
+                ? `答案：${item.正确答案}`
+                : `答案：${item.答案}`
+            "
+          >
             <template #title>
               <div style="font-size: larger; font-weight: 700">
-                {{ item.排除 === '手写' ? item.答案 : item.英文 }}
+                {{ item.排除 === "手写" ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>
+                <img
+                  v-if="item.teacherMark"
+                  src="../assets/getPassive.gif"
+                  style="
+                    width: 20px;
+                    height: auto;
+                    margin-left: 0.5rem;
+                    margin-right: 0.5rem;
+                  "
+                />
               </div>
               <div
                 style="margin-top: 0.5rem"
@@ -2210,8 +2302,8 @@ const reloadPage = () => {
                     : 'red',
                 }"
               >
-              {{ item.排除 === '手写' ? '用户手写' : '用户选择' }}：
-              {{ item.用户选择.join('/') }}
+                {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
+                {{ item.用户选择.join("/") }}
               </div>
             </template>
           </van-cell>

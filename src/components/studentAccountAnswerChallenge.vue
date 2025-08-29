@@ -18,7 +18,7 @@ import {
   closeToast,
   Toast,
 } from "vant";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import WolfBack from "./wolfBack.vue";
 import VictorySheep from "./victorySheep.vue";
 import HalfTrue from "./HalfTrue.vue";
@@ -32,6 +32,9 @@ const compareResult = ref([]);
 const userSelected = ref([]);
 const nid = ref("");
 
+const teacherMarkCount = computed(() => {
+  return compareResult.value.filter((item) => item.teacherMark === true).length;
+});
 const trueCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "true").length;
 });
@@ -110,7 +113,9 @@ const filteredCompareResult = computed(() => {
     return compareResult.value;
   } else {
     // 当 showAll 为 false 时，过滤掉 flag 为 true 的项
-    return compareResult.value.filter((item) => item.flag !== "true");
+    return compareResult.value.filter(
+      (item) => item.flag !== "true" || item.teacherMark == true
+    );
   }
 });
 function toggleShowAll() {
@@ -192,23 +197,6 @@ function showAnimationShineVictory() {
   }, 8000);
 }
 
-// 延迟库
-const showUncertain = ref(false);
-const uncertainResult = ref("");
-const showUncertainDot = ref(false);
-const showUncertainAndSpell = () => {
-  showWelcomeHalf.value = false;
-  showWelcome.value = false;
-  showUncertain.value = true;
-  showUncertainDot.value = false;
-  handleUncertainClose();
-};
-const showUncertainResult = () => {
-  showUncertain.value = true;
-  showUncertainDot.value = false;
-  handleUncertainClose();
-};
-
 // 单词发音
 const speakWord = (english, answer) => {
   const word = /[a-zA-Z]/.test(english) ? english : answer;
@@ -232,7 +220,6 @@ const speakWord = (english, answer) => {
 };
 // 记录答案时间
 const createTimeAnswer = ref("");
-const createTimeUncertain = ref("");
 const account_data_id = ref(0);
 const account_log_id = ref(0);
 const complement = ref(0);
@@ -267,173 +254,10 @@ const handleAnswerSheetClose = async () => {
   return res.data;
 };
 
-async function updateUncertainDuration(formattedDateStr) {
-  // 上传时间
-  let params = new URLSearchParams();
-  params.append("method", "updateAnswerDuration");
-  params.append("username", username.value);
-  params.append("account_data_id", account_data_id.value);
-  params.append("account_log_id", account_log_id.value);
-  params.append("type", "迟疑");
-  params.append("create_time", formattedDateStr);
-  params.append("duration", 0);
-  return await axios.post("words/", params).then((ret) => {
-    return ret.data;
-  });
-}
-const handleUncertainClose = () => {
-  const date = new Date();
-  const formattedDateStr = `${date.getFullYear()}年${(date.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}月${date.getDate().toString().padStart(2, "0")}日${date
-    .getHours()
-    .toString()
-    .padStart(2, "0")}时${date.getMinutes().toString().padStart(2, "0")}分${date
-    .getSeconds()
-    .toString()
-    .padStart(2, "0")}秒`;
-  // console.log("formattedDateStr:", formattedDateStr);
-
-  updateUncertainDuration(formattedDateStr).then((res) => {
-    console.log(res);
-  });
-};
-
 const handlePageUnload = () => {
   // 页面关闭
   handleAnswerSheetClose();
   sessionStorage.removeItem("videoGame");
-};
-
-// 看视频
-const showVideoPopup = ref(false);
-const showVideoButton = ref(true);
-const videoList = ref([]);
-const customWord = ref([]);
-const userDiamonds = ref("");
-
-const offsetDaily = ref({
-  x: window.innerWidth - 67,
-  y: 90,
-});
-const handleConfirmResult = async () => {
-  if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
-    // if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
-    // console.log('补全单词');
-    let toast1 = showLoadingToast({
-      message: "查询中...",
-      forbidClick: true,
-    });
-    let params = new URLSearchParams();
-    params.append("method", "getUserDiamonds");
-    params.append("user", username.value);
-    params.append("account_log_id", account_log_id.value);
-    let res = await axios.post("words/", params);
-    console.log("res: ", res);
-
-    toast1.close();
-    if (res.data == "补全已完成") {
-      showToast("补全已完成");
-      showVideoButton.value = false;
-      return;
-    }
-    userDiamonds.value = res.data.diamonds;
-    console.log("userDiamonds: ", userDiamonds.value);
-    if (userDiamonds.value >= 3) {
-      videoList.value = [];
-      compareResult.value.forEach((item) => {
-        if (item.flag !== "true" && item.排除 !== "试题") {
-          const correctAnswer =
-            item["正确答案"] !== undefined ? item["正确答案"] : item["答案"];
-
-          const errorItem = {
-            英文: item["英文"],
-            答案: correctAnswer,
-          };
-          videoList.value.push(errorItem);
-        }
-      });
-      console.log("videList:", videoList.value);
-
-      customWord.value = videoList.value.map(
-        (item) => `${item.英文} ${item.答案}`
-      );
-
-      showConfirmDialog({
-        title: "视频看单词",
-        showCancelButton: true,
-        theme: "round-button",
-        message: `当前账户💎${userDiamonds.value}\n看视频抵消背诵错误，消耗💎*3，\n是否确认？`,
-      }).then(() => {
-        pauseAudio();
-        showVideoPopup.value = true;
-      });
-    } else {
-      showConfirmDialog({
-        title: "视频补全失败",
-        theme: "round-button",
-        message: "钻石数量不足，周长任务可以获得钻石",
-        showCancelButton: false,
-      });
-    }
-  } else {
-    showConfirmDialog({
-      title: `视频补全失败`,
-      theme: "round-button",
-      message: `错误在2个及以下才能补全错误<br><b>(不含试题部分)</b>`,
-      allowHtml: true,
-      showCancelButton: false,
-    });
-  }
-};
-
-const onFinishedVideo = () => {
-  showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
-  showVideoButton.value = false;
-  showLoadingToast({
-    message: "补全中...",
-    duration: 0,
-  });
-  async function completeLog() {
-    let params = new URLSearchParams();
-    params.append("method", "completeLog");
-    params.append("account_data_id", account_data_id.value);
-    params.append("account_log_id", account_log_id.value);
-    params.append("complement", complement.value);
-    params.append("user", username.value);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  completeLog().then((res) => {
-    // console.log(res);
-    closeToast();
-    showConfirmDialog({
-      title: "恭喜！本次补全完成",
-      theme: "round-button",
-      message: "多多完成周长任务吧！",
-      showCancelButton: false,
-    });
-  });
-};
-
-const onExitVideo = () => {
-  showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
-  showToast("人不在屏幕前，游戏结束");
-};
-
-const onExitVideo2 = () => {
-  showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
-  showToast("点击次数过多，不够专心");
 };
 
 const areAnswersDifferent = (answer, correctAnswer) => {
@@ -472,64 +296,22 @@ const areAnswersDifferent = (answer, correctAnswer) => {
 };
 
 const newCoins = ref(0);
-const lock_spell = ref(false);
-const spellVocabulary = ref([]);
 const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   // document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("beforeunload", handlePageUnload);
   // window.removeEventListener("pagehide", handlePageUnload);
 });
-onUnmounted(() => {
-  if (audio) {
-    audio.pause();
-    audio.currentTime = 0;
-    audio = null;
-    isPlaying.value = false;
-  }
-});
 
-// 音乐播放
-let audio = null;
-const isPlaying = ref(false);
-const playAudio = () => {
-  if (!audio) {
-    audio = new Audio("/answerBGM.mp3");
-    audio.loop = true;
-    audio.volume = 0.3;
-  }
-
-  audio
-    .play()
-    .then(() => {
-      isPlaying.value = true;
-    })
-    .catch((err) => {
-      console.warn("播放失败：", err);
-    });
-};
-
-const pauseAudio = () => {
-  if (audio && isPlaying.value) {
-    audio.pause();
-    isPlaying.value = false;
-  }
-};
-
-const toggleAudio = () => {
-  if (isPlaying.value) {
-    pauseAudio();
-  } else {111
-    playAudio();
-  }
-};
-
+const teacherMark = ref("");
 onMounted(async () => {
+  // const route = useRoute();
   window.addEventListener("beforeunload", handlePageUnload);
   createTimeAnswer.value = new Date();
-  console.log("history.state", history.state)
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
+    teacherMark.value = JSON.parse(history.state.teacherMark);
+    console.log("teacherMark: ", teacherMark.value);
 
     account_data_id.value = history.state.nid;
     account_log_id.value = history.state.account_log_id;
@@ -537,56 +319,51 @@ onMounted(async () => {
     complement.value = history.state.complement;
     username.value = history.state.username;
 
-    uncertainResult.value = JSON.parse(history.state.uncertainResult);
-    spellVocabulary.value = JSON.parse(history.state.spellVocabulary);
-    lock_spell.value = history.state.lock_spell;
-    // console.log("spellVocabulary: ", spellVocabulary.value);
-    // console.log("lock_spell: ", lock_spell.value);
-
-    uncertainResult.value.sort((a, b) => {
-      const importantTypes = ["点金", "透视", "回溯"];
-
-      const aHasImportantType = importantTypes.some((type) =>
-        a.type.includes(type)
-      );
-      const bHasImportantType = importantTypes.some((type) =>
-        b.type.includes(type)
-      );
-
-      // 如果 a 有重要类型而 b 没有，a 排在前面
-      if (aHasImportantType && !bHasImportantType) {
-        return -1;
-      }
-      // 如果 b 有重要类型而 a 没有，b 排在前面
-      if (bHasImportantType && !aHasImportantType) {
-        return 1;
-      }
-      // 如果两者都有或都没有重要类型，则保持原顺序
-      return 0;
-    });
-    if (uncertainResult.value.length != 0) {
-      showUncertainDot.value = true;
+    // 增加teacherMark属性
+    const teacherMarkMap = {};
+    if (teacherMark.value) {
+      teacherMark.value.forEach((item) => {
+        teacherMarkMap[item.英文] = item.teacher_mark || false;
+      });
+      compareResult.value = compareResult.value.map((item) => ({
+        ...item,
+        teacherMark: teacherMarkMap[item.英文] || false,
+      }));
     }
 
     newCoins.value = history.state.newCoins;
     userSelected.value = JSON.parse(history.state.userSelected);
     rate.value = history.state.rate;
+
     nid.value = history.state.nid;
     halfTrue.value = history.state.halfTrue;
+    console.log("halfTrue: ", halfTrue.value);
     resolve(compareResult.value);
   });
   res.then((res) => {
     // console.log("compareResult", res);
-    // console.log("uncertainResult", uncertainResult.value);
     // console.log('trueCount.value: ', trueCount.value);
     console.log("compareResult.value: ", compareResult.value);
-    if (trueCount.value == compareResult.value.length) {
+    const hasTeacherMark = compareResult.value.some(
+      (item) => item.teacherMark === true
+    );
+    if (trueCount.value == compareResult.value.length && !hasTeacherMark) {
       const audiosuccess1eSound = new Audio(success1);
       audiosuccess1eSound.play().catch((err) => {
         console.warn("播放失败：", err);
       });
       showAnimationShineVictory();
       showWelcomeAllTrue.value = true;
+    } else if (
+      hasTeacherMark &&
+      trueCount.value == compareResult.value.length
+    ) {
+      const audiofail1Sound = new Audio(fail1);
+      audiofail1Sound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
+      showWelcomeHalf.value = true;
+      showAnimationHalfTrue();
     } else if (halfTrue.value == 0.5) {
       const audiofail1Sound = new Audio(fail1);
       audiofail1Sound.play().catch((err) => {
@@ -615,29 +392,19 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">很遗憾！下次加油哦</div>
       </template>
       <template #default>
         <div class="custom-content">
+          <div class="result-row" style="font-weight: 700">
+            教师标记{{ teacherMarkCount }}道题
+          </div>
           <div class="result-row">正确{{ trueCount }}道题</div>
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
           <div class="result-row">新获得{{ newCoins }}金币</div>
-          <Divider></Divider>
-          <van-tag type="warning" size="large" round
-            >下次将进行拼写考察，点击
-            <van-tag
-              type="danger"
-              size="large"
-              round
-              @click="showUncertainAndSpell"
-              >迟疑/拼写</van-tag
-            >
-            复习</van-tag
-          >
         </div>
       </template>
     </van-dialog>
@@ -648,29 +415,20 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">还不错！获得1/2奖励</div>
       </template>
       <template #default>
         <div class="custom-content">
+          <div class="result-row" style="font-weight: 700">
+            教师标记{{ teacherMarkCount }}道题
+          </div>
           <div class="result-row">正确{{ trueCount }}道题</div>
           <div class="result-row">半对{{ halfCount }}道题目</div>
           <div class="result-row">错误{{ falseCount }}道题</div>
           <div class="result-row">新获得{{ newCoins }}金币</div>
           <Divider></Divider>
-          <van-tag type="warning" size="large" round
-            >下次将进行拼写考察，点击
-            <van-tag
-              type="danger"
-              size="large"
-              round
-              @click="showUncertainAndSpell"
-              >迟疑/拼写</van-tag
-            >
-            复习</van-tag
-          >
         </div>
       </template>
     </van-dialog>
@@ -681,7 +439,6 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm="playAudio"
     >
       <template #title>
         <div class="custom-title">恭喜，全对了！</div>
@@ -695,7 +452,7 @@ onMounted(async () => {
 
     <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar title="背诵答案">
+      <van-nav-bar title="挑战结果">
         <template #left>
           <div
             style="
@@ -718,25 +475,11 @@ onMounted(async () => {
           </div>
         </template>
         <template #right>
-          <div style="margin-right: 1rem" @click="showUncertainResult()">
-            <van-badge :dot="showUncertainDot">
-              <span style="color: rgb(64, 135, 242)">迟疑 / 拼写</span>
-            </van-badge>
-          </div>
-
           <div @click="gotoNext()">
             <span style="color: rgb(64, 135, 242)"> 继续 </span>
           </div>
         </template>
       </van-nav-bar>
-    </div>
-
-    <!-- 音乐控制 -->
-    <div class="music-bar" @click="toggleAudio">
-      🎵 背景音乐控制
-      <button style="font-size: 12px">
-        {{ isPlaying ? "暂停" : "播放" }}
-      </button>
     </div>
 
     <!-- 预览滚动 -->
@@ -773,130 +516,11 @@ onMounted(async () => {
       </van-cell-group>
     </van-floating-panel>
 
-    <!-- 视频钻石 -->
-    <div class="child">
-      <van-floating-bubble
-        v-if="showVideoButton"
-        class="dailyFloat"
-        axis="xy"
-        magnetic="x"
-        v-model:offset="offsetDaily"
-        icon="gem-o"
-        @click="handleConfirmResult()"
-      />
-    </div>
-
-    <!-- 延迟库 -->
-    <van-popup
-      v-model:show="showUncertain"
-      position="left"
-      :style="{ height: '100%' }"
-      closeable
-      :lock-scroll="false"
-    >
-      <van-cell-group inset>
-        <div style="margin-left: 0.5rem; font-weight: 700; margin-right: 2rem">
-          <p style="font-size: 20px; color: black; margin-top: 2rem">迟疑库</p>
-          <p style="color: red; margin-top: -1rem">
-            监测到以下词汇不够熟练，请再次复习!
-          </p>
-          <div
-            style="
-              font-size: 16px;
-              margin-top: -0.5rem;
-              font-weight: 400;
-              color: gray;
-            "
-          >
-            共{{ uncertainResult.length }}词
-          </div>
-        </div>
-        <div v-for="(item, index) in uncertainResult" :key="index">
-          <van-cell
-            :label="
-              item.正确答案 === '无'
-                ? `答案：${item.答案}`
-                : `答案：${item.正确答案}`
-            "
-            :value="item.type"
-          >
-            <template #title>
-              <div style="font-size: larger; font-weight: 700">
-                {{ item.英文 }}
-              </div>
-            </template>
-          </van-cell>
-        </div>
-      </van-cell-group>
-      <van-divider></van-divider>
-      <div style="margin-left: 1.5rem; font-weight: 700; margin-right: 2rem">
-        <p style="font-size: 20px; color: black; margin-top: 1rem">拼写库</p>
-        <div v-if="lock_spell">
-          <p style="color: red; margin-top: -1rem">
-            拼写库被锁死，继续复习以下词汇
-          </p>
-        </div>
-        <div v-else>
-          <p style="color: red; margin-top: -1rem">
-            监测到以下词汇为非常不熟练，将进行拼写考察，请重视！
-          </p>
-        </div>
-
-        <div
-          style="
-            font-size: 16px;
-            margin-top: -0.5rem;
-            font-weight: 400;
-            color: gray;
-          "
-        >
-          共{{ spellVocabulary.length }}词
-        </div>
-      </div>
-      <div
-        v-for="(item, index) in spellVocabulary"
-        :key="index"
-        style="margin-left: 1rem"
-      >
-        <van-cell
-          :label="
-            item.正确答案 === '无' || !item.正确答案
-              ? `答案：${item.答案}`
-              : `答案：${item.正确答案}`
-          "
-          :value="item.type"
-        >
-          <template #title>
-            <div style="font-size: larger; font-weight: 700">
-              {{ item.英文 }}
-            </div>
-          </template>
-        </van-cell>
-      </div>
-    </van-popup>
-
-    <!-- 看视频 -->
-    <van-popup
-      v-model:show="showVideoPopup"
-      position="bottom"
-      :style="{ height: '100%' }"
-      closeable
-      :lock-scroll="false"
-    >
-      <VideoList
-        v-if="showVideoPopup"
-        :words="customWord"
-        @finished="onFinishedVideo"
-        @exit="onExitVideo"
-        @exit2="onExitVideo2"
-      />
-    </van-popup>
-
     <!-- 列表 -->
     <van-checkbox-group
       v-model="userSelected"
       class="checkbox-container"
-      style="padding-top: 32px"
+      style="padding-top: 0px"
     >
       <van-cell-group>
         <div
@@ -910,17 +534,26 @@ onMounted(async () => {
               'green-background': item.flag === 'true',
               'red-background': item.flag === 'false',
               'orange-background': item.flag === 'half',
+              'teacher-marked': item.teacherMark,
             }"
           >
             <template #title>
               <div
                 v-if="item.排除 !== '试题'"
                 @click="speakWord(item.英文, item.正确答案)"
+                class="title-container"
               >
-                {{ item.序号 + ". " + item.英文 }}
+                <span class="title-text">{{
+                  item.序号 + ". " + item.英文
+                }}</span>
                 <img
                   src="../assets/speaker.png"
                   style="width: 12px; height: auto"
+                />
+                <img
+                  v-if="item.teacherMark"
+                  src="../assets/getPassive.gif"
+                  style="width: 20px; height: auto; margin-left: 0.5rem"
                 />
               </div>
               <div

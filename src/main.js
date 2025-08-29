@@ -7,9 +7,12 @@ import HomePage from './components/homepage.vue';
 import Teacher from './components/teacher.vue';
 import TeacherList from './components/teacherList.vue';
 import StudentAnswer from './components/studentAnswer.vue';
+import StudentAccountAnswerChallenge from './components/studentAccountAnswerChallenge.vue';
+
 import StudentAccountList from './components/studentAccountList.vue';
 import StudentAccountItem from './components/studentAccountItem.vue';
 import StudentAccountSwipe from './components/studentAccountSwipe.vue';
+import StudentAccountChallenge from './components/studentAccountChallenge.vue';
 import StudentAccountTest from './components/studentAccountTest.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
 import StudentAccountPreExam from './components/studentAccountPreExam.vue';
@@ -46,6 +49,15 @@ const routes = [
         path: '/studentAccountSwipe',
         name: 'studentAccountSwipe',
         component: StudentAccountSwipe,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/studentAccountChallenge',
+        name: 'studentAccountChallenge',
+        component: StudentAccountChallenge,
         meta: {
             index: 1,
             preventBack: true
@@ -181,6 +193,15 @@ const routes = [
             preventBack: true
         }
     },
+        {
+        path: '/studentAccountAnswerChallenge',
+        name: 'studentAccountAnswerChallenge',
+        component: StudentAccountAnswerChallenge,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
     {
         path: '/viewers',
         name: 'viewers',
@@ -248,6 +269,9 @@ router.beforeEach((to, from, next) => {
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
             (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
+
+            (from.path === '/studentAccountAnswerChallenge' && to.path === '/studentAccountChallenge') ||
+            (from.path === '/studentAccountList' && to.path === '/studentAccountAnswerChallenge') ||
             (from.path === '/studentAccountItem' && to.meta.preventBack)) {
             // 如果满足以上任何条件，阻止导航
             next(false);
