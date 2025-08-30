@@ -246,7 +246,7 @@ const searchAnswer = (item, index) => {
   });
 };
 const getTypeColor = (type) => {
-  if (type === "预习") {
+  if (type.includes("预习")) {
     return "green";
   } else if (type === "迟疑") {
     return "orange";

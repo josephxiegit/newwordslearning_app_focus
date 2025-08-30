@@ -11,7 +11,8 @@ import {
   onBeforeMount,
   inject,
 } from "vue";
-import "vant/lib/index.css"; // 确保引入样式
+import { gsap } from "gsap";
+import "vant/lib/index.css";
 import cover3500Image from "../assets/3500_cover_2025.png";
 import angryWolf from "./angryWolf.vue";
 import missyou from "./missyou.vue";
@@ -73,15 +74,404 @@ const toggleCheckSelf = () => {
   selfCheck.value = !selfCheck.value;
 };
 
-// 点击跳转明细
-function showAnimationShineStartout() {
-  if (startOutRef.value.visible) {
-    startOutRef.value.hide();
-  } else {
-    startOutRef.value.show();
+// 显示答案pro
+const showAnswerProSheet = ref(false);
+const answerSheetProList = ref([]);
+const selfCheckPro = ref(true); // 乱序模式开关
+const selfCheckView = ref(true); // 中文显示开关
+const shuffleKey = ref(0);
+const originalAnswerSheetList = ref([]);
+const shuffledAnswerSheetList = ref([]);
+const createTimeProAnswer = ref("");
+
+const animateShuffle = () => {
+  // 选中所有 cell
+  const cells = document.querySelectorAll(".shuffle-list > div");
+
+  // 先让所有元素随机飞散
+  gsap.to(cells, {
+    x: () => (Math.random() - 0.5) * 200, // -100~100 随机偏移
+    y: () => (Math.random() - 0.5) * 200,
+    rotation: () => (Math.random() - 0.5) * 90,
+    opacity: 0.2,
+    duration: 0.4,
+    stagger: 0.05,
+    onComplete: () => {
+      // 飞散结束后恢复正常位置
+      gsap.to(cells, {
+        x: 0,
+        y: 0,
+        rotation: 0,
+        opacity: 1,
+        duration: 0.6,
+        ease: "back.out(1.7)",
+        stagger: 0.05,
+      });
+    },
+  });
+};
+
+// 计算属性：根据模式返回对应的列表
+const displayedAnswerSheetList = computed(() => {
+  return selfCheckPro.value
+    ? shuffledAnswerSheetList.value
+    : originalAnswerSheetList.value;
+});
+
+// 打乱数组的函数
+const shuffleArray = (array) => {
+  const shuffled = [...array]; // 创建副本
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  animationVisible.value = !animationVisible.value;
-}
+  return shuffled;
+};
+
+// 切换中文显示状态（全局）
+const toggleChineseView = () => {
+  selfCheckView.value = !selfCheckView.value;
+
+  // 同步更新所有词条的 showChinese 状态
+  const shouldShow = selfCheckView.value;
+
+  originalAnswerSheetList.value.forEach((item) => {
+    item.showChinese = shouldShow;
+  });
+  shuffledAnswerSheetList.value.forEach((item) => {
+    item.showChinese = shouldShow;
+  });
+};
+
+// 切换乱序/正序模式
+const toggleSelfCheckWithShuffle = async () => {
+  selfCheckPro.value = !selfCheckPro.value;
+
+  if (selfCheckPro.value) {
+    // console.log("切换到乱序模式");
+    // 重新生成乱序列表，并同步当前的中文显示状态
+    shuffledAnswerSheetList.value = shuffleArray(originalAnswerSheetList.value);
+    shuffledAnswerSheetList.value.forEach((item) => {
+      item.showChinese = selfCheckView.value;
+    });
+  } else {
+    // console.log("切换到正序模式");
+    // 切换到正序模式时，同步当前的中文显示状态
+    originalAnswerSheetList.value.forEach((item) => {
+      item.showChinese = selfCheckView.value;
+    });
+  }
+
+  shuffleKey.value += 1; // 强制重新渲染
+
+  nextTick(() => {
+    animateShuffle();
+  });
+};
+
+// 初始化数据
+const initializeData = () => {
+  const processedData = answerSheetProList.value.map((item) => ({
+    ...item,
+    showChinese: false, // 每个词条的单独显示状态
+  }));
+
+  originalAnswerSheetList.value = [...processedData];
+  shuffledAnswerSheetList.value = shuffleArray(processedData);
+};
+
+// 监听弹窗显示状态
+watch(showAnswerProSheet, (newVal) => {
+  if (newVal) {
+    // 弹窗打开时，重置为默认状态：显示中文，乱序模式，关闭普通复习
+    selfCheckView.value = true;
+    selfCheckPro.value = false;
+    showAnswerSheet.value = false;
+
+    // 清除所有单独显示状态
+    const currentList = selfCheckPro.value
+      ? shuffledAnswerSheetList.value
+      : originalAnswerSheetList.value;
+    currentList.forEach((item) => {
+      item.showChinese = true;
+    });
+    createTimeProAnswer.value = new Date();
+  } else {
+    handleAnswerSheetProClose();
+  }
+});
+
+// 监听原始数据变化
+watch(
+  answerSheetProList,
+  (newVal) => {
+    if (newVal && newVal.length > 0) {
+      initializeData();
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+const preloadProAudio = async (wordList) => {
+  let failedWords = [];
+  const total = wordList.length;
+
+  // 初始 toast
+  let toast = showLoadingToast({
+    message: `音频加载中 0/${total} ...`,
+    forbidClick: true,
+    duration: 0,
+  });
+
+  for (let i = 0; i < wordList.length; i++) {
+    const item = wordList[i];
+    if (item.audio) {
+      // 已经加载过，更新进度
+      toast.message = `音频加载中 ${i + 1}/${total} ...`;
+      continue;
+    }
+
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+      item.英文
+    )}&type=1`;
+    const audio = new Audio(url);
+    item.audio = audio;
+
+    // 封装 Promise，最多等待 5 秒
+    const loadPromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject("timeout"), 5000);
+      audio.oncanplaythrough = () => {
+        clearTimeout(timeout);
+        resolve("loaded");
+      };
+      audio.onerror = () => {
+        clearTimeout(timeout);
+        reject("error");
+      };
+    });
+
+    try {
+      await loadPromise;
+    } catch (e) {
+      failedWords.push(item.英文);
+      if (failedWords.length >= 5) {
+        toast.close();
+        await showConfirmDialog({
+          title: "音频加载失败",
+          message: "超过 5 个单词音频加载失败，请检查网络",
+          showCancel: false,
+          theme: "round-button",
+        });
+        return false;
+      }
+    }
+
+    // 每完成一个单词，更新进度
+    toast.message = `音频加载中 ${i + 1}/${total} ...`;
+  }
+
+  toast.close();
+
+  // 少于5个失败
+  if (failedWords.length > 0) {
+    await showConfirmDialog({
+      title: "部分音频加载失败",
+      message: `以下单词音频未成功加载：\n${failedWords.join(", ")}`,
+      showCancel: false,
+      theme: "round-button",
+    });
+  }
+
+  return true;
+};
+
+// speakWordPro：专业版单词播放，支持预加载
+const speakWordPro = (english, answer) => {
+  // 在 answerSheetProList 或 shuffledAnswerSheetList 中找到对应的 item
+  const allItems = [
+    ...originalAnswerSheetList.value,
+    ...shuffledAnswerSheetList.value,
+  ];
+  const item = allItems.find((i) => i.英文 === english);
+
+  if (!item) {
+    console.warn("未找到对应单词 item，使用实时播放 fallback");
+    fallbackSpeech(english, answer);
+    return;
+  }
+
+  // 如果 audio 对象已存在，直接播放
+  if (item.audio) {
+    item.audio.currentTime = 0;
+    item.audio.play().catch(() => {
+      fallbackSpeech(english, answer);
+    });
+  } else {
+    // 如果还没生成 Audio 对象，就生成并播放
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+      english
+    )}&type=1`;
+    const audio = new Audio(url);
+    audio.load(); // 尝试预加载
+    item.audio = audio;
+    audio.play().catch(() => {
+      fallbackSpeech(english, answer);
+    });
+  }
+};
+
+// fallback：实时语音
+const fallbackSpeech = (english, answer) => {
+  let utterance;
+  if (!/[a-zA-Z]/.test(english)) {
+    utterance = new SpeechSynthesisUtterance(answer);
+  } else {
+    utterance = new SpeechSynthesisUtterance(english);
+  }
+  utterance.lang = "en-US";
+  utterance.pitch = 0.5;
+  window.speechSynthesis.speak(utterance);
+};
+
+// 上传pro时间记录
+const handleAnswerSheetProClose = () => {
+  // 关闭答案页面执行
+  const endTime = new Date();
+  const timeDifference = endTime - createTimeProAnswer.value;
+  const minutes = Math.floor(timeDifference / 1000 / 60);
+  const seconds = Math.floor((timeDifference / 1000) % 60);
+  const formattedTimeDifference = `${minutes}分${seconds}秒`;
+  console.log("Time Difference:", formattedTimeDifference);
+
+  const dataAnswer = originalData.value[indexAnswer.value];
+  // console.log("dataAnswer:", dataAnswer);
+
+  const date = new Date(createTimeProAnswer.value);
+  const formattedDateStr = `${date.getFullYear()}年${(date.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}月${date.getDate().toString().padStart(2, "0")}日${date
+    .getHours()
+    .toString()
+    .padStart(2, "0")}时${date.getMinutes().toString().padStart(2, "0")}分${date
+    .getSeconds()
+    .toString()
+    .padStart(2, "0")}秒`;
+
+  async function updateAnswerProDuration() {
+    // 上传时间
+    let params = new URLSearchParams();
+    params.append("method", "updateAnswerProDuration");
+    params.append("username", dataAnswer["username"]);
+    params.append("account_data_id", dataAnswer["nid"]);
+    params.append("account_log_id", -1);
+    params.append("type", "预习pro");
+    params.append("create_time", formattedDateStr);
+    params.append("duration", formattedTimeDifference);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  updateAnswerProDuration().then((res) => {
+    console.log(res);
+  });
+};
+
+const clickShowAnswerPro = async () => {
+  // 清理过期数据（可选）
+  cleanExpiredUsageData();
+
+  // 检查今日使用次数
+  const todayCount = getTodayUsageCount();
+  console.log("todayCount: ", todayCount);
+  const dailyLimit = 3;
+
+  if (todayCount >= dailyLimit) {
+    // 如果已达到每日限制，显示提示
+    showConfirmDialog({
+      title: "今日查看次数已用完",
+      message: `每日限额${dailyLimit}次，今日已使用${todayCount}次，请明天再试`,
+      theme: "round-button",
+      // 只显示确认按钮，不执行任何操作
+      showCancel: false,
+    });
+    return;
+  }
+
+  const remainingCount = dailyLimit - todayCount;
+  const confirm = await showConfirmDialog({
+    title: "是否查看professional版本？",
+    message: `每日限额${dailyLimit}次，今日还可使用${remainingCount}次`,
+    theme: "round-button",
+  });
+
+  if (confirm) {
+    incrementUsageCount();
+
+    // 复制列表
+    answerSheetProList.value = answerSheetList.value.map((item) => ({
+      ...item,
+      showChinese: false,
+      audio: null,
+    }));
+
+    // 预加载音频
+    const success = await preloadProAudio(answerSheetProList.value);
+
+    if (success !== false) {
+      showAnswerProSheet.value = true; // 弹窗
+    }
+  }
+};
+
+const getTodayString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// 获取今日已使用次数
+const getTodayUsageCount = () => {
+  const today = getTodayString();
+  const storageKey = `pro_usage_${today}`;
+  const count = localStorage.getItem(storageKey);
+  return count ? parseInt(count, 10) : 0;
+};
+
+// 增加使用次数
+const incrementUsageCount = () => {
+  const today = getTodayString();
+  const storageKey = `pro_usage_${today}`;
+  const currentCount = getTodayUsageCount();
+  localStorage.setItem(storageKey, (currentCount + 1).toString());
+};
+
+// 清理过期的存储数据（可选，保持localStorage整洁）
+const cleanExpiredUsageData = () => {
+  const today = getTodayString();
+  const keys = Object.keys(localStorage);
+
+  keys.forEach((key) => {
+    if (key.startsWith("pro_usage_") && key !== `pro_usage_${today}`) {
+      localStorage.removeItem(key);
+    }
+  });
+};
+// 获取今日剩余使用次数的辅助方法
+const getRemainingCount = () => {
+  const todayCount = getTodayUsageCount();
+  return Math.max(0, 3 - todayCount);
+};
+
+// 如果你需要在组件中显示剩余次数
+const remainingCount = ref(getRemainingCount());
+
+// 可以添加一个刷新剩余次数的方法
+const updateRemainingCount = () => {
+  remainingCount.value = getRemainingCount();
+};
+
 // 查找拼写
 async function getSpellVocabulary(account_data_id) {
   // 获得spell_vocabulary
@@ -1691,32 +2081,74 @@ const goToNextPage = (
     redirect();
   }
 };
+const lastSpeakTime = ref(0);
+// const speakWord = async (english, answer) => {
+//   // youdao fayin
+//   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+//     english
+//   )}&type=1`;
+//   const audio = new Audio(url);
+//   audio.play().catch(() => {
+//     console.log("Fallback to SpeechSynthesis");
+//     let utterance;
+//     if (!/[a-zA-Z]/.test(english)) {
+//       utterance = new SpeechSynthesisUtterance(answer);
+//     } else {
+//       utterance = new SpeechSynthesisUtterance(english);
+//     }
 
+//     utterance.lang = "en-US";
+//     utterance.pitch = 0.5;
+//     window.speechSynthesis.speak(utterance);
+//   });
+// };
+
+// 跳转下一面
 const speakWord = async (english, answer) => {
-  // // speachweb
-  // try {
-  //   let utterance;
-  //   if (!/[a-zA-Z]/.test(english)) {
-  //     utterance = new SpeechSynthesisUtterance(answer);
-  //   } else {
-  //     utterance = new SpeechSynthesisUtterance(english);
-  //   }
+  const now = Date.now();
+  const timeDiff = now - lastSpeakTime.value;
 
-  //   utterance.lang = "en-US";
-  //   utterance.pitch = 0.5
-  //   window.speechSynthesis.speak(utterance);
-  // } catch (error) {
-  //   showToast("此浏览器不支持发音，请更换chrome或edge");
-  // }
+  // 检查是否在5秒限制内
+  if (timeDiff < 5000) {
+    // 显示提示消息
+    showToast("每5秒只能一次，可以尝试pro模式解除限制");
+    return;
+  }
 
-  // youdao fayin
+  // 更新最后点击时间
+  lastSpeakTime.value = now;
 
-  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-    english
-  )}&type=1`;
-  const audio = new Audio(url);
-  audio.play().catch(() => {
+  // 显示加载提示
+  let toast1 = showLoadingToast({
+    message: "加载中...",
+    forbidClick: true,
+    duration: 0,
+  });
+
+  // 设置8秒超时
+  const timeoutId = setTimeout(() => {
+    toast1.close();
+    showToast("超时，检查网络");
+  }, 8000);
+
+  try {
+    // 原有的发音逻辑
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+      english
+    )}&type=1`;
+    const audio = new Audio(url);
+
+    await audio.play();
+
+    // 播放成功，清除超时定时器并关闭加载提示
+    clearTimeout(timeoutId);
+    toast1.close();
+  } catch (error) {
     console.log("Fallback to SpeechSynthesis");
+
+    // 清除超时定时器
+    clearTimeout(timeoutId);
+
     let utterance;
     if (!/[a-zA-Z]/.test(english)) {
       utterance = new SpeechSynthesisUtterance(answer);
@@ -1727,33 +2159,12 @@ const speakWord = async (english, answer) => {
     utterance.lang = "en-US";
     utterance.pitch = 0.5;
     window.speechSynthesis.speak(utterance);
-  });
 
-  // // baidu api
-  // // 生成唯一的cuid（随机字符串 + 时间戳）
-  // const cuid = 'web_' + Math.random().toString(36).substr(2, 8) + '_' + Date.now();
-
-  // // 获取AccessToken
-  // const tokenResponse = await fetch(
-  //   `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=UfBjAfe60n05PzmcsKcAT23m&client_secret=I5Dvzi9cfKODgakI3FDf4xbruPITaLVh`
-  // );
-
-  // const tokenData = await tokenResponse.json();
-  // const accessToken = tokenData.access_token;
-
-  // // 调用语音合成API（注意：将lan参数改为'en'以支持英文发音）
-  // const ttsResponse = await fetch(
-  //   `https://tsn.baidu.com/text2audio?tex=${encodeURIComponent(english)}&tok=${accessToken}&cuid=${cuid}&ctp=1&lan=en&per=0`,
-  //   { responseType: 'arraybuffer' }
-  // );
-
-  // const audioBlob = await ttsResponse.blob();
-  // const audioUrl = URL.createObjectURL(audioBlob);
-  // const audio = new Audio(audioUrl);
-  // audio.play();
+    // 备用方案播放完成，关闭加载提示
+    toast1.close();
+  }
 };
 
-// 跳转下一面
 const showChooseMode = ref(false);
 const difficultyCoefficient = ref(30);
 const showChooseTestMode = ref(false);
@@ -2558,13 +2969,11 @@ watch(showAnswerSheet, (newVal) => {
 const handleVisibilityChange = () => {
   if (document.hidden) {
     showAnswerSheet.value = false;
-    // handleAnswerSheetClose();
   }
 };
 
 const handlePageUnload = () => {
   showAnswerSheet.value = false;
-  // handleAnswerSheetClose();
 };
 
 // 提前查看答案
@@ -2669,14 +3078,6 @@ const viewAnswer = (item, index) => {
             activeTabs.value = 0;
           });
         }
-        // else {
-        //   originalData.value = [];
-        //   pageIndexOriginalData.value = 0;
-        //   finishedOriginalData.value = false;
-        //   loadingOriginalData.value = false; // 重新触发加载
-        //   onLoadOriginalData(); // 手动调用onLoad以重新开始加载过程
-        //   activeTabs.value = 0;
-        // }
       });
     })
     .catch(() => {
@@ -3378,6 +3779,8 @@ const applyforChallenge = () => {
 
 // 主题
 onMounted(async () => {
+  // 更新pro显示答案次数
+  updateRemainingCount();
   // 弹幕单词
   // 检查并清理旧格式的数据
   const storedList = localStorage.getItem("listBarrage");
@@ -3853,7 +4256,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="挑战模式更新，新动画 新音效 新创意。发音功能持续优化中..."
+        text="挑战模式更新，预习pro更新"
       />
     </div>
     <van-toast
@@ -4814,10 +5217,21 @@ onMounted(async () => {
       :style="{ height: '90%' }"
     >
       <div
-        style="font-size: 18px; font-weight: 700; margin: 1rem 1rem 0.8rem 1rem"
+        style="
+          font-size: 18px;
+          font-weight: 700;
+          margin: 1rem;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        "
       >
-        挑战前复习（试题部分不提供预习）
+        挑战前复习
+        <van-button type="warning" size="mini" @click.stop="clickShowAnswerPro">
+          预习pro版
+        </van-button>
       </div>
+
       <div
         @click="toggleCheckSelf"
         style="
@@ -4883,6 +5297,111 @@ onMounted(async () => {
               </van-cell>
             </div>
           </div>
+        </van-cell-group>
+      </van-cell-group>
+    </van-popup>
+
+    <!-- 显示答案pro -->
+    <van-popup
+      closeable
+      v-model:show="showAnswerProSheet"
+      position="top"
+      :style="{ height: '100%' }"
+    >
+      <div
+        style="
+          font-size: 18px;
+          font-weight: 700;
+          margin: 1rem 1rem 0.8rem 1rem;
+          color: red;
+        "
+      >
+        复习功能pro
+      </div>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-right: 1rem;
+        "
+      >
+        <div
+          style="
+            font-size: 13px;
+            margin: 0.5rem 1rem 0.5rem 1rem;
+            font-weight: 700;
+          "
+        >
+          {{ answerSheetProList.length }}词
+        </div>
+        <div style="display: flex">
+          <div
+            style="font-size: 12px; margin-right: 0.2rem; margin-top: 0.2rem"
+          >
+            查看中文
+          </div>
+
+          <van-icon
+            :name="selfCheckView ? 'eye-o' : 'closed-eye'"
+            style="margin-right: 1rem; margin-top: 0.1rem"
+            size="20"
+            @click.stop="toggleChineseView"
+          />
+
+          <div
+            style="font-size: 12px; margin-right: 0.2rem; margin-top: 0.2rem"
+          >
+            点击乱序
+          </div>
+
+          <van-icon
+            :name="selfCheckPro ? 'notes' : 'notes-o'"
+            style="margin-right: 1rem; margin-top: 0.1rem"
+            size="20"
+            @click.stop="toggleSelfCheckWithShuffle"
+          />
+        </div>
+      </div>
+      <van-cell-group inset style="margin-top: 0.5rem; margin-left: -0.2rem">
+        <van-cell-group>
+          <transition-group name="shuffle" tag="div" class="shuffle-list">
+            <div v-for="(item, index) in displayedAnswerSheetList" :key="index">
+              <div v-if="item.排除 !== '试题'">
+                <van-cell
+                  @click="speakWordPro(item.英文, item.正确答案)"
+                  style="min-height: 40px"
+                >
+                  <!-- 自定义标题：英文 + 喇叭 -->
+                  <template #title>
+                    <div style="display: flex; align-items: center; gap: 6px">
+                      <span>{{ parseInt(item.序号) }}. {{ item.英文 }}</span>
+                      <img
+                        src="../assets/speaker.png"
+                        style="width: 16px; height: auto; cursor: pointer"
+                        @click.stop="speakWordPro(item.英文, item.正确答案)"
+                      />
+                    </div>
+                  </template>
+
+                  <!-- 内容区域：中文 or 提示 -->
+                  <div @click.stop>
+                    <template v-if="item.showChinese">
+                      {{ item.中文 }}
+                    </template>
+                    <template v-else>
+                      <span
+                        style="color: #999; cursor: pointer"
+                        @click="item.showChinese = true"
+                      >
+                        点击查看答案
+                      </span>
+                    </template>
+                  </div>
+                </van-cell>
+              </div>
+            </div>
+          </transition-group>
         </van-cell-group>
       </van-cell-group>
     </van-popup>
@@ -5193,6 +5712,43 @@ onMounted(async () => {
           "
         />
       </div>
+      <!-- 自定义底部按钮区域 -->
+      <template #footer>
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+          "
+        >
+          <van-button
+            type="danger"
+            @click="handleSwipeMode"
+            style="flex: 1; margin-right: 8px"
+          >
+            游戏模式
+          </van-button>
+
+          <van-button
+            size="small"
+            type="default"
+            @click="viewAnswer(originalData[gotoIndex], gotoIndex)"
+            style="margin: 0 8px; font-size: 12px"
+          >
+            查看预习
+          </van-button>
+
+          <van-button
+            type="primary"
+            @click="handleRegularMode"
+            :disabled="!isRegularModeEnabled"
+            style="flex: 1; margin-left: 8px"
+          >
+            {{ confirmButtonText }}
+          </van-button>
+        </div>
+      </template>
     </van-dialog>
 
     <!-- 复习模式选择 -->
@@ -5903,5 +6459,30 @@ onMounted(async () => {
 .bubble-container {
   position: relative;
   display: inline-block;
+}
+
+/* 乱序 */
+.shuffle-move {
+  transition: transform 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55),
+    opacity 0.8s ease;
+}
+
+/* 进入动画：从下方飞入并放大 */
+.shuffle-enter-active {
+  transition: all 0.8s ease;
+}
+.shuffle-enter-from {
+  opacity: 0;
+  transform: translateY(60px) scale(0.6) rotate(-10deg);
+}
+
+/* 离开动画：往上飞出并缩小 */
+.shuffle-leave-active {
+  transition: all 0.8s ease;
+  position: absolute;
+}
+.shuffle-leave-to {
+  opacity: 0;
+  transform: translateY(-60px) scale(0.6) rotate(10deg);
 }
 </style>

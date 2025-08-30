@@ -68,7 +68,8 @@ const searchAnswer = (item, index) => {
       if (res.length == 0) {
         answerLogResult.value = [];
       } else {
-        answerLogResult.value = res.filter((item) => item.type === "预习");
+        // answerLogResult.value = res.filter((item) => item.type === "预习");
+        answerLogResult.value = res.filter((item) => item.type?.includes("预习"));
         console.log("answerLogResult: ", answerLogResult.value);
         reviewLogResult.value = res.filter((item) => item.type == "检查");
         // console.log("reviewLogResult: ", reviewLogResult.value);
@@ -1989,7 +1990,8 @@ const reloadPage = () => {
                     margin-left: 0rem;
                   "
                 >
-                  <div style="">预习时间:</div>
+                  <div v-if="item.type=='预习pro'" style="">预习时间Pro:</div>
+                  <div v-else style="">预习时间:</div>
                   <div style="margin-top: 0.3rem; width: 140%">
                     {{ item.create_time }}
                   </div>
