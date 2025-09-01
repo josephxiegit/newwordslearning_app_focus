@@ -1219,144 +1219,76 @@ const handleSwipeChange = async (index) => {
   resume();
 };
 
-// 音频缓存
-// 音频缓存和下载进度相关变量
-const audioCache = ref(new Map()); // 存储预加载的音频
-const downloadProgress = ref(0); // 下载进度 0-100
-const isDownloading = ref(false); // 是否正在下载
-const downloadStatus = ref(""); // 下载状态信息
+// 预加载音频
+const audioCache = new Map();
+const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
+const speakWord = (english) => {
+  // 1) 优先从缓存获取
+  const cached = audioCache.get(english);
+  if (cached) {
+    if (cached instanceof Blob) {
+      const audioUrl = URL.createObjectURL(cached);
+      const audio = new Audio(audioUrl);
+      audio.currentTime = 0;
 
-// 预加载音频函数
-async function preloadAudios() {
-  if (!answers.value || answers.value.length === 0) {
-    console.log("没有数据需要预加载");
-    return;
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(audioUrl);
+      });
+
+      audio.addEventListener("error", () => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("缓存 Blob 播放失败，回退 TTS：", audio.error);
+        fallbackSpeech(english);
+      });
+
+      audio.play().catch((err) => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
+        fallbackSpeech(english);
+      });
+      return;
+    }
+
+    if (cached instanceof Audio) {
+      cached.currentTime = 0;
+      cached.play().catch((err) => {
+        console.warn("播放被拒或失败（Audio cache），回退 TTS：", err);
+        fallbackSpeech(english);
+      });
+      return;
+    }
   }
 
-  isDownloading.value = true;
-  downloadProgress.value = 0;
-
-  // 提取所有需要下载的英文单词，去重
-  const wordsToDownload = [
-    ...new Set(
-      answers.value
-        .map((item) => item.英文)
-        .filter((word) => word && /[a-zA-Z]/.test(word)) // 只下载包含英文字母的单词
-    ),
-  ];
-
-  console.log("需要下载的单词：", wordsToDownload);
-  downloadStatus.value = `准备下载 ${wordsToDownload.length} 个音频文件...`;
-
-  let successCount = 0;
-  let failedCount = 0;
-
-  // 并发下载，但限制并发数量避免服务器压力过大
-  const concurrencyLimit = 3;
-
-  for (let i = 0; i < wordsToDownload.length; i += concurrencyLimit) {
-    const batch = wordsToDownload.slice(i, i + concurrencyLimit);
-
-    // 并发下载当前批次
-    const batchPromises = batch.map(async (word) => {
-      try {
-        const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-          word
-        )}&type=1`;
-        const audio = new Audio(url);
-
-        return new Promise((resolve) => {
-          const timeoutId = setTimeout(() => {
-            console.warn(`下载超时: ${word}`);
-            failedCount++;
-            resolve(false);
-          }, 10000); // 10秒超时
-
-          audio.addEventListener(
-            "canplaythrough",
-            () => {
-              clearTimeout(timeoutId);
-              audioCache.value.set(word, audio);
-              successCount++;
-              console.log(`下载成功: ${word}`);
-              resolve(true);
-            },
-            { once: true }
-          );
-
-          audio.addEventListener(
-            "error",
-            () => {
-              clearTimeout(timeoutId);
-              console.warn(`下载失败: ${word}`);
-              failedCount++;
-              resolve(false);
-            },
-            { once: true }
-          );
-
-          // 开始加载
-          audio.load();
-        });
-      } catch (error) {
-        console.warn(`下载出错: ${word}`, error);
-        failedCount++;
-        return false;
-      }
-    });
-
-    // 等待当前批次完成
-    await Promise.all(batchPromises);
-
-    // 更新进度
-    const completed = successCount + failedCount;
-    downloadProgress.value = Math.round(
-      (completed / wordsToDownload.length) * 100
-    );
-    downloadStatus.value = `已完成 ${completed}/${wordsToDownload.length} 个音频下载 (成功: ${successCount}, 失败: ${failedCount})`;
+  // 2) 从接口返回的 audio_data 查找
+  if (window.preloadedAudioData && window.preloadedAudioData[english]) {
+    try {
+      const base64 = window.preloadedAudioData[english].data;
+      const blob = base64ToBlob(base64, "audio/mpeg");
+      audioCache.set(english, blob);
+      return speakWord(english); // 再次调用，走缓存逻辑
+    } catch (err) {
+      console.warn("base64 转换失败：", err);
+    }
   }
 
-  isDownloading.value = false;
-  downloadStatus.value = `音频下载完成！成功: ${successCount}, 失败: ${failedCount}`;
-
-  console.log("音频预加载完成", {
-    total: wordsToDownload.length,
-    success: successCount,
-    failed: failedCount,
-    cache: audioCache.value,
-  });
-}
-
-// 修改后的 speakWord 函数
-function speakWord(word) {
-  // 首先检查缓存中是否有预加载的音频
-  if (audioCache.value.has(word)) {
-    const cachedAudio = audioCache.value.get(word);
-    // 重置播放位置并播放
-    cachedAudio.currentTime = 0;
-    cachedAudio.play().catch((error) => {
-      console.warn(`播放缓存音频失败: ${word}`, error);
-      // 如果缓存音频播放失败，fallback到原来的方法
-      fallbackSpeak(word);
-    });
-    return;
-  }
-  console.log("缓存不存在，不播放");
-  // 如果没有缓存，使用原来的方法
-  fallbackSpeak(word);
-}
-
-// 原来的 speakWord 逻辑作为 fallback
-function fallbackSpeak(word) {
+  // 3) 从 item 对象查找
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-    word
+    english
   )}&type=1`;
   const audio = new Audio(url);
   audio.play().catch(() => {
     console.log("Fallback to SpeechSynthesis");
     let utterance;
-    utterance = new SpeechSynthesisUtterance(word);
-    if (!/[a-zA-Z]/.test(word)) {
+    utterance = new SpeechSynthesisUtterance(english);
+    if (!/[a-zA-Z]/.test(english)) {
       utterance.lang = "zh-CN";
     } else {
       utterance.lang = "en-US";
@@ -1366,7 +1298,15 @@ function fallbackSpeak(word) {
       window.speechSynthesis.speak(utterance);
     }, 800);
   });
-}
+};
+
+const fallbackSpeech = (english) => {
+  let utterance;
+  utterance = new SpeechSynthesisUtterance(english);
+  utterance.lang = "en-US";
+  utterance.pitch = 0.5;
+  window.speechSynthesis.speak(utterance);
+};
 
 const titleData = ref("");
 const username = ref("");
@@ -1385,12 +1325,7 @@ const hasSubmitted = ref(false);
 const nidSubmit = ref("");
 
 onUnmounted(() => {
-  // 清理音频缓存
-  audioCache.value.forEach((audio) => {
-    audio.pause();
-    audio.src = "";
-  });
-  audioCache.value.clear();
+
 });
 
 onMounted(async () => {
@@ -1468,7 +1403,7 @@ onMounted(async () => {
         synonymsOptions.value[0]["排除"] !== "试题" &&
         synonymsOptions.value[0]["排除"] !== "手写"
       ) {
-        fallbackSpeak(synonymsOptions.value[0]["英文"]);
+        speakWord(synonymsOptions.value[0]["英文"]);
       }
     } catch (error) {
       console.error("Error speaking word:", error);
@@ -1485,7 +1420,44 @@ onMounted(async () => {
       }
     });
     console.log("answers: ", answers.value);
-    await preloadAudios();
+
+    // 预加载语音
+    const answerSheetProList = answers.value.map((item) => ({
+      ...item,
+      showChinese: false,
+      audio: null,
+    }));
+    console.log("answerSheetProList: ", answerSheetProList);
+    let params = new URLSearchParams();
+    params.append("method", "getAudioList");
+    params.append("word_list", JSON.stringify(answerSheetProList));
+    const response = await axios.post("words/", params);
+    console.log("response: ", response.data);
+    if (response.data.success && response.data.audio_data) {
+      // 成功的音频存进缓存
+      Object.entries(response.data.audio_data).forEach(([word, obj]) => {
+        try {
+          const blob = base64ToBlob(obj.data, "audio/mpeg");
+          audioCache.set(word, blob);
+        } catch (err) {
+          console.warn(`音频转换失败: ${word}`, err);
+        }
+      });
+
+      // 检查是否有失败的词
+      if (response.data.failed_words && response.data.failed_words.length > 0) {
+        const failedList = response.data.failed_words.join("，");
+        showConfirmDialog({
+          theme: "round-button",
+          title: "音频加载失败",
+          message: `以下单词的音频未能加载：\n${failedList}`,
+          confirmButtonText: "知道了",
+        }).catch(() => {
+          // 用户点了取消（如果你保留了取消按钮）
+        });
+      }
+    }
+
     titleData.value = data.title;
 
     username.value = data.username;

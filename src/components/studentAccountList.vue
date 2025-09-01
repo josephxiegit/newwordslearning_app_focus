@@ -212,115 +212,87 @@ watch(
   { immediate: true, deep: true }
 );
 
-const preloadProAudio = async (wordList) => {
-  let failedWords = [];
-  const total = wordList.length;
-
-  // 初始 toast
-  let toast = showLoadingToast({
-    message: `音频加载中 0/${total} ...`,
-    forbidClick: true,
-    duration: 0,
-  });
-
-  for (let i = 0; i < wordList.length; i++) {
-    const item = wordList[i];
-    if (item.audio) {
-      // 已经加载过，更新进度
-      toast.message = `音频加载中 ${i + 1}/${total} ...`;
-      continue;
-    }
-
-    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-      item.英文
-    )}&type=1`;
-    const audio = new Audio(url);
-    item.audio = audio;
-
-    // 封装 Promise，最多等待 5 秒
-    const loadPromise = new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject("timeout"), 5000);
-      audio.oncanplaythrough = () => {
-        clearTimeout(timeout);
-        resolve("loaded");
-      };
-      audio.onerror = () => {
-        clearTimeout(timeout);
-        reject("error");
-      };
-    });
-
-    try {
-      await loadPromise;
-    } catch (e) {
-      failedWords.push(item.英文);
-      if (failedWords.length >= 5) {
-        toast.close();
-        await showConfirmDialog({
-          title: "音频加载失败",
-          message: "超过 5 个单词音频加载失败，请检查网络",
-          showCancel: false,
-          theme: "round-button",
-        });
-        return false;
-      }
-    }
-
-    // 每完成一个单词，更新进度
-    toast.message = `音频加载中 ${i + 1}/${total} ...`;
+// 预加载语音
+const audioCache = new Map();
+const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
   }
-
-  toast.close();
-
-  // 少于5个失败
-  if (failedWords.length > 0) {
-    await showConfirmDialog({
-      title: "部分音频加载失败",
-      message: `以下单词音频未成功加载：\n${failedWords.join(", ")}`,
-      showCancel: false,
-      theme: "round-button",
-    });
-  }
-
-  return true;
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
 };
-
-// speakWordPro：专业版单词播放，支持预加载
 const speakWordPro = (english, answer) => {
-  // 在 answerSheetProList 或 shuffledAnswerSheetList 中找到对应的 item
+  // 1) 优先从缓存获取
+  const cached = audioCache.get(english);
+  if (cached) {
+    if (cached instanceof Blob) {
+      const audioUrl = URL.createObjectURL(cached);
+      const audio = new Audio(audioUrl);
+      audio.currentTime = 0;
+
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(audioUrl);
+      });
+
+      audio.addEventListener("error", () => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("缓存 Blob 播放失败，回退 TTS：", audio.error);
+        fallbackSpeech(english, answer);
+      });
+
+      audio.play().catch((err) => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
+        fallbackSpeech(english, answer);
+      });
+      return;
+    }
+
+    if (cached instanceof Audio) {
+      cached.currentTime = 0;
+      cached.play().catch((err) => {
+        console.warn("播放被拒或失败（Audio cache），回退 TTS：", err);
+        fallbackSpeech(english, answer);
+      });
+      return;
+    }
+  }
+
+  // 2) 从接口返回的 audio_data 查找
+  if (window.preloadedAudioData && window.preloadedAudioData[english]) {
+    try {
+      const base64 = window.preloadedAudioData[english].data;
+      const blob = base64ToBlob(base64, "audio/mpeg");
+      audioCache.set(english, blob);
+      return speakWordPro(english, answer); // 再次调用，走缓存逻辑
+    } catch (err) {
+      console.warn("base64 转换失败：", err);
+    }
+  }
+
+  // 3) 从 item 对象查找（你原来的逻辑）
   const allItems = [
     ...originalAnswerSheetList.value,
     ...shuffledAnswerSheetList.value,
   ];
   const item = allItems.find((i) => i.英文 === english);
-
-  if (!item) {
-    console.warn("未找到对应单词 item，使用实时播放 fallback");
-    fallbackSpeech(english, answer);
-    return;
+  if (item) {
+    if (item.audioBinary instanceof Blob) {
+      audioCache.set(english, item.audioBinary);
+      return speakWordPro(english, answer);
+    }
+    if (item.audio instanceof Audio) {
+      audioCache.set(english, item.audio);
+      return speakWordPro(english, answer);
+    }
   }
 
-  // 如果 audio 对象已存在，直接播放
-  if (item.audio) {
-    item.audio.currentTime = 0;
-    item.audio.play().catch(() => {
-      fallbackSpeech(english, answer);
-    });
-  } else {
-    // 如果还没生成 Audio 对象，就生成并播放
-    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-      english
-    )}&type=1`;
-    const audio = new Audio(url);
-    audio.load(); // 尝试预加载
-    item.audio = audio;
-    audio.play().catch(() => {
-      fallbackSpeech(english, answer);
-    });
-  }
+  // 4) 都没有，回退 TTS
+  console.warn("未找到预加载音频，使用 fallback");
+  fallbackSpeech(english, answer);
 };
-
-// fallback：实时语音
 const fallbackSpeech = (english, answer) => {
   let utterance;
   if (!/[a-zA-Z]/.test(english)) {
@@ -331,6 +303,90 @@ const fallbackSpeech = (english, answer) => {
   utterance.lang = "en-US";
   utterance.pitch = 0.5;
   window.speechSynthesis.speak(utterance);
+};
+// 点击预习pro
+const clickShowAnswerPro = async () => {
+  // 清理过期数据（可选）
+  cleanExpiredUsageData();
+
+  // 检查今日使用次数
+  const todayCount = getTodayUsageCount();
+  // console.log("todayCount: ", todayCount);
+  let dailyLimit = 3;
+  let localTeacherPassword = window.localStorage.getItem('teacherPassword');
+  // console.log('localTeacherPassword: ', localTeacherPassword);
+  if(localTeacherPassword == "ss654321") {
+    dailyLimit = 999;
+  }
+
+  if (todayCount >= dailyLimit) {
+    // 如果已达到每日限制，显示提示
+    showConfirmDialog({
+      title: "今日查看次数已用完",
+      message: `每日限额${dailyLimit}次，今日已使用${todayCount}次，请明天再试`,
+      theme: "round-button",
+      showCancel: false,
+    });
+    return;
+  }
+
+  const remainingCount = dailyLimit - todayCount;
+  const confirm = await showConfirmDialog({
+    title: "是否查看professional版本？",
+    message: `每日限额${dailyLimit}次，今日还可使用${remainingCount}次`,
+    theme: "round-button",
+  });
+
+  if (confirm) {
+    incrementUsageCount();
+
+    // 复制列表
+    answerSheetProList.value = answerSheetList.value.map((item) => ({
+      ...item,
+      showChinese: false,
+      audio: null,
+    }));
+    console.log("answerSheetProList: ", answerSheetProList.value);
+
+    // 预加载音频
+    const toast = showLoadingToast({
+      duration: 0,
+      forbidClick: true,
+      message: "加载音频...",
+      loadingType: "spinner",
+    });
+    let params = new URLSearchParams();
+    params.append("method", "getAudioList");
+    params.append("word_list", JSON.stringify(answerSheetProList.value));
+    const response = await axios.post("words/", params);
+    console.log("response: ", response.data);
+    if (response.data.success && response.data.audio_data) {
+      toast.close()
+      showAnswerProSheet.value = true;
+      // 成功的音频存进缓存
+      Object.entries(response.data.audio_data).forEach(([word, obj]) => {
+        try {
+          const blob = base64ToBlob(obj.data, "audio/mpeg");
+          audioCache.set(word, blob);
+        } catch (err) {
+          console.warn(`音频转换失败: ${word}`, err);
+        }
+      });
+
+      // 检查是否有失败的词
+      if (response.data.failed_words && response.data.failed_words.length > 0) {
+        const failedList = response.data.failed_words.join("，");
+        showConfirmDialog({
+          theme: 'round-button',
+          title: "音频加载失败",
+          message: `以下单词的音频未能加载：\n${failedList}`,
+          confirmButtonText: "知道了",
+        }).catch(() => {
+          // 用户点了取消（如果你保留了取消按钮）
+        });
+      }
+    }
+  }
 };
 
 // 上传pro时间记录
@@ -374,53 +430,6 @@ const handleAnswerSheetProClose = () => {
   updateAnswerProDuration().then((res) => {
     console.log(res);
   });
-};
-
-const clickShowAnswerPro = async () => {
-  // 清理过期数据（可选）
-  cleanExpiredUsageData();
-
-  // 检查今日使用次数
-  const todayCount = getTodayUsageCount();
-  console.log("todayCount: ", todayCount);
-  const dailyLimit = 3;
-
-  if (todayCount >= dailyLimit) {
-    // 如果已达到每日限制，显示提示
-    showConfirmDialog({
-      title: "今日查看次数已用完",
-      message: `每日限额${dailyLimit}次，今日已使用${todayCount}次，请明天再试`,
-      theme: "round-button",
-      // 只显示确认按钮，不执行任何操作
-      showCancel: false,
-    });
-    return;
-  }
-
-  const remainingCount = dailyLimit - todayCount;
-  const confirm = await showConfirmDialog({
-    title: "是否查看professional版本？",
-    message: `每日限额${dailyLimit}次，今日还可使用${remainingCount}次`,
-    theme: "round-button",
-  });
-
-  if (confirm) {
-    incrementUsageCount();
-
-    // 复制列表
-    answerSheetProList.value = answerSheetList.value.map((item) => ({
-      ...item,
-      showChinese: false,
-      audio: null,
-    }));
-
-    // 预加载音频
-    const success = await preloadProAudio(answerSheetProList.value);
-
-    if (success !== false) {
-      showAnswerProSheet.value = true; // 弹窗
-    }
-  }
 };
 
 const getTodayString = () => {
@@ -4256,7 +4265,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="挑战模式更新，预习pro更新"
+        text="挑战模式更新，预习pro更新，音频持续优化中..."
       />
     </div>
     <van-toast

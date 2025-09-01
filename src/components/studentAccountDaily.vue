@@ -44,8 +44,92 @@ const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
 const checkboxRefs = ref([]);
 
+// const speakWord2 = (english, answer) => {
+//   // 发音
+//   const word = /[a-zA-Z]/.test(english) ? english : answer;
+//   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+//     word
+//   )}&type=1`;
+//   const audio = new Audio(url);
+//   audio.play()
+//   .catch(() => {
+//     console.log("Fallback to SpeechSynthesis");
+//     let utterance;
+//     utterance = new SpeechSynthesisUtterance(english);
+//     if (!/[a-zA-Z]/.test(english)) {
+//       utterance.lang = "zh-CN";
+//     } else {
+//       utterance.lang = "en-US";
+//     }
+//     window.speechSynthesis.speak(utterance);
+//   });
+// };
+
+// 预加载语音
+const audioCache = new Map();
+const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
 const speakWord = (english, answer) => {
-  // 发音
+  // 1) 优先从缓存获取
+  const cached = audioCache.get(english);
+  if (cached) {
+    // console.log(111);
+    if (cached instanceof Blob) {
+      const audioUrl = URL.createObjectURL(cached);
+      const audio = new Audio(audioUrl);
+      audio.currentTime = 0;
+
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(audioUrl);
+      });
+
+      audio.addEventListener("error", () => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("缓存 Blob 播放失败，回退 TTS：", audio.error);
+        fallbackSpeech(english, answer);
+      });
+
+      audio.play().catch((err) => {
+        URL.revokeObjectURL(audioUrl);
+        console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
+        fallbackSpeech(english, answer);
+      });
+      return;
+    }
+
+    if (cached instanceof Audio) {
+      // console.log(222);
+      cached.currentTime = 0;
+      cached.play().catch((err) => {
+        console.warn("播放被拒或失败（Audio cache），回退 TTS：", err);
+        fallbackSpeech(english, answer);
+      });
+      return;
+    }
+  }
+
+  // 2) 从接口返回的 audio_data 查找
+  if (window.preloadedAudioData && window.preloadedAudioData[english]) {
+    // console.log(333);
+    try {
+      const base64 = window.preloadedAudioData[english].data;
+      const blob = base64ToBlob(base64, "audio/mpeg");
+      audioCache.set(english, blob);
+      return speakWord(english, answer); // 再次调用，走缓存逻辑
+    } catch (err) {
+      console.warn("base64 转换失败：", err);
+    }
+  }
+
+  // 3) 从 item 对象查找（你原来的逻辑）
+  // console.log(444);
   const word = /[a-zA-Z]/.test(english) ? english : answer;
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     word
@@ -53,30 +137,24 @@ const speakWord = (english, answer) => {
   const audio = new Audio(url);
   audio.play().catch(() => {
     console.log("Fallback to SpeechSynthesis");
-    let utterance;
-    utterance = new SpeechSynthesisUtterance(english);
-    if (!/[a-zA-Z]/.test(english)) {
-      utterance.lang = "zh-CN";
-    } else {
-      utterance.lang = "en-US";
-    }
-    window.speechSynthesis.speak(utterance);
+    fallbackSpeech(english, answer);
   });
+
+
+  // 4) 都没有，回退 TTS
+  // console.warn("未找到预加载音频，使用 fallback");
+  // fallbackSpeech(english, answer);
 };
-
-const isTextOverflow = (text) => {
-  // 创建一个测试元素
-  const testElement = document.createElement("span");
-  testElement.style.visibility = "hidden";
-  testElement.style.whiteSpace = "nowrap";
-  testElement.innerText = text;
-  document.body.appendChild(testElement);
-
-  // 获取元素的宽度
-  const isOverflowing = testElement.offsetWidth > 100; // 替换为你的期望宽度
-  document.body.removeChild(testElement);
-
-  return isOverflowing;
+const fallbackSpeech = (english, answer) => {
+  let utterance;
+  if (!/[a-zA-Z]/.test(english)) {
+    utterance = new SpeechSynthesisUtterance(answer);
+  } else {
+    utterance = new SpeechSynthesisUtterance(english);
+  }
+  utterance.lang = "en-US";
+  utterance.pitch = 0.5;
+  window.speechSynthesis.speak(utterance);
 };
 
 // 拼写tag
@@ -958,6 +1036,12 @@ onMounted(async () => {
     srcswipeEncouragement.value = swipeEncouragementBears;
     srcswipeEncouragement2.value = swipeEncouragementBears2;
   }
+  const toast = showLoadingToast({
+    duration: 0,
+    forbidClick: true,
+    message: "加载音频...",
+    loadingType: "spinner",
+  });
   const initData = async () => {
     // 初始化数据
     synonymsOptions.value = JSON.parse(history.state.data);
@@ -1021,6 +1105,8 @@ onMounted(async () => {
     // synonymsOptions.value = resultDataTempt.value;
     console.log("synonymsOptions: ", synonymsOptions.value);
     console.log("resultDataTempt: ", resultDataTempt.value);
+    
+    // 预加载音频
     if (
       synonymsOptions.value[currentIndex.value + 1]["排除"] !== "试题" &&
       synonymsOptions.value[currentIndex.value + 1]["排除"] !== "手写"
@@ -1031,6 +1117,36 @@ onMounted(async () => {
       );
     }
     flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+    let params = new URLSearchParams();
+    params.append("method", "getAudioList");
+    params.append("word_list", JSON.stringify(resultDataTempt.value));
+    const response = await axios.post("words/", params);
+    console.log("response: ", response.data);
+    if (response.data.success && response.data.audio_data) {
+      // 成功的音频存进缓存
+      Object.entries(response.data.audio_data).forEach(([word, obj]) => {
+        try {
+          const blob = base64ToBlob(obj.data, "audio/mpeg");
+          audioCache.set(word, blob);
+        } catch (err) {
+          console.warn(`音频转换失败: ${word}`, err);
+        }
+      });
+
+      // 检查是否有失败的词
+      if (response.data.failed_words && response.data.failed_words.length > 0) {
+        const failedList = response.data.failed_words.join("，");
+        showConfirmDialog({
+          theme: 'round-button',
+          title: "音频加载失败",
+          message: `以下单词的音频未能加载：\n${failedList}`,
+          confirmButtonText: "知道了",
+        }).catch(() => {
+          // 用户点了取消（如果你保留了取消按钮）
+        });
+      }
+    }
+    toast.close()
   };
 
   // 调用初始化函数
@@ -1132,7 +1248,7 @@ onMounted(async () => {
                           <div v-else>
                             <div>{{ item.序号 + ". " + item.正确答案 }}</div>
                           </div>
-                                                    <div
+                          <div
                             v-if="item.排除 !== '手写'"
                             style="font-size: 13px; color: red"
                           >
