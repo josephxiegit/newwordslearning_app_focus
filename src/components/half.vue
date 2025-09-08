@@ -25,7 +25,7 @@
 <script setup>
 import { ref, onMounted, defineExpose, inject } from "vue";
 // 主题路径
-import encouragementSrcGoatAndWolf from "../assets/half.png";
+import encouragementSrcGoatAndWolf from "../assets/half.gif";
 import encouragementSrcGoatBears from "../assets/Boonie Bears/half.gif";
 const srcTheme = ref("");
 const flagTheme = inject("flagTheme");

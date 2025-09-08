@@ -313,9 +313,9 @@ const clickShowAnswerPro = async () => {
   const todayCount = getTodayUsageCount();
   // console.log("todayCount: ", todayCount);
   let dailyLimit = 3;
-  let localTeacherPassword = window.localStorage.getItem('teacherPassword');
+  let localTeacherPassword = window.localStorage.getItem("teacherPassword");
   // console.log('localTeacherPassword: ', localTeacherPassword);
-  if(localTeacherPassword == "ss654321") {
+  if (localTeacherPassword == "ss654321") {
     dailyLimit = 999;
   }
 
@@ -361,7 +361,7 @@ const clickShowAnswerPro = async () => {
     const response = await axios.post("words/", params);
     console.log("response: ", response.data);
     if (response.data.success && response.data.audio_data) {
-      toast.close()
+      toast.close();
       showAnswerProSheet.value = true;
       // 成功的音频存进缓存
       Object.entries(response.data.audio_data).forEach(([word, obj]) => {
@@ -377,7 +377,7 @@ const clickShowAnswerPro = async () => {
       if (response.data.failed_words && response.data.failed_words.length > 0) {
         const failedList = response.data.failed_words.join("，");
         showConfirmDialog({
-          theme: 'round-button',
+          theme: "round-button",
           title: "音频加载失败",
           message: `以下单词的音频未能加载：\n${failedList}`,
           confirmButtonText: "知道了",
@@ -3097,14 +3097,16 @@ const viewAnswer = (item, index) => {
 
     if (dialogElement) {
       const rect = dialogElement.getBoundingClientRect();
-      // console.log('rect: ', rect)
+      // console.log('rect.top (relative to viewport): ', rect.top);
+      // console.log('window.scrollY (scroll offset): ', window.scrollY);
 
-      // 将对话框的坐标存储在 ref 中
+      // 将视口坐标转换为文档坐标
       dialogPosition.value = {
-        x: rect.right - rect.width * 1.4,
-        y: rect.top - rect.height * 2,
+        x: rect.right + window.scrollX - rect.width * 1.4,
+        y: rect.top + window.scrollY - rect.height * 2,
       };
-      // console.log("dialogPosition:", dialogPosition.value);
+
+      // console.log("Corrected dialogPosition (relative to document):", dialogPosition.value);
     }
   });
 };

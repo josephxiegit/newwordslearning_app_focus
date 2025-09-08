@@ -169,7 +169,6 @@ const scrollToItem = (index) => {
 const showWelcome = ref(false);
 const showWelcomeHalf = ref(false);
 const showWelcomeAllTrue = ref(false);
-const showStar = ref(false);
 const rate = ref("");
 const halfTrue = ref("");
 const wolfBackRef = ref(null);
@@ -348,6 +347,7 @@ onMounted(async () => {
       (item) => item.teacherMark === true
     );
     if (trueCount.value == compareResult.value.length && !hasTeacherMark) {
+    // if (true) {
       const audiosuccess1eSound = new Audio(success1);
       audiosuccess1eSound.play().catch((err) => {
         console.warn("播放失败：", err);

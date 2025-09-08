@@ -54,6 +54,12 @@ function showAnimationhalf(callback) {
   }
 
   currentHalfAudio = new Audio(halfSound);
+  currentHalfAudio.volume = 0.3;
+  currentHalfAudio.addEventListener('ended', () => {
+    if (currentHalfAudio) {
+      currentHalfAudio.volume = 1.0; // 恢复到原始音量
+    }
+  });
   currentHalfAudio.play().catch((err) => {
     console.warn("播放失败：", err);
   });
@@ -1860,10 +1866,10 @@ onMounted(async () => {
           </van-col>
         </van-row>
         <van-row style="margin-top: px">
-          <van-col span="9" offset="">
+          <van-col span="13" offset="">
             <!-- 添加过渡动画 -->
             <transition name="slide-fade" @after-enter="startHideTimer">
-              <div v-if="showTeacherMark2" class="teacher-mark-text2">
+              <div v-if="showTeacherMark2" style="font-size: smaller;">
                 <div v-if="teacherMarkCount == 0">恭喜！老师尚未标记</div>
                 <div v-else>糟糕！老师标记了{{ teacherMarkCount }}词</div>
               </div>
@@ -1898,7 +1904,7 @@ onMounted(async () => {
 
 
 
-<style scope>
+<style scoped>
 html {
   touch-action: manipulation; /* 禁用双击缩放 */
 }
@@ -1938,12 +1944,13 @@ html {
   display: flex;
   flex-direction: column;
   color: white;
-  transform: translateY(0px); /* 整体向上移动50px */
+  transform: translateY(0px);
+  
 }
 
 .synonym-display {
   position: absolute;
-  top: 30%; /* 从33.33%改为30%，稍微向上 */
+  top: 27%; /* 从33.33%改为30%，稍微向上 */
   left: 50%;
   transform: translate(-50%, -50%);
   width: 100%;
@@ -1973,7 +1980,7 @@ html {
 
 .overlay-footer {
   position: absolute;
-  bottom: max(300px, 20vh);
+  bottom: 30vh; 
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -2004,7 +2011,7 @@ html {
 }
 
 .space {
-  height: 52%;
+  height: 60%;
   font-size: 30px;
   font-weight: 700;
   color: #ee0a24;
@@ -2144,29 +2151,69 @@ html {
   white-space: nowrap !important;
 }
 
-/* 遮罩层 */
-.overlay-content-dynamic {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: 100vh;
-  padding: max(60px, 10vh) 20px max(40px, 8vh);
+/* 遮罩层主容器 */
+.overlay-content {
+  display: flex;                 /* 启用 Flexbox 布局 */
+  flex-direction: column;        /* 垂直排列子元素 (上 -> 中 -> 下) */
+  height: 100vh;                 /* 高度撑满整个视口 */
+  width: 100vw;                  /* 宽度撑满整个视口 */
   box-sizing: border-box;
+  padding: 40px 20px 30px;       /* 顶部、左右、底部留出安全间距 */
+  justify-content: space-between;/* 关键！让顶部和底部元素远离，中间元素占据剩余空间 */
 }
 
-.synonym-display-dynamic {
-  flex: 1;
+/* 中间：英文显示区 */
+.synonym-display {
+  flex: 1;                       /* 关键！占据所有可用的剩余空间 */
   display: flex;
+  flex-direction: column;        /* 内部也用flex，方便居中 */
   align-items: center;
   justify-content: center;
-  min-height: 0; /* 允许收缩 */
-  margin-bottom: max(30px, 5vh);
+  min-height: 0;                 /* Flexbox hack，允许在空间不足时收缩 */
+  overflow-y: auto;              /* 如果内容实在太多，则此区域内部滚动，不影响底部按钮 */
+  margin-bottom: 20px;           /* 和底部元素保持一点距离 */
 }
 
-/* 确保教师标记文字不会造成额外的重叠 */
+.synonym-item {
+  text-align: center;            /* 文本居中 */
+  /* 您可以根据需要调整字体大小等 */
+}
+
+.passive-gif {
+  /* 您可以设置一个最大高度，防止图片过大 */
+  max-height: 150px;
+  margin-bottom: 20px;
+}
+
+
+/* 底部：操作区 */
+.overlay-footer {
+  display: flex;
+  flex-direction: column;        /* 垂直排列倒计时、提示和按钮 */
+  align-items: center;           /* 水平居中 */
+  flex-shrink: 0;                /* 防止在空间不足时被压缩 */
+  gap: 8px;                      /* 现代CSS方式，在子元素之间创建8px的间距，比margin更方便 */
+}
+
+.countdown {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.tip-text {
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+
+/* 教师标记文字 */
 .teacher-mark-text {
-  position: absolute;
-  top: 11rem; /* 向上偏移 */
+  /* 注意：如果teacher-mark-text也想参与布局，就不要用 absolute 定位 */
+  /* 这里我们让它作为footer的一部分，或者放在最上面 */
+  /* 如果您依然希望它绝对定位，那它可能会和其他元素重叠，需要微调 top/bottom */
+  position: relative; /* 改为相对定位，让它在文档流中 */
+  margin-bottom: 15px; /* 和下方内容隔开 */
+  align-self: center;  /* 在flex容器中自我居中 */
   background-color: #ff6b35;
   color: white;
   padding: 8px 16px;
@@ -2174,34 +2221,18 @@ html {
   font-size: 14px;
   font-weight: bold;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 120px;
   text-align: center;
   white-space: nowrap;
 }
 
-.teacher-mark-text2 {
-  position: absolute;
-  background-color: #ff9e74;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: bold;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 120px;
-  text-align: center;
-  white-space: nowrap;
-}
-/* 小屏幕下的教师标记优化 */
-@media (max-height: 667px) {
+/* 针对特别小的屏幕，可以进一步减小间距和字体 */
+@media (max-height: 600px) {
+  .overlay-content {
+    padding: 20px 20px 20px;
+  }
   .teacher-mark-text {
-    top: 11rem;
     font-size: 12px;
     padding: 6px 12px;
-    min-width: 100px;
-  }
-  .synonym-item {
-    margin-bottom: 3rem;
   }
 }
 

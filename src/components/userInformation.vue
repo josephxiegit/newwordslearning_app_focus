@@ -5,6 +5,7 @@ import userinfor1 from "../assets/userinfor1.png";
 import attemptPurchase from "../assets/attemptPurchase.png";
 import profileUsershop from "../assets/Boonie Bears/profile_usershop.png";
 import profileUsershopPassiveMagic from "../assets/usershop_passive_magic.png";
+import shopPreviewPro from "../assets/shop_preview_pro.png";
 import profileRemoveBarrage from "../assets/barrage.png";
 import viewPurchase from "../assets/viewPurchase.png";
 import { useRouter } from "vue-router";
@@ -111,7 +112,8 @@ const isLoading = ref(false);
 const priceBears = ref(20000);
 const pricePassiveMagic = ref(25000);
 const priceRemoveBarrage = ref(1200);
-const priceStar = ref(4500);
+const pricePreviewPro = ref(1200);
+const priceStar = ref(1000);
 const priceAttempt = ref(800);
 const priceView = ref(800);
 const showPurchaseList = ref(false);
@@ -124,6 +126,8 @@ const getPurchaseList = (method) => {
     showPassiveMagic.value = true;
   } else if (method == "皮肤购买") {
     showSkinBoonieBear.value = true;
+  } else if (method == "预习次数") {
+    showPreviewPro.value = true;
   } else {
     showPurchaseList.value = true;
     methodPurchase.value = method;
@@ -131,7 +135,10 @@ const getPurchaseList = (method) => {
 };
 const confirmPurchase = (index) => {
   let rate = originalData.value[index]["rate"];
-  priceStar.value = rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
+  // priceStar.value = rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
+  priceStar.value = rate >= 2.5 ? 1000 : 
+                  rate >= 2 ? 4500 : 
+                  rate >= 1.5 ? 8000 : 0;
   // console.log("priceStar: ", priceStar.value);
   if (originalData.value[index]["rate"] < 1.5) {
     showToast("至少拥有1.5颗星星");
@@ -527,23 +534,23 @@ const purchaseRemoveBarrage = () => {
   const diff = now - timestamp;
   const threeDays = 3 * 24 * 60 * 60 * 1000;
 
-  // if (diff < threeDays) {
-  //   const remaining = threeDays - diff; // 还差多少毫秒
+  if (diff < threeDays) {
+    const remaining = threeDays - diff; // 还差多少毫秒
 
-  //   const remainDays = Math.floor(remaining / (1000 * 60 * 60 * 24));
-  //   const remainHours = Math.floor(
-  //     (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-  //   );
+    const remainDays = Math.floor(remaining / (1000 * 60 * 60 * 24));
+    const remainHours = Math.floor(
+      (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+    );
 
-  //   showToast(`还需要 ${remainDays} 天 ${remainHours} 小时才能购买`);
-  //   return;
-  // }
+    showToast(`还需要 ${remainDays} 天 ${remainHours} 小时才能购买`);
+    return;
+  }
 
   showConfirmDialog({
     title: "弹幕消除",
     message: `确认花费${priceRemoveBarrage.value}金币消除弹幕吗？`,
   }).then(async () => {
-    if (usercoins.value < 1200) {
+    if (usercoins.value < priceRemoveBarrage.value) {
       showFailToast("金币不足，无法购买");
       return;
     }
@@ -560,6 +567,52 @@ const purchaseRemoveBarrage = () => {
     usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
     isLoading.value = false;
     showToast("删除成功");
+  });
+};
+
+// 预习次数
+const showPreviewPro = ref(false);
+const getTodayString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+const purchasePreviewPro = () => {
+  showConfirmDialog({
+    title: "购买预习pro次数",
+    message: `确认花费${pricePreviewPro.value}金币购买今日10次吗？`,
+  }).then(async () => {
+    if (usercoins.value < pricePreviewPro.value) {
+      showFailToast("金币不足，无法购买");
+      return;
+    }
+    const today = getTodayString();
+    const keys = Object.keys(localStorage);
+
+    keys.forEach((key) => {
+      if (key.startsWith("pro_usage_") && key !== `pro_usage_${today}`) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    const storageKey = `pro_usage_${today}`;
+    localStorage.setItem(storageKey, (-7).toString());
+    isLoading.value = true;
+    const params = new URLSearchParams({
+      method: "purchasePreviewPro",
+      pricePreviewPro: pricePreviewPro.value,
+      username: username.value,
+    });
+    const response = await axios.post("words/", params);
+    // console.log("res: ", response.data);
+    const userCoinsResponse = await getUserCoins();
+    usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
+    isLoading.value = false;
+
+
+    showToast("购买成功");
   });
 };
 
@@ -837,6 +890,48 @@ onMounted(async () => {
           style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
         >
           仅在游戏模式中生效
+        </div>
+      </template>
+    </van-dialog>
+
+    <!-- pro增加数量 -->
+    <van-card desc="增加当天预习pro数量" title="预习售卖" class="custom-cell">
+      <template #thumb>
+        <img :src="shopPreviewPro" class="custom-thumb-image" alt="thumbnail" />
+      </template>
+      <template #price>
+        <div class="price-container">
+          <span class="price-text">价格：{{ pricePreviewPro }}金币</span>
+        </div>
+      </template>
+      <template #footer>
+        <div class="button-purchase">
+          <van-button
+            size="mini"
+            type="primary"
+            class="buy-button"
+            @click="getPurchaseList('预习次数')"
+            >购买</van-button
+          >
+        </div>
+      </template>
+    </van-card>
+    <van-dialog
+      v-model:show="showPreviewPro"
+      title="预习pro次数"
+      show-cancel-button
+      @confirm="purchasePreviewPro()"
+    >
+      <img
+        src="../assets/shop_preview_pro.png"
+        style="width: 100%; height: auto; margin-right: 0.5rem"
+      />
+      <template #title>
+        <div style="margin-bottom: 0rem; font-size: larger">预习pro次数</div>
+        <div
+          style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+        >
+          可以购买当天使用10次
         </div>
       </template>
     </van-dialog>
