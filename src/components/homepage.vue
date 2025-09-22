@@ -7,7 +7,7 @@ import {
   onBeforeUpdate,
   computed,
   onUnmounted,
-  inject
+  inject,
 } from "vue";
 import Typed from "typed.js";
 
@@ -378,19 +378,32 @@ const submitAccount = () => {
   // isLoading.value = true;
   if (passwordAccount.value.trim() && userAccount.value.trim()) {
     submitAccountData().then((res) => {
-      console.log('res: ', res);
+      console.log("res: ", res);
       if (res == "用户名不存在") {
         showFailToast("用户名不存在");
+        setTimeout(() => {
+          showToast({
+            message: "提示：姓名全拼音全小写，如：张三：zhangsan",
+            duration: 0,
+            closeOnClick: true,
+          });
+        }, 1500);
+        return
       } else if (res == "密码错误") {
         showFailToast("密码错误");
+        return
       } else if (res.status == false) {
         showFailToast("用户暂时冻结");
+        return
       } else {
         // 主题选择
-        localStorage.setItem('theme_name', res.theme.theme_name);
-        if(res.theme.theme_name == "喜羊羊与灰太狼") {flagTheme.value = 1}
-        if(res.theme.theme_name == "熊出没") {flagTheme.value = 2}
-
+        localStorage.setItem("theme_name", res.theme.theme_name);
+        if (res.theme.theme_name == "喜羊羊与灰太狼") {
+          flagTheme.value = 1;
+        }
+        if (res.theme.theme_name == "熊出没") {
+          flagTheme.value = 2;
+        }
 
         async function missTask() {
           let params = new URLSearchParams();
@@ -411,50 +424,50 @@ const submitAccount = () => {
 
         async function executeTasks() {
           // try {
-            // 先执行 missTask
-            // isLoading.value = true;
-            const res_miss = await missTask();
-            if (res_miss.message != "无") {
-              missyouFlag.value = true;
-              missDays.value = res_miss.message;
-              console.log("missDays.value: ", missDays.value);
-            }
+          // 先执行 missTask
+          // isLoading.value = true;
+          const res_miss = await missTask();
+          if (res_miss.message != "无") {
+            missyouFlag.value = true;
+            missDays.value = res_miss.message;
+            console.log("missDays.value: ", missDays.value);
+          }
 
-            // 然后执行后续逻辑
-            if (userAccount.value == "user" || userAccount.value == "teacher") {
-              await userTestUpdate();
-              router.push({
-                path: "/studentAccountList",
-                state: {
-                  data: JSON.stringify(res),
-                  missyouflag: missyouFlag.value,
-                  missDays: missDays.value,
-                },
-              });
-            } else {
-              const userData = {
-                username: userAccount.value.trim(),
-                password: passwordAccount.value.trim(),
-              };
-              const now = new Date();
-              const expirationDate = new Date(
-                now.getTime() + 7 * 24 * 60 * 60 * 1000
-              );
-              localStorage.setItem("userData", JSON.stringify(userData));
-              localStorage.setItem(
-                "expirationDate",
-                expirationDate.toISOString()
-              );
-              isLoading.value = false;
-              router.push({
-                path: "/studentAccountList",
-                state: {
-                  data: JSON.stringify(res),
-                  missyouflag: missyouFlag.value,
-                  missDays: missDays.value,
-                },
-              });
-            }
+          // 然后执行后续逻辑
+          if (userAccount.value == "user" || userAccount.value == "teacher") {
+            await userTestUpdate();
+            router.push({
+              path: "/studentAccountList",
+              state: {
+                data: JSON.stringify(res),
+                missyouflag: missyouFlag.value,
+                missDays: missDays.value,
+              },
+            });
+          } else {
+            const userData = {
+              username: userAccount.value.trim(),
+              password: passwordAccount.value.trim(),
+            };
+            const now = new Date();
+            const expirationDate = new Date(
+              now.getTime() + 7 * 24 * 60 * 60 * 1000
+            );
+            localStorage.setItem("userData", JSON.stringify(userData));
+            localStorage.setItem(
+              "expirationDate",
+              expirationDate.toISOString()
+            );
+            isLoading.value = false;
+            router.push({
+              path: "/studentAccountList",
+              state: {
+                data: JSON.stringify(res),
+                missyouflag: missyouFlag.value,
+                missDays: missDays.value,
+              },
+            });
+          }
           // } catch (error) {
           //   console.error("Error executing tasks:", error);
           // }
@@ -629,7 +642,7 @@ onUnmounted(() => {
       :style="{ height: '100%' }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
     >
-    <!-- closeable -->
+      <!-- closeable -->
       <div
         style="
           display: flex;
@@ -643,7 +656,7 @@ onUnmounted(() => {
         <div ref="pRef" class="content"></div>
 
         <!-- designed by xie -->
-        
+
         <div class="logo-container" style="margin-top: 40">
           <div
             class="logo"

@@ -47,6 +47,7 @@ const animationhalfVisible = ref(false);
 let currentHalfAudio = null;
 
 function showAnimationhalf(callback) {
+  showFlagText.value = false;
   // 如果之前有音频在播放，先停止它
   if (currentHalfAudio) {
     currentHalfAudio.pause();
@@ -55,7 +56,7 @@ function showAnimationhalf(callback) {
 
   currentHalfAudio = new Audio(halfSound);
   currentHalfAudio.volume = 0.3;
-  currentHalfAudio.addEventListener('ended', () => {
+  currentHalfAudio.addEventListener("ended", () => {
     if (currentHalfAudio) {
       currentHalfAudio.volume = 1.0; // 恢复到原始音量
     }
@@ -463,7 +464,10 @@ const onEnter = (event) => {
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
 const flagSingleOrMultiChoice = ref("单选");
-
+const showFlagText = ref(false);
+const toggleFlagText = () => {
+  showFlagText.value = !showFlagText.value;
+}
 let originalChinese = "";
 const isDisabled = (index, index2) => {
   const item = synonymsOptions.value[index];
@@ -779,6 +783,7 @@ const goToNext = () => {
         swipeRef.value.next();
         currentRate.value = 100;
         timerRate.value = 100;
+        showFlagText.value = false;
       } else {
         // 到达最后一个轮播图，执行提交函数
         pause();
@@ -1330,9 +1335,7 @@ const isSubmitting = ref(false);
 const hasSubmitted = ref(false);
 const nidSubmit = ref("");
 
-onUnmounted(() => {
-
-});
+onUnmounted(() => {});
 
 onMounted(async () => {
   // 显示倒计时并等待完成
@@ -1722,9 +1725,17 @@ onMounted(async () => {
                           </div>
                           <div
                             v-if="item.排除 !== '手写'"
-                            style="font-size: 17px; color: red"
                           >
-                            {{ flagSingleOrMultiChoice }}
+                            <div
+                              v-if="!showFlagText"
+                              @click="toggleFlagText"
+                              style="cursor: pointer"
+                            >
+                              <van-icon name="closed-eye" />
+                            </div>
+                            <div v-else style="font-size: 17px; color: red">
+                              {{ flagSingleOrMultiChoice }}
+                            </div>
                           </div>
                         </div>
                         <div
@@ -1869,7 +1880,7 @@ onMounted(async () => {
           <van-col span="13" offset="">
             <!-- 添加过渡动画 -->
             <transition name="slide-fade" @after-enter="startHideTimer">
-              <div v-if="showTeacherMark2" style="font-size: smaller;">
+              <div v-if="showTeacherMark2" style="font-size: smaller">
                 <div v-if="teacherMarkCount == 0">恭喜！老师尚未标记</div>
                 <div v-else>糟糕！老师标记了{{ teacherMarkCount }}词</div>
               </div>
@@ -1945,7 +1956,6 @@ html {
   flex-direction: column;
   color: white;
   transform: translateY(0px);
-  
 }
 
 .synonym-display {
@@ -1980,7 +1990,7 @@ html {
 
 .overlay-footer {
   position: absolute;
-  bottom: 30vh; 
+  bottom: 30vh;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -2153,29 +2163,29 @@ html {
 
 /* 遮罩层主容器 */
 .overlay-content {
-  display: flex;                 /* 启用 Flexbox 布局 */
-  flex-direction: column;        /* 垂直排列子元素 (上 -> 中 -> 下) */
-  height: 100vh;                 /* 高度撑满整个视口 */
-  width: 100vw;                  /* 宽度撑满整个视口 */
+  display: flex; /* 启用 Flexbox 布局 */
+  flex-direction: column; /* 垂直排列子元素 (上 -> 中 -> 下) */
+  height: 100vh; /* 高度撑满整个视口 */
+  width: 100vw; /* 宽度撑满整个视口 */
   box-sizing: border-box;
-  padding: 40px 20px 30px;       /* 顶部、左右、底部留出安全间距 */
-  justify-content: space-between;/* 关键！让顶部和底部元素远离，中间元素占据剩余空间 */
+  padding: 40px 20px 30px; /* 顶部、左右、底部留出安全间距 */
+  justify-content: space-between; /* 关键！让顶部和底部元素远离，中间元素占据剩余空间 */
 }
 
 /* 中间：英文显示区 */
 .synonym-display {
-  flex: 1;                       /* 关键！占据所有可用的剩余空间 */
+  flex: 1; /* 关键！占据所有可用的剩余空间 */
   display: flex;
-  flex-direction: column;        /* 内部也用flex，方便居中 */
+  flex-direction: column; /* 内部也用flex，方便居中 */
   align-items: center;
   justify-content: center;
-  min-height: 0;                 /* Flexbox hack，允许在空间不足时收缩 */
-  overflow-y: auto;              /* 如果内容实在太多，则此区域内部滚动，不影响底部按钮 */
-  margin-bottom: 20px;           /* 和底部元素保持一点距离 */
+  min-height: 0; /* Flexbox hack，允许在空间不足时收缩 */
+  overflow-y: auto; /* 如果内容实在太多，则此区域内部滚动，不影响底部按钮 */
+  margin-bottom: 20px; /* 和底部元素保持一点距离 */
 }
 
 .synonym-item {
-  text-align: center;            /* 文本居中 */
+  text-align: center; /* 文本居中 */
   /* 您可以根据需要调整字体大小等 */
 }
 
@@ -2185,14 +2195,13 @@ html {
   margin-bottom: 20px;
 }
 
-
 /* 底部：操作区 */
 .overlay-footer {
   display: flex;
-  flex-direction: column;        /* 垂直排列倒计时、提示和按钮 */
-  align-items: center;           /* 水平居中 */
-  flex-shrink: 0;                /* 防止在空间不足时被压缩 */
-  gap: 8px;                      /* 现代CSS方式，在子元素之间创建8px的间距，比margin更方便 */
+  flex-direction: column; /* 垂直排列倒计时、提示和按钮 */
+  align-items: center; /* 水平居中 */
+  flex-shrink: 0; /* 防止在空间不足时被压缩 */
+  gap: 8px; /* 现代CSS方式，在子元素之间创建8px的间距，比margin更方便 */
 }
 
 .countdown {
@@ -2205,7 +2214,6 @@ html {
   color: #aaa;
 }
 
-
 /* 教师标记文字 */
 .teacher-mark-text {
   /* 注意：如果teacher-mark-text也想参与布局，就不要用 absolute 定位 */
@@ -2213,7 +2221,7 @@ html {
   /* 如果您依然希望它绝对定位，那它可能会和其他元素重叠，需要微调 top/bottom */
   position: relative; /* 改为相对定位，让它在文档流中 */
   margin-bottom: 15px; /* 和下方内容隔开 */
-  align-self: center;  /* 在flex容器中自我居中 */
+  align-self: center; /* 在flex容器中自我居中 */
   background-color: #ff6b35;
   color: white;
   padding: 8px 16px;

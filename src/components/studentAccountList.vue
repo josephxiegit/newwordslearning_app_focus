@@ -3760,32 +3760,6 @@ function handleCancelChallenge() {
 
 const applyforChallenge = () => {
   showChallenge();
-  // showConfirmDialog({
-  //   title: "确定向老师申请挑战赛吗",
-  //   message: "获胜可赢得金色标志",
-  //   theme: "round-button",
-  //   allowHtml: true,
-  // }).then(async () => {
-
-  //   let params = new URLSearchParams();
-  //   params.append("method", "applyforChallenge");
-  //   params.append("nid", applyitem["nid"]);
-  //   const res = await axios.post("words/", params);
-  //   console.log("res: ", res.data);
-  //   if (res.data == "申请失败") {
-  //     showFailToast("申请失败，联系老师");
-  //   } else {
-  //     goToNextPage(
-  //       indexAnswer.value,
-  //       originalData.value[indexAnswer.value],
-  //       4,
-  //       0,
-  //       1,
-  //       0,
-  //       0
-  //     );
-  //   }
-  // });
 };
 
 // 主题
