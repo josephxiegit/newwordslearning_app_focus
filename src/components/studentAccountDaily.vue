@@ -24,6 +24,7 @@ import {
 import { useRouter } from "vue-router";
 import preExamAnimation from "./preExam.vue";
 import dailyAnimation from "./dailyAnimation.vue";
+import WinningStreakPopup from "./WinningStreakPopup.vue";
 import chineseMeaningSrcGoatAndWolf from "../assets/chinese_meaning.png";
 import chineseMeaningSrcBears from "../assets/Boonie Bears/chinese_meaning.png";
 import successSound from "../assets/sound/success.mp3";
@@ -139,7 +140,6 @@ const speakWord = (english, answer) => {
     console.log("Fallback to SpeechSynthesis");
     fallbackSpeech(english, answer);
   });
-
 
   // 4) 都没有，回退 TTS
   // console.warn("未找到预加载音频，使用 fallback");
@@ -419,7 +419,6 @@ const closeMeaning = () => {
   startAnimation();
 };
 
-
 const countdownMeaningClose = ref(5);
 const isDisabledMeaningClose = ref(true);
 const buttonTextMeaningClose = ref(`关闭 (${countdownMeaningClose.value}s)`);
@@ -489,7 +488,7 @@ const goToNext = async () => {
       answerShow.value = true;
       buttonText.value = "下一个";
       buttonTextType.value = "warning";
-      
+
       isCheckboxDisabled.value = true;
       // 判断对错
       let areEqual = false;
@@ -677,22 +676,73 @@ const goToNext = async () => {
             });
           }
           submitList.value = compareAndAddFlag(submitList.value);
-          if (reviewRequired.value === 1) {
-            showSuccessToast("恭喜！💎数量增加+1");
-          } else {
-            showSuccessToast("恭喜！💎数量增加+2");
-          }
-          router.push({
-            path: "/studentAccountList",
-            state: {
-              username: username.value,
-              data: basicPreExam.value,
-              reviewRequired: reviewRequired.value
-            },
-          });
-          updateAccountLog();
+          // if (reviewRequired.value === 1) {
+          //   showSuccessToast("恭喜！💎数量增加+1");
+          // } else {
+          //   showSuccessToast("恭喜！💎数量增加+2");
+          // }
+          // router.push({
+          //   path: "/studentAccountList",
+          //   state: {
+          //     username: username.value,
+          //     data: basicPreExam.value,
+          //     reviewRequired: reviewRequired.value
+          //   },
+          // });
+          // updateAccountLog();
           // console.log("提交");
           // console.log("submitList:", submitList.value);
+
+          isLoading.value = true;
+          try {
+            // 创建超时 Promise
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error("请求超时")), 8000);
+            });
+
+            // 竞速：哪个先完成就用哪个结果
+            const response = await Promise.race([
+              // axios.post("words/", params),
+              updateAccountLog(),
+              timeoutPromise,
+            ]);
+
+            // console.log('response: ', response);
+            activeWinningStreak.value = response["today_record_count"];
+            // console.log('activeWinningStreak.value: ', activeWinningStreak.value);
+          } catch (error) {
+            if (error.message === "请求超时") {
+              console.log("请求超时，请重试");
+              showFailToast("网络错误请重试");
+              isLoading.value = false;
+              return;
+              // 可以显示提示信息
+              // Toast('请求超时，请重试');
+            } else {
+              console.error("请求失败:", error);
+            }
+          } finally {
+            isLoading.value = false;
+          }
+          // console.log("reviewRequired.value: ", reviewRequired.value);
+          // console.log("activeWinningStreak.value: ", activeWinningStreak.value);
+          const message =
+            reviewRequired.value === 1
+              ? "恭喜！💎数量增加+1"
+              : "恭喜！💎数量增加+2";
+          // console.log(reviewRequired.value === 1 ? 111 : 222);
+
+          setTimeout(() => {
+            showSuccessToast(message);
+          }, 1000);
+          if (
+            activeWinningStreak.value > 6 ||
+            activeWinningStreak.value == undefined
+          ) {
+            redirect();
+          } else {
+            shoWinningStreak.value = true;
+          }
         } else {
           if (!localStorage.getItem("dailyAnimation")) {
             showAnimation_true();
@@ -999,6 +1049,28 @@ const pivotFontStyle = computed(() => {
 const showEncouragement = ref(false);
 const showEncouragement2 = ref(false);
 
+// 连胜纪录
+const shoWinningStreak = ref(false);
+const activeWinningStreak = ref(0);
+
+const handleContinue = () => {
+  // 用户点击继续按钮
+  redirect();
+};
+const handleAutoClose = () => {
+  // 8秒后自动关闭
+};
+const redirect = () => {
+  router.push({
+    path: "/studentAccountList",
+    state: {
+      username: username.value,
+      data: basicPreExam.value,
+      reviewRequired: reviewRequired.value,
+    },
+  });
+};
+
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
 });
@@ -1086,7 +1158,7 @@ onMounted(async () => {
     totalSlides.value = synonymsOptions.value.length;
 
     submittoken.value = new Date().getTime();
-    // console.log("submittoken: ", submittoken.value);
+    console.log("submittoken: ", submittoken.value);
 
     username.value = history.state.username;
     account_id_list.value = history.state.account_id_list;
@@ -1103,9 +1175,9 @@ onMounted(async () => {
     });
 
     // synonymsOptions.value = resultDataTempt.value;
-    console.log("synonymsOptions: ", synonymsOptions.value);
-    console.log("resultDataTempt: ", resultDataTempt.value);
-    
+    // console.log("synonymsOptions: ", synonymsOptions.value);
+    // console.log("resultDataTempt: ", resultDataTempt.value);
+
     // 预加载音频
     if (
       synonymsOptions.value[currentIndex.value + 1]["排除"] !== "试题" &&
@@ -1137,7 +1209,7 @@ onMounted(async () => {
       if (response.data.failed_words && response.data.failed_words.length > 0) {
         const failedList = response.data.failed_words.join("，");
         showConfirmDialog({
-          theme: 'round-button',
+          theme: "round-button",
           title: "音频加载失败",
           message: `以下单词的音频未能加载：\n${failedList}`,
           confirmButtonText: "知道了",
@@ -1146,7 +1218,7 @@ onMounted(async () => {
         });
       }
     }
-    toast.close()
+    toast.close();
   };
 
   // 调用初始化函数
@@ -1494,6 +1566,13 @@ onMounted(async () => {
     <dailyAnimation ref="preExamAnimationRef" />
     <preExamAnimation ref="preExamAnimationRef2" :flagChoose="flagChoose2" />
     <loading v-if="isLoading" />
+    <WinningStreakPopup
+      v-model:show="shoWinningStreak"
+      :active-step="activeWinningStreak"
+      :flag-theme="flagTheme"
+      @continue="handleContinue"
+      @auto-close="handleAutoClose"
+    />
   </div>
 </template>
 

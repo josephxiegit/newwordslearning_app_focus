@@ -254,7 +254,7 @@ const handleAnswerSheetClose = async () => {
     .getSeconds()
     .toString()
     .padStart(2, "0")}秒`;
-
+  console.log('account_data_id: ', account_data_id);
   let params = new URLSearchParams();
   params.append("method", "updateAnswerDuration");
   params.append("username", username.value);

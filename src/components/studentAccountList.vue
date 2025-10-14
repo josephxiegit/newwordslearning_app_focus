@@ -2091,26 +2091,6 @@ const goToNextPage = (
   }
 };
 const lastSpeakTime = ref(0);
-// const speakWord = async (english, answer) => {
-//   // youdao fayin
-//   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-//     english
-//   )}&type=1`;
-//   const audio = new Audio(url);
-//   audio.play().catch(() => {
-//     console.log("Fallback to SpeechSynthesis");
-//     let utterance;
-//     if (!/[a-zA-Z]/.test(english)) {
-//       utterance = new SpeechSynthesisUtterance(answer);
-//     } else {
-//       utterance = new SpeechSynthesisUtterance(english);
-//     }
-
-//     utterance.lang = "en-US";
-//     utterance.pitch = 0.5;
-//     window.speechSynthesis.speak(utterance);
-//   });
-// };
 
 // 跳转下一面
 const speakWord = async (english, answer) => {
@@ -3762,10 +3742,199 @@ const applyforChallenge = () => {
   showChallenge();
 };
 
+// 本周日历，连胜
+const weekDays = ref([]);
+const selectedDate = ref(null);
+const showCalendar = ref(false);
+const isWeekComplete = ref(false);
+const daysWinningStreak = ref(0);
+const completeWeeks = ref([]);
+const weekCompleteState = ref("");
+const completeWeekStates = ref({});
+
+const generateWeekDays = async () => {
+  const today = new Date();
+  const currentDay = today.getDay();
+  const weekStart = currentDay === 0 ? -6 : 1 - currentDay; // 从周一开始
+
+  weekDays.value = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + weekStart + i);
+
+    const weekNames = ["日", "一", "二", "三", "四", "五", "六"];
+    const isToday = date.toDateString() === today.toDateString();
+
+    weekDays.value.push({
+      date: date.toISOString(),
+      week: weekNames[date.getDay()],
+      day: date.getDate(),
+      isToday: isToday,
+      isSelected: false,
+    });
+  }
+
+  // 获取本周周一的日期
+  const mondayDate = new Date(today);
+  mondayDate.setDate(today.getDate() + weekStart);
+  const mondayString = formatDate(mondayDate);
+
+  // console.log("username:", username.value);
+  let params = new URLSearchParams();
+  params.append("method", "getUserWinningStreak");
+  params.append("username", username.value);
+  const response = await axios.post("words/", params);
+  console.log("response: ", response.data);
+  if (response.data.status === "success") {
+    completeWeeks.value = response.data.data.map((record) => ({
+      monday: record.week_monday.split(" ")[0],
+      state: record.complete_state, // 0, 1, 2
+    }));
+
+    // 如果找到本周完成的记录，标记为完成
+    daysWinningStreak.value = response.data.winning_streak * 7;
+    const thisWeekRecord = response.data.data.find((record) => {
+      const recordDate = record.week_monday.split(" ")[0];
+      return recordDate === mondayString;
+    });
+
+    isWeekComplete.value =
+      !!thisWeekRecord && thisWeekRecord.complete_state > 0;
+    weekCompleteState.value = thisWeekRecord
+      ? thisWeekRecord.complete_state
+      : 0;
+
+    completeWeekStates.value = {};
+    response.data.data.forEach((record) => {
+      const monday = record.week_monday.split(" ")[0]; // "YYYY-MM-DD"
+      completeWeekStates.value[monday] = record.complete_state || 0;
+    });
+  }
+};
+
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getMondayOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return formatDate(monday);
+};
+
+// 生成日历数据（本月、上月、上上月）
+const calendarMonths = computed(() => {
+  const today = new Date();
+  const months = [];
+
+  for (let i = 2; i >= 0; i--) {
+    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+
+    for (let j = 0; j < firstDay; j++) {
+      days.push({ date: null, isEmpty: true });
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day);
+      const dateString = formatDate(currentDate); // 假设返回 "YYYY-MM-DD"
+      const mondayString = getMondayOfWeek(currentDate); // 也返回 "YYYY-MM-DD"
+
+      // ← 关键：从映射里取状态（不存在则默认 0）
+      const completeState =
+        completeWeekStates.value && completeWeekStates.value[mondayString]
+          ? completeWeekStates.value[mondayString]
+          : 0;
+
+      const isComplete = completeState > 0;
+      const isToday = formatDate(new Date()) === dateString;
+
+      days.push({
+        date: currentDate,
+        day: day,
+        dateString: dateString,
+        isComplete: isComplete,
+        complete_state: completeState, // ← 把状态放进去
+        isToday: isToday,
+        isEmpty: false,
+      });
+    }
+
+    months.push({
+      year: year,
+      month: month + 1,
+      title: `${year}年${month + 1}月`,
+      days: days,
+    });
+  }
+
+  return months;
+});
+
+const selectDate = (day) => {
+  showCalendar.value = true;
+  nextTick(() => {
+    setTimeout(() => {
+      const calendar = document.querySelector(".custom-calendar");
+      if (calendar) {
+        calendar.scrollTop = calendar.scrollHeight;
+      }
+    }, 0);
+  });
+};
+
+const onConfirmCalendar = (value) => {
+  showCalendar.value = false;
+};
+
+const showMessage = () => {
+  showDialog({
+    title: "更新：连胜说明",
+    message:
+      "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。",
+    theme: "round-button",
+    teleport: "body",
+  }).then(() => {});
+};
 // 主题
 onMounted(async () => {
   // 更新pro显示答案次数
   updateRemainingCount();
+  // 检查是否已经显示过更新提示
+  const lastShownTime = localStorage.getItem("winStreakUpdateTime");
+  const shownCount = parseInt(
+    localStorage.getItem("winStreakUpdateCount") || "0"
+  );
+  const now = Date.now();
+  const dayInMs = 24 * 60 * 60 * 1000;
+
+  // 如果显示次数小于10次，且（从未显示过 或 距离上次显示超过1天）
+  if (
+    shownCount < 10 &&
+    (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
+  ) {
+    showDialog({
+      title: "更新：连胜说明",
+      message:
+        "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。",
+      theme: "round-button",
+    }).then(() => {
+      localStorage.setItem("winStreakUpdateTime", now.toString());
+      localStorage.setItem("winStreakUpdateCount", (shownCount + 1).toString());
+    });
+  }
+
   // 弹幕单词
   // 检查并清理旧格式的数据
   const storedList = localStorage.getItem("listBarrage");
@@ -3991,6 +4160,10 @@ onMounted(async () => {
     return "ok";
   });
   res = res.then(() => {
+    // 显示本周日历连胜
+    generateWeekDays();
+  });
+  res = res.then(() => {
     // 判断是否需要复习
     async function getFlagReview() {
       const params = new URLSearchParams();
@@ -4036,6 +4209,7 @@ onMounted(async () => {
     });
     return "ok";
   });
+
   // res = res.then(() => {
   //   // 得到每日任务信息
   //   async function getFlagReview() {
@@ -4084,6 +4258,100 @@ onMounted(async () => {
         </template>
       </van-nav-bar>
     </div>
+
+    <!-- 本周日历 连胜 -->
+    <div
+      style="
+        font-size: 12px;
+        color: #1989fa;
+        margin: 0.2rem 0rem -0.3rem 0.7rem;
+      "
+    >
+      连胜{{ daysWinningStreak }}天
+    </div>
+    <div class="week-calendar">
+      <div
+        v-for="day in weekDays"
+        :key="day.date"
+        class="calendar-day"
+        :class="{
+          'week-complete-1': weekCompleteState === 1,
+          'week-complete-2': weekCompleteState === 2,
+        }"
+        @click="selectDate(day)"
+      >
+        <div class="week-text">{{ day.week }}</div>
+        <div class="date-text">{{ day.day }}</div>
+        <div v-if="day.isToday" class="today-dot"></div>
+      </div>
+    </div>
+
+    <!-- 自定义日历 -->
+    <transition name="calendar-fade">
+      <div
+        v-if="showCalendar"
+        class="custom-calendar-overlay"
+        @click="closeCalendar"
+      >
+        <div class="custom-calendar" @click.stop>
+          <div class="calendar-header">
+            <div class="title-wrapper">
+              <span class="calendar-title">连胜{{ daysWinningStreak }}天</span>
+              <span class="calendar-subtitle" @click="showMessage"
+                >每周三次背诵可完成一周任务，6次完成金色</span
+              >
+            </div>
+            <span class="close-btn" @click="onConfirmCalendar">✕</span>
+          </div>
+
+          <div class="calendar-body">
+            <div
+              v-for="monthData in calendarMonths"
+              :key="monthData.title"
+              class="month-section"
+            >
+              <div class="month-title">{{ monthData.title }}</div>
+
+              <!-- 星期标题 -->
+              <div class="weekday-header">
+                <div class="weekday-cell">日</div>
+                <div class="weekday-cell">一</div>
+                <div class="weekday-cell">二</div>
+                <div class="weekday-cell">三</div>
+                <div class="weekday-cell">四</div>
+                <div class="weekday-cell">五</div>
+                <div class="weekday-cell">六</div>
+              </div>
+
+              <!-- 日期格子 -->
+              <div class="days-grid">
+                <div
+                  v-for="(dayData, index) in monthData.days"
+                  :key="index"
+                  class="day-cell"
+                  :class="{
+                    empty: dayData.isEmpty,
+                    'complete-week-1': dayData.complete_state === 1,
+                    'complete-week-2': dayData.complete_state === 2,
+                    today: dayData.isToday,
+                  }"
+                  @click="!dayData.isEmpty && selectDate(dayData)"
+                >
+                  <span v-if="!dayData.isEmpty" class="day-number">
+                    {{ dayData.day }}
+                  </span>
+                  <div v-if="dayData.isToday" class="today-indicator"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="calendar-footer">
+            <button class="confirm-btn" @click="onConfirmCalendar">确认</button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <router-view />
     <van-tabbar route>
@@ -4241,7 +4509,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="挑战模式更新，预习pro更新，音频持续优化中..."
+        text="连胜奖励更新，徽章系统持续开发中...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6469,5 +6737,313 @@ onMounted(async () => {
 .shuffle-leave-to {
   opacity: 0;
   transform: translateY(-60px) scale(0.6) rotate(10deg);
+}
+
+/* 日历连胜 */
+.week-calendar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0px 0;
+  background-color: #fff;
+  border-bottom: 1px solid #ebedf0;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 60px;
+  position: relative;
+}
+
+.week-text {
+  font-size: 12px;
+  color: #969799;
+  margin-bottom: 4px;
+}
+
+.date-text {
+  font-size: 16px;
+  color: #323233;
+  font-weight: 500;
+}
+
+.calendar-day.active .week-text,
+.calendar-day.active .date-text {
+  color: #1989fa;
+}
+
+.today-dot {
+  width: 4px;
+  height: 4px;
+  background-color: #1989fa;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 8px;
+}
+
+/* 本周完成时，所有日期变金色 */
+/* 浅黄色（complete_state = 1） */
+.calendar-day.week-complete-1::before {
+  content: "";
+  position: absolute;
+  top: 0.35rem;
+  left: 0;
+  right: 0;
+  bottom: 0.2rem;
+  background: linear-gradient(135deg, #fff9cc 0%, #ffe680 100%);
+  border-radius: 8px;
+}
+
+.calendar-day.week-complete-1 .week-text,
+.calendar-day.week-complete-1 .date-text {
+  color: #a67c00;
+  position: relative;
+  z-index: 1;
+}
+
+/* 金色（complete_state = 2） */
+.calendar-day.week-complete-2::before {
+  content: "";
+  position: absolute;
+  top: 0.35rem;
+  left: 0;
+  right: 0;
+  bottom: 0.2rem;
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+  border-radius: 8px;
+}
+
+.calendar-day.week-complete-2 .week-text,
+.calendar-day.week-complete-2 .date-text {
+  color: #8b4513;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+}
+
+/* 自定义日历样式 */
+.custom-calendar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 999;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.custom-calendar {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+}
+
+.title-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #323233;
+}
+
+.calendar-subtitle {
+  font-size: 12px;
+  color: #576b95;
+  background: #ecf5ff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.calendar-subtitle:hover {
+  background: #d9ecff;
+}
+
+.calendar-subtitle:active {
+  background: #c6e2ff;
+}
+
+.close-btn {
+  font-size: 24px;
+  color: #969799;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.calendar-body {
+  padding: 0 12px 12px;
+}
+
+.month-section {
+  margin-top: 16px;
+}
+
+.month-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #323233;
+  padding: 8px 4px;
+}
+
+.weekday-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.weekday-cell {
+  text-align: center;
+  font-size: 12px;
+  color: #969799;
+  padding: 8px 0;
+}
+
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.day-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.day-cell.empty {
+  cursor: default;
+}
+
+.day-cell:not(.empty):hover {
+  background: #f7f8fa;
+}
+
+.day-cell.complete-week {
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+}
+
+.day-cell.complete-week .day-number {
+  color: #8b4513;
+  font-weight: bold;
+}
+
+.day-cell.today {
+  border: 1px solid #1989fa;
+}
+
+.day-number {
+  font-size: 14px;
+  color: #323233;
+}
+
+.today-indicator {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: #1989fa;
+  border-radius: 50%;
+}
+
+.day-cell.complete-week .today-indicator {
+  background: #8b4513;
+}
+
+.calendar-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #eee;
+  position: sticky;
+  bottom: 0;
+  background: white;
+}
+
+.confirm-btn {
+  width: 100%;
+  padding: 12px;
+  background: #1989fa;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.confirm-btn:active {
+  background: #1677d1;
+}
+
+/* ✅ 浅黄色（完成一半 complete_state = 1） */
+.day-cell.complete-week-1 {
+  background: linear-gradient(135deg, #fff9cc 0%, #ffe680 100%);
+}
+
+.day-cell.complete-week-1 .day-number {
+  color: #a67c00;
+  font-weight: bold;
+}
+
+/* ✅ 金色（完全完成 complete_state = 2） */
+.day-cell.complete-week-2 {
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+}
+
+.day-cell.complete-week-2 .day-number {
+  color: #8b4513;
+  font-weight: bold;
+}
+
+/* 淡入 + 从下滑入的动画 */
+.calendar-fade-enter-active,
+.calendar-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.calendar-fade-enter-from,
+.calendar-fade-leave-to {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+.calendar-fade-enter-to,
+.calendar-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 </style>

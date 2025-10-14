@@ -10,6 +10,7 @@ import {
   nextTick,
   onBeforeUnmount,
   reactive,
+  inject,
 } from "vue";
 import {
   showFailToast,
@@ -24,7 +25,16 @@ import encouragement from "./encouragement.vue";
 import helpforgood from "./helpforgood.vue";
 import helpforbad from "./helpforbad.vue";
 import submitloading from "./submitloading.vue";
+import WinningStreakPopup from "./WinningStreakPopup.vue";
+
 import happyhalf from "../assets/sound/happyhalf.mp3";
+import winningstreak_1 from "../assets/sound/winningstreak-1.mp3";
+import winningstreak_2 from "../assets/sound/winningstreak-2.mp3";
+import winningstreak_3 from "../assets/sound/winningstreak-3.mp3";
+import winningstreak_goatjpg from "../assets/winningstreak.jpg";
+import winningstreak_bearjpg from "../assets/Boonie Bears/winningstreak.jpg";
+
+const flagTheme = inject("flagTheme");
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -73,33 +83,6 @@ const mergeAnswerAndSynonym = () => {
   }
   return newList;
 };
-// const convertSelections = (synonymsSelected, synonymsOptions) => {
-//   console.log("synonymsOptions: ", synonymsOptions);
-//   console.log("synonymsSelected: ", synonymsSelected);
-//   const resultMap = new Map();
-
-//   synonymsOptions.forEach((option) => {
-//     resultMap.set(option.序号, ["无"]); // 初始标记为“无”
-//   });
-
-//   synonymsSelected.forEach((selection) => {
-//     const [dictNumber, chineseIndex] = selection.split("-").map(Number);
-//     const dictEntry = synonymsOptions.find((item) => item.序号 === dictNumber);
-//     if (dictEntry) {
-//       const chineseWord = dictEntry.中文[chineseIndex - 1];
-//       if (resultMap.get(dictNumber)[0] === "无") {
-//         resultMap.set(dictNumber, [chineseWord]);
-//       } else {
-//         resultMap.get(dictNumber).push(chineseWord);
-//       }
-//     }
-//   });
-
-//   // 将Map转换为所需的数组格式
-//   return Array.from(resultMap, ([序号, 中文]) => ({ 序号, 中文 })).sort(
-//     (a, b) => a.序号 - b.序号
-//   ); // 确保结果是按序号排序的
-// };
 const convertSelections = (synonymsSelected, synonymsOptions) => {
   const resultMap = new Map();
 
@@ -371,7 +354,6 @@ const clickSubmitUser = async (action, done) => {
 
         return spellVocabularyResult; // 返回局部变量
       }
-      // console.log("compareResult", compareResult.value);
       // console.log("uncertainVocabulary", uncertainVocabulary.value);
       spellVocabulary.value = getSpellVocabulary(
         compareResult,
@@ -447,8 +429,10 @@ const clickSubmitUser = async (action, done) => {
         return halfCount <= 2 ? 0.5 : false;
       }
       const rate = checkFlags(compareResult);
-
       console.log("rate: ", rate);
+
+      compareResult2.value = compareResult;
+      rate2.value = rate;
 
       async function updateAccountData() {
         // 更新AccountData
@@ -508,34 +492,46 @@ const clickSubmitUser = async (action, done) => {
       isLoading.value = true;
       startAnimation();
 
-      // console.log('compareResult', compareResult);
+      console.log('compareResult', compareResult);
       if (compareResult.length == 0) {
         showFailToast("提交数据不能为空");
         isLoading.value = false;
         return;
       } else {
-        function redirect(accountDataResult) {
-          router.push({
-            path: "/studentAccountAnswer",
-            state: {
-              uncertainResult: JSON.stringify(
-                Array.from(uncertainVocabulary.value)
-              ),
-              compareResult: JSON.stringify(compareResult),
-              userSelected: JSON.stringify(synonymsSelected.value),
-              nid: nid.value,
-              rate: accountDataResult.rate,
-              halfTrue: rate,
-              newCoins: totalCoins.value,
-              username: username.value,
-              account_log_id: accountDataResult["new_log_nid"],
-              spellVocabulary: JSON.stringify(spellVocabulary.value),
-              lock_spell: lock_spell.value,
-              complement: 1 - rate,
-              RateOrigin: RateOrigin.value,
-            },
-          });
-        }
+        // function redirect(accountDataResult) {
+        //   router.push({
+        //     path: "/studentAccountAnswer",
+        //     state: {
+        //       uncertainResult: JSON.stringify(
+        //         Array.from(uncertainVocabulary.value)
+        //       ),
+        //       compareResult: JSON.stringify(compareResult),
+        //       userSelected: JSON.stringify(synonymsSelected.value),
+        //       nid: nid.value,
+        //       rate: accountDataResult.rate,
+        //       halfTrue: rate,
+        //       newCoins: totalCoins.value,
+        //       username: username.value,
+        //       account_log_id: accountDataResult["new_log_nid"],
+        //       spellVocabulary: JSON.stringify(spellVocabulary.value),
+        //       lock_spell: lock_spell.value,
+        //       complement: 1 - rate,
+        //       RateOrigin: RateOrigin.value,
+        //     },
+        //   });
+        // }
+
+
+
+        // buttonWinning.value = () => {
+        //   // 清除定时器
+        //   if (redirectTimer) {
+        //     clearTimeout(redirectTimer);
+        //     redirectTimer = null;
+        //   }
+        //   // 立即执行跳转
+        //   redirect(accountDataResult);
+        // };
         // 如果 updateAccountlog 成功，继续执行其他操作
         const updateAccountPromise = updateAccountData();
         // console.log("accountDataResult: ", accountDataResult);
@@ -546,15 +542,36 @@ const clickSubmitUser = async (action, done) => {
             updateAccountPromise,
             timeoutPromise,
           ]);
-
-          if (accountDataResult === "不能提交相同内容") {
+          accountDataResult2.value = accountDataResult;
+          if (accountDataResult["message"] === "不能提交相同内容") {
+            console.log('accountDataResult: ', accountDataResult);
             isLoading.value = false;
             showDialog({
               title: "恭喜！提交成功！",
               message: "跳转答案页",
               theme: "round-button",
             }).then(() => {
-              redirect(accountDataResult);
+              // activeWinningStreak.value =
+              //   accountDataResult["today_record_count"];
+              // if (activeWinningStreak.value > 6) {
+              //   redirect(accountDataResult);
+              // } else {
+              //   shoWinningStreak.value = true;
+              //   setTimeout(() => {
+              //     shoWinningButton.value = true;
+              //   }, 2000);
+              //   redirectTimer = setTimeout(() => {
+              //     redirect(accountDataResult);
+              //   }, 8000);
+              // }
+              activeWinningStreak.value =
+                accountDataResult["today_record_count"];
+
+              if (activeWinningStreak.value > 6) {
+                redirect(accountDataResult);
+              } else {
+                shoWinningStreak.value = true;
+              }
             });
             return;
           }
@@ -601,8 +618,29 @@ const clickSubmitUser = async (action, done) => {
           sessionStorage.removeItem("showMagic");
           sessionStorage.removeItem("flagHelp");
           // 执行页面跳转等其他操作
-          if (accountDataResult && accountDataResult !== "不能提交相同内容") {
-            redirect(accountDataResult);
+          if (
+            accountDataResult &&
+            accountDataResult["message"] !== "不能提交相同内容"
+          ) {
+            // activeWinningStreak.value = accountDataResult["today_record_count"];
+            // if (activeWinningStreak.value > 6) {
+            //   redirect(accountDataResult);
+            // } else {
+            //   shoWinningStreak.value = true;
+            //   setTimeout(() => {
+            //     shoWinningButton.value = true;
+            //   }, 2000);
+            //   redirectTimer = setTimeout(() => {
+            //     redirect(accountDataResult);
+            //   }, 8000);
+            // }
+            activeWinningStreak.value = accountDataResult["today_record_count"];
+
+            if (activeWinningStreak.value > 6) {
+              redirect(accountDataResult);
+            } else {
+              shoWinningStreak.value = true;
+            }
           }
         }
       }
@@ -723,6 +761,7 @@ const purchaseConfirm = async () => {
 
   // 比对结果给出flag
   const compareResult = compareAndAddFlag(synonymAndSelections);
+  
   console.log("compareResult: ", compareResult);
   const allFlagsTrue = compareResult.every((item) => item.flag == "true");
   if (allFlagsTrue) {
@@ -765,7 +804,6 @@ const purchaseConfirm = async () => {
     setTimeout(() => {
       showAnswerMagic.value = true;
       showMagic.value = false;
-
     }, 2000);
   }
   // }
@@ -1101,6 +1139,7 @@ const flagHelp = ref(true);
 const totalCoins = ref(0);
 const helpOutside = () => {
   // flagHelp.value = true;
+
   if (flagHelp.value) {
     showConfirmDialog({
       title: "场外支援",
@@ -1250,6 +1289,87 @@ function showAnimationShineHelpForGood() {
   animationVisible_help.value = !animationVisible_help.value;
 }
 
+// 连胜进度条
+// const shoWinningStreak = ref(false);
+// const shoWinningButton = ref(false);
+// const activeWinningStreak = ref(0); // 最终目标步骤
+// const animatedStep = ref(0); // 当前动画显示的步骤
+// let redirectTimer = null;
+// const buttonWinning = ref(null);
+
+// const startStreakAnimation = () => {
+//   // 延迟500ms后播放音效
+//   setTimeout(() => {
+//     let soundFile = null;
+//     const value = activeWinningStreak.value;
+
+//     if ([0, 1, 2, 4, 5].includes(value)) {
+//       soundFile = winningstreak_1;
+//     } else if (value === 3) {
+//       soundFile = winningstreak_2;
+//     } else if (value === 6) {
+//       soundFile = winningstreak_3;
+//     }
+
+//     if (soundFile) {
+//       const audio = new Audio(soundFile);
+//       audio.play();
+//     }
+//   }, 500);
+//   animatedStep.value = 0;
+
+//   if (activeWinningStreak.value === 0) {
+//     return;
+//   }
+
+//   const duration = 2000; // 总时长 2 秒
+//   const steps = activeWinningStreak.value;
+//   const delayPerStep = duration / steps; // 每步的延迟时间
+
+//   // 逐步激活每个步骤
+//   for (let i = 1; i <= steps; i++) {
+//     setTimeout(() => {
+//       animatedStep.value = i;
+//     }, delayPerStep * i);
+//   }
+// };
+const shoWinningStreak = ref(false);
+const activeWinningStreak = ref(0);
+const compareResult2 = ref("");
+const accountDataResult2 = ref("");
+const rate2 = ref("");
+
+const handleContinue = () => {
+  // 用户点击继续按钮
+  redirect(accountDataResult2.value);
+};
+const handleAutoClose = () => {
+  // 8秒后自动关闭
+
+};
+const redirect = (accountDataResult) => {
+  router.push({
+    path: "/studentAccountAnswer",
+    state: {
+      uncertainResult: JSON.stringify(
+        Array.from(uncertainVocabulary.value)
+      ),
+      compareResult: JSON.stringify(compareResult2.value), // 注意这里需要用 .value
+      userSelected: JSON.stringify(synonymsSelected.value),
+      nid: nid.value,
+      rate: accountDataResult.rate,
+      halfTrue: rate2.value, // 注意这里需要用 .value
+      newCoins: totalCoins.value,
+      username: username.value,
+      account_log_id: accountDataResult["new_log_nid"],
+      spellVocabulary: JSON.stringify(spellVocabulary.value),
+      lock_spell: lock_spell.value,
+      complement: 1 - rate2.value, // 注意这里需要用 .value
+      RateOrigin: RateOrigin.value,
+    },
+  });
+};
+
 const titleData = ref("");
 const username = ref("");
 const alias = ref("");
@@ -1279,6 +1399,7 @@ function handleBeforeUnload(event) {
   event.returnValue = ""; // 显示浏览器默认的“离开页面”确认对话框
 }
 onMounted(async () => {
+  // shoWinningStreak.value = true;
   window.addEventListener("beforeunload", handleBeforeUnload);
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
@@ -1337,7 +1458,7 @@ onMounted(async () => {
   titleData.value = data.title;
   username.value = data.username;
   submittoken.value = new Date().getTime();
-  // console.log("submittoken: ", submittoken.value);
+  console.log("submittoken: ", submittoken.value);
   // console.log("username: ", username.value);
   synonymsOptions.value.forEach((item) => {
     if (item.is_spell) {
@@ -1693,6 +1814,79 @@ onMounted(async () => {
         </div>
       </van-cell-group>
     </van-checkbox-group>
+
+    <!-- 连胜进度 -->
+    <!-- <van-popup
+      v-model:show="shoWinningStreak"
+      position="right"
+      :style="{ width: '100%', height: '100%' }"
+      @open="startStreakAnimation"
+    >
+      <div
+        style="
+          padding-top: 13%;
+          text-align: center;
+          font-size: 24px;
+          font-weight: bold;
+          position: relative;
+        "
+      >
+        <span>本周任务</span>
+        <img
+          v-if="shoWinningStreak"
+          :src="flagTheme === 1 ? winningstreak_goatjpg : winningstreak_bearjpg"
+          alt="任务图标"
+          class="slide-in-image"
+          style="
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            position: absolute;
+            right: 2rem;
+            transform: translateY(-50%);
+          "
+        />
+      </div>
+      <div style="display: flex; justify-content: center; margin-top: 1rem">
+        <van-steps
+          direction="vertical"
+          :active="animatedStep"
+          active-icon="success"
+          class="animated-steps"
+        >
+          <van-step>
+            <h3>开始学习</h3>
+          </van-step>
+          <van-step>
+            <h3>本周首次</h3>
+          </van-step>
+          <van-step>
+            <h3>本周二次</h3>
+          </van-step>
+          <van-step>
+            <h3>任务完成</h3>
+          </van-step>
+          <van-step>
+            <h3>完成四次</h3>
+          </van-step>
+          <van-step>
+            <h3>完成五次</h3>
+          </van-step>
+          <van-step>
+            <h3>金色传说</h3>
+          </van-step>
+        </van-steps>
+      </div>
+      <div
+        v-show="shoWinningButton"
+        style="display: flex; justify-content: center; margin-top: rem"
+      >
+        <van-button type="success" style="width: 60%" @click="buttonWinning"
+          >继续</van-button
+        >
+      </div>
+    </van-popup> -->
+
     <!-- 进度条 -->
     <div class="progress" v-if="showProgress">
       <van-progress
@@ -1706,6 +1900,13 @@ onMounted(async () => {
     <helpforgood ref="helpforgoodRef" />
     <helpforbad ref="helpforbadRef" />
     <submitloading v-if="isLoading" />
+    <WinningStreakPopup
+      v-model:show="shoWinningStreak"
+      :active-step="activeWinningStreak"
+      :flag-theme="flagTheme"
+      @continue="handleContinue"
+      @auto-close="handleAutoClose"
+    />
   </div>
 </template>
 
@@ -1811,4 +2012,24 @@ onMounted(async () => {
   transform: translateX(-50%); /* 修正水平居中时的偏移 */
   width: 80%; /* 设置进度条的宽度，根据需要调整 */
 }
+
+/* .animated-steps :deep(.van-step__circle),
+.animated-steps :deep(.van-step__line),
+.animated-steps :deep(.van-step__title) {
+  transition: all 0.3s ease-in-out;
+}
+.slide-in-image {
+  animation: slideInFromRight 1.1s ease-out 1s both;
+}
+
+@keyframes slideInFromRight {
+  0% {
+    transform: translate(calc(100vw + 100px), -50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(-50%);
+    opacity: 1;
+  }
+} */
 </style>

@@ -91,7 +91,8 @@ function processData(res) {
         .replace(/I"ll/gi, "I'll")
         .replace(/you"ll/gi, "you'll")
         .replace(/one"s/gi, "one's")
-        .replace(/let"s/gi, "let's");
+        .replace(/let"s/gi, "let's")
+        .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
       // 保布尔及类型等准JSON规则一致各解析逻辑:
       dataString = dataString

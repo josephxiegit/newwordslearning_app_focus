@@ -24,6 +24,8 @@ import swipeHelp from "./swipeHelp.vue";
 import submitloading from "./submitloading.vue";
 import passiveMagic from "./passiveMagic.vue";
 import passiveMagic2 from "./passiveMagic2.vue";
+import WinningStreakPopup from "./WinningStreakPopup.vue";
+
 import shouxieSrcGoatAndWolf from "../assets/test.gif";
 import shouxieBears from "../assets/Boonie Bears/test.gif";
 import woohooSound from "../assets/sound/woohoo.mp3";
@@ -442,6 +444,9 @@ const clickSubmitUser = async (action, done) => {
   const type = Number(remainingSeconds.value) == 8 ? 0 : 1;
   // console.log('type', type);
 
+  compareResult2.value = compareResult;
+  rate2.value = rate;
+
   async function updateAccountData() {
     // 更新AccountData
     let params = new URLSearchParams();
@@ -492,28 +497,29 @@ const clickSubmitUser = async (action, done) => {
   }
   // 计算得到多少新coins
   const newCoins = totalCoins.value;
+  newCoins2.value = newCoins;
   // console.log("newCoins: ", newCoins);
 
-  function redirect(accountDataResult) {
-    router.push({
-      path: "/studentAccountAnswer",
-      state: {
-        uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
-        compareResult: JSON.stringify(compareResult),
-        userSelected: JSON.stringify(synonymsSelected.value),
-        nid: nid.value,
-        rate: accountDataResult.rate,
-        halfTrue: rate,
-        newCoins: newCoins,
-        username: username.value,
-        account_log_id: accountDataResult["new_log_nid"],
-        spellVocabulary: JSON.stringify(spellVocabulary.value),
-        lock_spell: lock_spell.value,
-        complement: 1.5 - rate,
-        RateOrigin: RateOrigin.value,
-      },
-    });
-  }
+  // function redirect(accountDataResult) {
+  //   router.push({
+  //     path: "/studentAccountAnswer",
+  //     state: {
+  //       uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
+  //       compareResult: JSON.stringify(compareResult),
+  //       userSelected: JSON.stringify(synonymsSelected.value),
+  //       nid: nid.value,
+  //       rate: accountDataResult.rate,
+  //       halfTrue: rate,
+  //       newCoins: newCoins,
+  //       username: username.value,
+  //       account_log_id: accountDataResult["new_log_nid"],
+  //       spellVocabulary: JSON.stringify(spellVocabulary.value),
+  //       lock_spell: lock_spell.value,
+  //       complement: 1.5 - rate,
+  //       RateOrigin: RateOrigin.value,
+  //     },
+  //   });
+  // }
 
   // 开始加载
   isLoading.value = true;
@@ -532,7 +538,7 @@ const clickSubmitUser = async (action, done) => {
       updateAccountPromise,
       timeoutPromise,
     ]);
-
+    accountDataResult2.value = accountDataResult;
     if (accountDataResult === "不能提交相同内容") {
       // 如果账户数据已提交，显示对话框并跳转
       isLoading.value = false;
@@ -541,7 +547,15 @@ const clickSubmitUser = async (action, done) => {
         message: "跳转答案页",
         theme: "round-button",
       }).then(() => {
-        redirect(accountDataResult);
+        // redirect(accountDataResult);
+        activeWinningStreak.value =
+          accountDataResult["today_record_count"];
+
+        if (activeWinningStreak.value > 6) {
+          redirect(accountDataResult);
+        } else {
+          shoWinningStreak.value = true;
+        }
       });
       return;
     }
@@ -583,8 +597,15 @@ const clickSubmitUser = async (action, done) => {
     changeOverlayColor("rgba(128, 128, 128, 0.6)");
 
     // 跳转（只有在没有超时的情况下才执行）
-    if (accountDataResult && accountDataResult !== "不能提交相同内容") {
-      redirect(accountDataResult);
+    if (accountDataResult && accountDataResult["message"] !== "不能提交相同内容") {
+      // redirect(accountDataResult);
+      activeWinningStreak.value = accountDataResult["today_record_count"];
+
+      if (activeWinningStreak.value > 6) {
+        redirect(accountDataResult);
+      } else {
+        shoWinningStreak.value = true;
+      }
     }
   }
 };
@@ -1906,23 +1927,6 @@ const handleSwipeChange = (index) => {
   } catch (error) {
     console.error("Error speaking word:", error);
   }
-  //   nextTick(() => {
-  //   setTimeout(() => {
-  //     // 再次验证状态一致性
-  //     if (currentIndex.value === index && synonymsOptions.value[index]) {
-  //       try {
-  //         if (
-  //           synonymsOptions.value[index]["排除"] !== "试题" &&
-  //           synonymsOptions.value[index]["排除"] !== "手写"
-  //         ) {
-  //           speakWord(synonymsOptions.value[index]["英文"]);
-  //         }
-  //       } catch (error) {
-  //         console.error("发音错误:", error);
-  //       }
-  //     }
-  //   }, 100); // 给DOM更新足够时间
-  // });
   showAnswerIsSpell.value = "";
   // selectedItems.value = [];
   currentIndex.value = index;
@@ -1950,6 +1954,50 @@ const handlePageHide = (event) => {
   );
   sessionStorage.setItem("numberPrev", JSON.stringify(numberPrev.value));
 };
+
+// 连胜奖励
+const shoWinningStreak = ref(false);
+const activeWinningStreak = ref(0);
+const compareResult2 = ref("");
+const accountDataResult2 = ref("");
+const rate2 = ref("");
+const newCoins2 = ref("");
+
+const handleContinue = () => {
+  // 用户点击继续按钮
+  redirect(accountDataResult2.value);
+};
+const handleAutoClose = () => {
+  // 8秒后自动关闭
+
+};
+const redirect = (accountDataResult) => {
+  router.push({
+    path: "/studentAccountAnswer",
+    state: {
+      uncertainResult: JSON.stringify(
+        Array.from(uncertainVocabulary.value)
+      ),
+      compareResult: JSON.stringify(compareResult2.value), // 注意这里需要用 .value
+      userSelected: JSON.stringify(synonymsSelected.value),
+      nid: nid.value,
+      rate: accountDataResult.rate,
+      halfTrue: rate2.value, // 注意这里需要用 .value
+      newCoins: newCoins2.value,
+      username: username.value,
+      account_log_id: accountDataResult["new_log_nid"],
+      spellVocabulary: JSON.stringify(spellVocabulary.value),
+      lock_spell: lock_spell.value,
+      complement: 1.5 - rate2.value, // 注意这里需要用 .value
+      RateOrigin: RateOrigin.value,
+    },
+  });
+};
+
+
+
+
+
 const titleData = ref("");
 const username = ref("");
 const alias = ref("");
@@ -2583,6 +2631,13 @@ onMounted(async () => {
     <submitloading v-if="isLoading" />
     <passive-magic ref="passiveMagicRef" />
     <passive-magic-2 ref="passiveMagic2Ref" />
+    <WinningStreakPopup
+      v-model:show="shoWinningStreak"
+      :active-step="activeWinningStreak"
+      :flag-theme="flagTheme"
+      @continue="handleContinue"
+      @auto-close="handleAutoClose"
+    />
   </div>
 </template>
 
