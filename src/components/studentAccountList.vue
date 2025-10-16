@@ -3779,7 +3779,7 @@ const generateWeekDays = async () => {
   mondayDate.setDate(today.getDate() + weekStart);
   const mondayString = formatDate(mondayDate);
 
-  // console.log("username:", username.value);
+  console.log("username:", username.value);
   let params = new URLSearchParams();
   params.append("method", "getUserWinningStreak");
   params.append("username", username.value);
@@ -3886,9 +3886,9 @@ const selectDate = (day) => {
   showCalendar.value = true;
   nextTick(() => {
     setTimeout(() => {
-      const calendar = document.querySelector(".custom-calendar");
-      if (calendar) {
-        calendar.scrollTop = calendar.scrollHeight;
+      const calendarBody = document.querySelector(".calendar-body");
+      if (calendarBody) {
+        calendarBody.scrollTop = calendarBody.scrollHeight;
       }
     }, 0);
   });
@@ -4178,7 +4178,7 @@ onMounted(async () => {
     }
 
     getFlagReview().then((response) => {
-      console.log("response: ", response);
+      // console.log("response: ", response);
       reviewList_first.value = response.filter(
         (item) => item.is_review_required === 1
       ).length;
@@ -6834,11 +6834,10 @@ onMounted(async () => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: flex-start;
+  align-items: center; /* 改为 center，让日历垂直居中 */
   justify-content: center;
   z-index: 999;
-  overflow-y: auto;
-  padding: 20px 0;
+  padding: 20px; /* 减少上下padding */
 }
 
 .custom-calendar {
@@ -6846,8 +6845,9 @@ onMounted(async () => {
   border-radius: 8px;
   width: 90%;
   max-width: 400px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 80vh; /* 限制最大高度为视口的85% */
+  display: flex; /* 使用 flex 布局 */
+  flex-direction: column;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -6857,10 +6857,8 @@ onMounted(async () => {
   align-items: center;
   padding: 16px 20px;
   border-bottom: 1px solid #eee;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0; /* 防止被压缩 */
   background: white;
-  z-index: 10;
 }
 
 .title-wrapper {
@@ -6902,6 +6900,9 @@ onMounted(async () => {
 
 .calendar-body {
   padding: 0 12px 12px;
+  overflow-y: auto; /* 添加垂直滚动 */
+  flex: 1; /* 占据剩余空间 */
+  min-height: 0; /* 重要：允许 flex 子元素收缩 */
 }
 
 .month-section {
@@ -6955,11 +6956,13 @@ onMounted(async () => {
   background: #f7f8fa;
 }
 
-.day-cell.complete-week {
+.day-cell.complete-week-1,
+.day-cell.complete-week-2 {
   background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
 }
 
-.day-cell.complete-week .day-number {
+.day-cell.complete-week-1 .day-number,
+.day-cell.complete-week-2 .day-number {
   color: #8b4513;
   font-weight: bold;
 }
@@ -6982,15 +6985,15 @@ onMounted(async () => {
   border-radius: 50%;
 }
 
-.day-cell.complete-week .today-indicator {
+.day-cell.complete-week-1 .today-indicator,
+.day-cell.complete-week-2 .today-indicator {
   background: #8b4513;
 }
 
 .calendar-footer {
   padding: 12px 20px;
   border-top: 1px solid #eee;
-  position: sticky;
-  bottom: 0;
+  flex-shrink: 0; /* 防止被压缩 */
   background: white;
 }
 

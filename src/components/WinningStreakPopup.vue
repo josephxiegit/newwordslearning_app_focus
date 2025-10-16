@@ -5,69 +5,58 @@
     :style="{ width: '100%', height: '100%' }"
     @open="handleOpen"
   >
-    <div
-      style="
-        padding-top: 13%;
-        text-align: center;
-        font-size: 24px;
-        font-weight: bold;
-        position: relative;
-      "
-    >
-      <span>本周任务</span>
-      <img
-        v-if="isVisible"
-        :src="currentThemeImage"
-        alt="任务图标"
-        class="slide-in-image"
-        style="
-          width: 80px;
-          height: 80px;
-          object-fit: contain;
-          position: absolute;
-          right: 2rem;
-          top: 80%;
-          transform: translateY(-50%);
-        "
-      />
-    </div>
-    <div style="display: flex; justify-content: center; margin-top: 1rem">
-      <van-steps
-        direction="vertical"
-        :active="animatedStep"
-        active-icon="success"
-        class="animated-steps"
-      >
-        <van-step>
-          <h3>开始学习</h3>
-        </van-step>
-        <van-step>
-          <h3>本周首次</h3>
-        </van-step>
-        <van-step>
-          <h3>本周二次</h3>
-        </van-step>
-        <van-step>
-          <h3>任务完成</h3>
-        </van-step>
-        <van-step>
-          <h3>完成四次</h3>
-        </van-step>
-        <van-step>
-          <h3>完成五次</h3>
-        </van-step>
-        <van-step>
-          <h3>金色传说</h3>
-        </van-step>
-      </van-steps>
-    </div>
-    <div
-      v-show="showButton"
-      style="display: flex; justify-content: center; margin-top: 1rem"
-    >
-      <van-button type="success" style="width: 60%" @click="handleContinue"
-        >继续</van-button
-      >
+    <div class="popup-container">
+      <!-- 头部标题 -->
+      <div class="header-section">
+        <span>本周任务</span>
+        <img
+          v-if="isVisible"
+          :src="currentThemeImage"
+          alt="任务图标"
+          class="slide-in-image"
+        />
+      </div>
+
+      <!-- 步骤区域（可滚动） -->
+      <div class="steps-section">
+        <!-- 圆形箭头按钮 -->
+        <button
+          v-show="showButton"
+          class="circle-arrow-btn"
+          @click="handleContinue"
+        >
+          →
+        </button>
+        
+        <van-steps
+          direction="vertical"
+          :active="animatedStep"
+          active-icon="success"
+          class="animated-steps"
+        >
+          <van-step>
+            <h5>开始学习</h5>
+          </van-step>
+          <van-step>
+            <h5>本周首次</h5>
+          </van-step>
+          <van-step>
+            <h5>本周二次</h5>
+          </van-step>
+          <van-step>
+            <h5>任务完成</h5>
+          </van-step>
+          <van-step>
+            <h5>完成四次</h5>
+          </van-step>
+          <van-step>
+            <h5>完成五次</h5>
+          </van-step>
+          <van-step>
+            <h5>金色传说</h5>
+          </van-step>
+        </van-steps>
+      </div>
     </div>
   </van-popup>
 </template>
@@ -129,7 +118,7 @@ watch(
   (newVal) => {
     isVisible.value = newVal;
     if (newVal) {
-      startTimers(); // 👈 关键
+      startTimers();
     } else {
       clearTimers();
     }
@@ -206,7 +195,6 @@ const startTimers = () => {
   // 自动关闭
   autoCloseTimer = setTimeout(() => {
     emit("auto-close");
-    // isVisible.value = false;
   }, props.autoCloseDelay);
 };
 
@@ -228,14 +216,95 @@ const handleContinue = () => {
 </script>
 
 <style scoped>
+/* 主容器 - 使用 flex 布局，充满整个弹窗 */
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 头部区域 */
+.header-section {
+  flex-shrink: 0;
+  padding-top: max(2vh, 15px);
+  padding-bottom: 0rem;
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  position: relative;
+}
+
+.slide-in-image {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  position: absolute;
+  right: 2rem;
+  top: 100%;
+  transform: translateY(-50%);
+  animation: slideInFromRight 0.9s ease-out 0.9s both;
+}
+
+/* 步骤区域 */
+.steps-section {
+  flex: 0.8;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+  min-height: 0;
+  position: relative; /* 为按钮的绝对定位提供参考 */
+}
+
+/* 圆形箭头按钮 - 使用绝对定位 */
+.circle-arrow-btn {
+  position: absolute;
+  left: 50px; /* 距离左侧的距离 */
+  top: 50%; /* 垂直居中 */
+  transform: translateY(-50%); /* 精确垂直居中 */
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #07c160;
+  color: white;
+  border: none;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
+  transition: all 0.3s ease;
+  animation: fadeInScale 0.3s ease-out;
+  z-index: 10;
+}
+
+.circle-arrow-btn:hover {
+  background: #06ad56;
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 4px 12px rgba(7, 193, 96, 0.4);
+}
+
+.circle-arrow-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
 .animated-steps :deep(.van-step__circle),
 .animated-steps :deep(.van-step__line),
 .animated-steps :deep(.van-step__title) {
   transition: all 0.3s ease-in-out;
-}
-
-.slide-in-image {
-  animation: slideInFromRight 0.9s ease-out 0.9s both;
 }
 
 @keyframes slideInFromRight {
@@ -247,5 +316,16 @@ const handleContinue = () => {
     transform: translateY(-50%);
     opacity: 1;
   }
+}
+
+/* 缩小步骤间距 */
+.animated-steps :deep(.van-step) {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.animated-steps :deep(h5) {
+  font-size: 18px;
+  font-weight: 600;
 }
 </style>
