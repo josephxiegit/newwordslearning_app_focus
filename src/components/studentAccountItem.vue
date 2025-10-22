@@ -485,53 +485,18 @@ const clickSubmitUser = async (action, done) => {
 
       // 开始加载
       // 创建一个超时的 Promise
-
       const timeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error("请求超时")), 6000) // 6秒超时
       );
       isLoading.value = true;
       startAnimation();
 
-      console.log('compareResult', compareResult);
+      console.log("compareResult", compareResult);
       if (compareResult.length == 0) {
         showFailToast("提交数据不能为空");
         isLoading.value = false;
         return;
       } else {
-        // function redirect(accountDataResult) {
-        //   router.push({
-        //     path: "/studentAccountAnswer",
-        //     state: {
-        //       uncertainResult: JSON.stringify(
-        //         Array.from(uncertainVocabulary.value)
-        //       ),
-        //       compareResult: JSON.stringify(compareResult),
-        //       userSelected: JSON.stringify(synonymsSelected.value),
-        //       nid: nid.value,
-        //       rate: accountDataResult.rate,
-        //       halfTrue: rate,
-        //       newCoins: totalCoins.value,
-        //       username: username.value,
-        //       account_log_id: accountDataResult["new_log_nid"],
-        //       spellVocabulary: JSON.stringify(spellVocabulary.value),
-        //       lock_spell: lock_spell.value,
-        //       complement: 1 - rate,
-        //       RateOrigin: RateOrigin.value,
-        //     },
-        //   });
-        // }
-
-
-
-        // buttonWinning.value = () => {
-        //   // 清除定时器
-        //   if (redirectTimer) {
-        //     clearTimeout(redirectTimer);
-        //     redirectTimer = null;
-        //   }
-        //   // 立即执行跳转
-        //   redirect(accountDataResult);
-        // };
         // 如果 updateAccountlog 成功，继续执行其他操作
         const updateAccountPromise = updateAccountData();
         // console.log("accountDataResult: ", accountDataResult);
@@ -543,31 +508,24 @@ const clickSubmitUser = async (action, done) => {
             timeoutPromise,
           ]);
           accountDataResult2.value = accountDataResult;
+          new_final_rate.value = accountDataResult["rate"];
           if (accountDataResult["message"] === "不能提交相同内容") {
-            console.log('accountDataResult: ', accountDataResult);
+            console.log("accountDataResult: ", accountDataResult);
             isLoading.value = false;
             showDialog({
               title: "恭喜！提交成功！",
               message: "跳转答案页",
               theme: "round-button",
             }).then(() => {
-              // activeWinningStreak.value =
-              //   accountDataResult["today_record_count"];
-              // if (activeWinningStreak.value > 6) {
-              //   redirect(accountDataResult);
-              // } else {
-              //   shoWinningStreak.value = true;
-              //   setTimeout(() => {
-              //     shoWinningButton.value = true;
-              //   }, 2000);
-              //   redirectTimer = setTimeout(() => {
-              //     redirect(accountDataResult);
-              //   }, 8000);
-              // }
               activeWinningStreak.value =
                 accountDataResult["today_record_count"];
-
-              if (activeWinningStreak.value > 6) {
+              dailyWinningStreak.value =
+                accountDataResult["daily_record_count"];
+              if (
+                activeWinningStreak.value > 6 &&
+                dailyWinningStreak.value > 2 &&
+                new_final_rate.value >= 3
+              ) {
                 redirect(accountDataResult);
               } else {
                 shoWinningStreak.value = true;
@@ -622,21 +580,14 @@ const clickSubmitUser = async (action, done) => {
             accountDataResult &&
             accountDataResult["message"] !== "不能提交相同内容"
           ) {
-            // activeWinningStreak.value = accountDataResult["today_record_count"];
-            // if (activeWinningStreak.value > 6) {
-            //   redirect(accountDataResult);
-            // } else {
-            //   shoWinningStreak.value = true;
-            //   setTimeout(() => {
-            //     shoWinningButton.value = true;
-            //   }, 2000);
-            //   redirectTimer = setTimeout(() => {
-            //     redirect(accountDataResult);
-            //   }, 8000);
-            // }
             activeWinningStreak.value = accountDataResult["today_record_count"];
+            dailyWinningStreak.value = accountDataResult["daily_record_count"];
 
-            if (activeWinningStreak.value > 6) {
+            if (
+              activeWinningStreak.value > 6 &&
+              dailyWinningStreak.value > 2 &&
+              new_final_rate.value >= 3
+            ) {
               redirect(accountDataResult);
             } else {
               shoWinningStreak.value = true;
@@ -761,7 +712,7 @@ const purchaseConfirm = async () => {
 
   // 比对结果给出flag
   const compareResult = compareAndAddFlag(synonymAndSelections);
-  
+
   console.log("compareResult: ", compareResult);
   const allFlagsTrue = compareResult.every((item) => item.flag == "true");
   if (allFlagsTrue) {
@@ -1290,54 +1241,14 @@ function showAnimationShineHelpForGood() {
 }
 
 // 连胜进度条
-// const shoWinningStreak = ref(false);
-// const shoWinningButton = ref(false);
-// const activeWinningStreak = ref(0); // 最终目标步骤
-// const animatedStep = ref(0); // 当前动画显示的步骤
-// let redirectTimer = null;
-// const buttonWinning = ref(null);
-
-// const startStreakAnimation = () => {
-//   // 延迟500ms后播放音效
-//   setTimeout(() => {
-//     let soundFile = null;
-//     const value = activeWinningStreak.value;
-
-//     if ([0, 1, 2, 4, 5].includes(value)) {
-//       soundFile = winningstreak_1;
-//     } else if (value === 3) {
-//       soundFile = winningstreak_2;
-//     } else if (value === 6) {
-//       soundFile = winningstreak_3;
-//     }
-
-//     if (soundFile) {
-//       const audio = new Audio(soundFile);
-//       audio.play();
-//     }
-//   }, 500);
-//   animatedStep.value = 0;
-
-//   if (activeWinningStreak.value === 0) {
-//     return;
-//   }
-
-//   const duration = 2000; // 总时长 2 秒
-//   const steps = activeWinningStreak.value;
-//   const delayPerStep = duration / steps; // 每步的延迟时间
-
-//   // 逐步激活每个步骤
-//   for (let i = 1; i <= steps; i++) {
-//     setTimeout(() => {
-//       animatedStep.value = i;
-//     }, delayPerStep * i);
-//   }
-// };
 const shoWinningStreak = ref(false);
 const activeWinningStreak = ref(0);
+const dailyWinningStreak = ref(0);
+const rate2 = ref(0);
+const new_final_rate = ref(0);
+
 const compareResult2 = ref("");
 const accountDataResult2 = ref("");
-const rate2 = ref("");
 
 const handleContinue = () => {
   // 用户点击继续按钮
@@ -1345,15 +1256,12 @@ const handleContinue = () => {
 };
 const handleAutoClose = () => {
   // 8秒后自动关闭
-
 };
 const redirect = (accountDataResult) => {
   router.push({
     path: "/studentAccountAnswer",
     state: {
-      uncertainResult: JSON.stringify(
-        Array.from(uncertainVocabulary.value)
-      ),
+      uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
       compareResult: JSON.stringify(compareResult2.value), // 注意这里需要用 .value
       userSelected: JSON.stringify(synonymsSelected.value),
       nid: nid.value,
@@ -1400,6 +1308,9 @@ function handleBeforeUnload(event) {
 }
 onMounted(async () => {
   // shoWinningStreak.value = true;
+  // activeWinningStreak.value = 14;
+  // dailyWinningStreak.value = 4;
+  // rate2.value = 3;
   window.addEventListener("beforeunload", handleBeforeUnload);
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
@@ -1815,78 +1726,6 @@ onMounted(async () => {
       </van-cell-group>
     </van-checkbox-group>
 
-    <!-- 连胜进度 -->
-    <!-- <van-popup
-      v-model:show="shoWinningStreak"
-      position="right"
-      :style="{ width: '100%', height: '100%' }"
-      @open="startStreakAnimation"
-    >
-      <div
-        style="
-          padding-top: 13%;
-          text-align: center;
-          font-size: 24px;
-          font-weight: bold;
-          position: relative;
-        "
-      >
-        <span>本周任务</span>
-        <img
-          v-if="shoWinningStreak"
-          :src="flagTheme === 1 ? winningstreak_goatjpg : winningstreak_bearjpg"
-          alt="任务图标"
-          class="slide-in-image"
-          style="
-            width: 80px;
-            height: 80px;
-            object-fit: contain;
-            position: absolute;
-            right: 2rem;
-            transform: translateY(-50%);
-          "
-        />
-      </div>
-      <div style="display: flex; justify-content: center; margin-top: 1rem">
-        <van-steps
-          direction="vertical"
-          :active="animatedStep"
-          active-icon="success"
-          class="animated-steps"
-        >
-          <van-step>
-            <h3>开始学习</h3>
-          </van-step>
-          <van-step>
-            <h3>本周首次</h3>
-          </van-step>
-          <van-step>
-            <h3>本周二次</h3>
-          </van-step>
-          <van-step>
-            <h3>任务完成</h3>
-          </van-step>
-          <van-step>
-            <h3>完成四次</h3>
-          </van-step>
-          <van-step>
-            <h3>完成五次</h3>
-          </van-step>
-          <van-step>
-            <h3>金色传说</h3>
-          </van-step>
-        </van-steps>
-      </div>
-      <div
-        v-show="shoWinningButton"
-        style="display: flex; justify-content: center; margin-top: rem"
-      >
-        <van-button type="success" style="width: 60%" @click="buttonWinning"
-          >继续</van-button
-        >
-      </div>
-    </van-popup> -->
-
     <!-- 进度条 -->
     <div class="progress" v-if="showProgress">
       <van-progress
@@ -1900,9 +1739,13 @@ onMounted(async () => {
     <helpforgood ref="helpforgoodRef" />
     <helpforbad ref="helpforbadRef" />
     <submitloading v-if="isLoading" />
+
+    <!-- 连胜进度 -->
     <WinningStreakPopup
       v-model:show="shoWinningStreak"
       :active-step="activeWinningStreak"
+      :daily-step="dailyWinningStreak"
+      :rate-step="new_final_rate"
       :flag-theme="flagTheme"
       @continue="handleContinue"
       @auto-close="handleAutoClose"

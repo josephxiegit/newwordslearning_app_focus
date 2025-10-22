@@ -500,27 +500,6 @@ const clickSubmitUser = async (action, done) => {
   newCoins2.value = newCoins;
   // console.log("newCoins: ", newCoins);
 
-  // function redirect(accountDataResult) {
-  //   router.push({
-  //     path: "/studentAccountAnswer",
-  //     state: {
-  //       uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
-  //       compareResult: JSON.stringify(compareResult),
-  //       userSelected: JSON.stringify(synonymsSelected.value),
-  //       nid: nid.value,
-  //       rate: accountDataResult.rate,
-  //       halfTrue: rate,
-  //       newCoins: newCoins,
-  //       username: username.value,
-  //       account_log_id: accountDataResult["new_log_nid"],
-  //       spellVocabulary: JSON.stringify(spellVocabulary.value),
-  //       lock_spell: lock_spell.value,
-  //       complement: 1.5 - rate,
-  //       RateOrigin: RateOrigin.value,
-  //     },
-  //   });
-  // }
-
   // 开始加载
   isLoading.value = true;
   // 创建一个超时的 Promise
@@ -539,7 +518,9 @@ const clickSubmitUser = async (action, done) => {
       timeoutPromise,
     ]);
     accountDataResult2.value = accountDataResult;
-    if (accountDataResult === "不能提交相同内容") {
+    console.log('accountDataResult: ', accountDataResult);
+    new_final_rate.value = accountDataResult.rate;
+    if (accountDataResult["message"] === "不能提交相同内容") {
       // 如果账户数据已提交，显示对话框并跳转
       isLoading.value = false;
       showDialog({
@@ -547,11 +528,14 @@ const clickSubmitUser = async (action, done) => {
         message: "跳转答案页",
         theme: "round-button",
       }).then(() => {
-        // redirect(accountDataResult);
-        activeWinningStreak.value =
-          accountDataResult["today_record_count"];
+        activeWinningStreak.value = accountDataResult["today_record_count"];
+        dailyWinningStreak.value = accountDataResult["daily_record_count"];
 
-        if (activeWinningStreak.value > 6) {
+        if (
+          activeWinningStreak.value > 6 &&
+          dailyWinningStreak.value > 2 &&
+          new_final_rate.value >= 3
+        ) {
           redirect(accountDataResult);
         } else {
           shoWinningStreak.value = true;
@@ -597,11 +581,19 @@ const clickSubmitUser = async (action, done) => {
     changeOverlayColor("rgba(128, 128, 128, 0.6)");
 
     // 跳转（只有在没有超时的情况下才执行）
-    if (accountDataResult && accountDataResult["message"] !== "不能提交相同内容") {
+    if (
+      accountDataResult &&
+      accountDataResult["message"] !== "不能提交相同内容"
+    ) {
       // redirect(accountDataResult);
       activeWinningStreak.value = accountDataResult["today_record_count"];
+      dailyWinningStreak.value = accountDataResult["daily_record_count"];
 
-      if (activeWinningStreak.value > 6) {
+      if (
+        activeWinningStreak.value > 6 &&
+        dailyWinningStreak.value > 2 &&
+        new_final_rate.value >= 3
+      ) {
         redirect(accountDataResult);
       } else {
         shoWinningStreak.value = true;
@@ -1818,7 +1810,7 @@ watch(isOverHalf, (newVal) => {
 
     showEncouragement.value = true;
 
-    console.log("autoplay2: ", autoplay2.value);
+    // console.log("autoplay2: ", autoplay2.value);
     setTimeout(() => {
       showEncouragement.value = false;
     }, 1500);
@@ -1869,7 +1861,6 @@ const { pause, resume } = useIntervalFn(
 const currentHeight = ref("");
 const rowMarginTop = ref(0);
 const handleSwipeChange = (index) => {
-
   // 到下一个页面自动触发
   nextTick(() => {
     const el = swipeRef.value?.$el?.querySelector(
@@ -1958,9 +1949,12 @@ const handlePageHide = (event) => {
 // 连胜奖励
 const shoWinningStreak = ref(false);
 const activeWinningStreak = ref(0);
+const dailyWinningStreak = ref(0);
+const rate2 = ref(0);
+const new_final_rate = ref(0);
+
 const compareResult2 = ref("");
 const accountDataResult2 = ref("");
-const rate2 = ref("");
 const newCoins2 = ref("");
 
 const handleContinue = () => {
@@ -1969,15 +1963,12 @@ const handleContinue = () => {
 };
 const handleAutoClose = () => {
   // 8秒后自动关闭
-
 };
 const redirect = (accountDataResult) => {
   router.push({
     path: "/studentAccountAnswer",
     state: {
-      uncertainResult: JSON.stringify(
-        Array.from(uncertainVocabulary.value)
-      ),
+      uncertainResult: JSON.stringify(Array.from(uncertainVocabulary.value)),
       compareResult: JSON.stringify(compareResult2.value), // 注意这里需要用 .value
       userSelected: JSON.stringify(synonymsSelected.value),
       nid: nid.value,
@@ -1993,10 +1984,6 @@ const redirect = (accountDataResult) => {
     },
   });
 };
-
-
-
-
 
 const titleData = ref("");
 const username = ref("");
@@ -2196,7 +2183,7 @@ onMounted(async () => {
     username.value = data.username;
 
     submittoken.value = new Date().getTime();
-    // console.log("submittoken: ", submittoken.value);
+    console.log("submittoken: ", submittoken.value);
 
     const trueCount_is_spell =
       synonymsOptions.value.filter((item) => item.is_spell === true).length ||
@@ -2253,7 +2240,7 @@ onMounted(async () => {
       if (response.data.failed_words && response.data.failed_words.length > 0) {
         const failedList = response.data.failed_words.join("，");
         showConfirmDialog({
-          theme: 'round-button',
+          theme: "round-button",
           title: "音频加载失败",
           message: `以下单词的音频未能加载：\n${failedList}`,
           confirmButtonText: "知道了",
@@ -2634,6 +2621,8 @@ onMounted(async () => {
     <WinningStreakPopup
       v-model:show="shoWinningStreak"
       :active-step="activeWinningStreak"
+      :daily-step="dailyWinningStreak"
+      :rate-step="new_final_rate"
       :flag-theme="flagTheme"
       @continue="handleContinue"
       @auto-close="handleAutoClose"

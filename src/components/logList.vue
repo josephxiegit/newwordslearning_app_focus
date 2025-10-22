@@ -79,6 +79,7 @@ function processData(res) {
         .replace(/"m /g, "'m ")
         .replace(/can"t/g, "can't")
         .replace(/mustn"t/g, "mustn't")
+        .replace(/nustn"t/g, "nustn't")
         .replace(/needn"t/g, "needn't")
         .replace(/o"clock/g, "o'clock")
         .replace(/won"t/g, "won't")

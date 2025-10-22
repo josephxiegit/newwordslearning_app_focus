@@ -45,27 +45,6 @@ const synonymsOptions = ref([]);
 const synonymsSelected = ref([]);
 const checkboxRefs = ref([]);
 
-// const speakWord2 = (english, answer) => {
-//   // 发音
-//   const word = /[a-zA-Z]/.test(english) ? english : answer;
-//   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-//     word
-//   )}&type=1`;
-//   const audio = new Audio(url);
-//   audio.play()
-//   .catch(() => {
-//     console.log("Fallback to SpeechSynthesis");
-//     let utterance;
-//     utterance = new SpeechSynthesisUtterance(english);
-//     if (!/[a-zA-Z]/.test(english)) {
-//       utterance.lang = "zh-CN";
-//     } else {
-//       utterance.lang = "en-US";
-//     }
-//     window.speechSynthesis.speak(utterance);
-//   });
-// };
-
 // 预加载语音
 const audioCache = new Map();
 const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
@@ -676,20 +655,6 @@ const goToNext = async () => {
             });
           }
           submitList.value = compareAndAddFlag(submitList.value);
-          // if (reviewRequired.value === 1) {
-          //   showSuccessToast("恭喜！💎数量增加+1");
-          // } else {
-          //   showSuccessToast("恭喜！💎数量增加+2");
-          // }
-          // router.push({
-          //   path: "/studentAccountList",
-          //   state: {
-          //     username: username.value,
-          //     data: basicPreExam.value,
-          //     reviewRequired: reviewRequired.value
-          //   },
-          // });
-          // updateAccountLog();
           // console.log("提交");
           // console.log("submitList:", submitList.value);
 
@@ -709,6 +674,7 @@ const goToNext = async () => {
 
             // console.log('response: ', response);
             activeWinningStreak.value = response["today_record_count"];
+            dailyWinningStreak.value = response["daily_record_count"];
             // console.log('activeWinningStreak.value: ', activeWinningStreak.value);
           } catch (error) {
             if (error.message === "请求超时") {
@@ -736,7 +702,7 @@ const goToNext = async () => {
             showSuccessToast(message);
           }, 1000);
           if (
-            activeWinningStreak.value > 6 ||
+            (activeWinningStreak.value > 6 && dailyWinningStreak.value > 2) ||
             activeWinningStreak.value == undefined
           ) {
             redirect();
@@ -1052,6 +1018,8 @@ const showEncouragement2 = ref(false);
 // 连胜纪录
 const shoWinningStreak = ref(false);
 const activeWinningStreak = ref(0);
+const dailyWinningStreak = ref(0);
+const new_final_rate = ref(3);
 
 const handleContinue = () => {
   // 用户点击继续按钮
@@ -1544,14 +1512,6 @@ onMounted(async () => {
         <Divider></Divider>
       </div>
 
-      <!-- <van-button
-        block
-        type="primary"
-        @click="closeMeaning"
-        style="margin-top: 1rem"
-      >
-        关闭
-      </van-button> -->
       <van-button
         block
         :disabled="isDisabledMeaningClose"
@@ -1569,6 +1529,8 @@ onMounted(async () => {
     <WinningStreakPopup
       v-model:show="shoWinningStreak"
       :active-step="activeWinningStreak"
+      :daily-step="dailyWinningStreak"
+      :rate-step="new_final_rate"
       :flag-theme="flagTheme"
       @continue="handleContinue"
       @auto-close="handleAutoClose"

@@ -3744,13 +3744,14 @@ const applyforChallenge = () => {
 
 // 本周日历，连胜
 const weekDays = ref([]);
-const selectedDate = ref(null);
+const dailyCalendarData = ref({});
 const showCalendar = ref(false);
 const isWeekComplete = ref(false);
 const daysWinningStreak = ref(0);
 const completeWeeks = ref([]);
 const weekCompleteState = ref("");
 const completeWeekStates = ref({});
+const has_enough_today = ref(false);
 
 const generateWeekDays = async () => {
   const today = new Date();
@@ -3809,6 +3810,14 @@ const generateWeekDays = async () => {
       const monday = record.week_monday.split(" ")[0]; // "YYYY-MM-DD"
       completeWeekStates.value[monday] = record.complete_state || 0;
     });
+
+    has_enough_today.value = response.data.has_enough_today;
+    dailyCalendarData.value = {};
+    response.data.daily_data.forEach((record) => {
+      const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
+      dailyCalendarData.value[date] = record.record_count || 0;
+    });
+    console.log("dailyCalendarData", dailyCalendarData.value);
   }
 };
 
@@ -3851,7 +3860,7 @@ const calendarMonths = computed(() => {
       const dateString = formatDate(currentDate); // 假设返回 "YYYY-MM-DD"
       const mondayString = getMondayOfWeek(currentDate); // 也返回 "YYYY-MM-DD"
 
-      // ← 关键：从映射里取状态（不存在则默认 0）
+      // 关键：从映射里取状态（不存在则默认 0）
       const completeState =
         completeWeekStates.value && completeWeekStates.value[mondayString]
           ? completeWeekStates.value[mondayString]
@@ -3860,14 +3869,20 @@ const calendarMonths = computed(() => {
       const isComplete = completeState > 0;
       const isToday = formatDate(new Date()) === dateString;
 
+      // ← 新增：检查dailyCalendarData中是否有对应日期
+      const hasFlower = dailyCalendarData.value[dateString] !== undefined;
+      const recordCount = dailyCalendarData.value[dateString] || 0;
+
       days.push({
         date: currentDate,
         day: day,
         dateString: dateString,
         isComplete: isComplete,
-        complete_state: completeState, // ← 把状态放进去
+        complete_state: completeState,
         isToday: isToday,
         isEmpty: false,
+        hasFlower: hasFlower,
+        recordCount: recordCount,
       });
     }
 
@@ -3893,6 +3908,23 @@ const selectDate = (day) => {
     }, 0);
   });
 };
+const selectDate2 = (day) => {
+  // console.log("day: ", day.dateString);
+  // console.log("dailyCalendarData: ", dailyCalendarData.value);
+  const count = dailyCalendarData.value[day.dateString];
+  // console.log("count: ", count);
+  if (count !== undefined) {
+    showToast({
+      message: `${day.dateString} 背诵 ${count} 次`,
+      zIndex: 9999,
+    });
+  } else {
+    showToast({
+      message: `${day.dateString} 暂无背诵数据`,
+      zIndex: 9999,
+    });
+  }
+};
 
 const onConfirmCalendar = (value) => {
   showCalendar.value = false;
@@ -3900,40 +3932,56 @@ const onConfirmCalendar = (value) => {
 
 const showMessage = () => {
   showDialog({
-    title: "更新：连胜说明",
+    title: "连胜说明",
     message:
-      "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。",
+      "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上",
     theme: "round-button",
     teleport: "body",
+    zIndex: 9999,
+    allowHtml: true,
+    messageAlign: "left",
   }).then(() => {});
 };
+
+// 更新版本提示
+const showUpdate = () => {
+  // 使用版本号来管理更新提示
+    const UPDATE_VERSION = "v2"; // 新版本号
+    const lastShownTime = localStorage.getItem(`winStreakUpdateTime_${UPDATE_VERSION}`);
+    const shownCount = parseInt(
+      localStorage.getItem(`winStreakUpdateCount_${UPDATE_VERSION}`) || "0"
+    );
+    const now = Date.now();
+    const dayInMs = 24 * 60 * 60 * 1000;
+
+    // 清理旧版本的 localStorage 数据
+    localStorage.removeItem("winStreakUpdateTime");
+    localStorage.removeItem("winStreakUpdateCount");
+
+    // 如果显示次数小于5次，且（从未显示过 或 距离上次显示超过1天）
+    if (
+      shownCount < 5 &&
+      (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
+    ) {
+      showDialog({
+        title: "更新：连胜说明",
+        message:
+          "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上",
+        theme: "round-button",
+        allowHtml: true,
+        messageAlign: "left",
+      }).then(() => {
+        localStorage.setItem(`winStreakUpdateTime_${UPDATE_VERSION}`, now.toString());
+        localStorage.setItem(`winStreakUpdateCount_${UPDATE_VERSION}`, (shownCount + 1).toString());
+      });
+    }
+}
 // 主题
 onMounted(async () => {
   // 更新pro显示答案次数
   updateRemainingCount();
   // 检查是否已经显示过更新提示
-  const lastShownTime = localStorage.getItem("winStreakUpdateTime");
-  const shownCount = parseInt(
-    localStorage.getItem("winStreakUpdateCount") || "0"
-  );
-  const now = Date.now();
-  const dayInMs = 24 * 60 * 60 * 1000;
-
-  // 如果显示次数小于10次，且（从未显示过 或 距离上次显示超过1天）
-  if (
-    shownCount < 10 &&
-    (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
-  ) {
-    showDialog({
-      title: "更新：连胜说明",
-      message:
-        "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。",
-      theme: "round-button",
-    }).then(() => {
-      localStorage.setItem("winStreakUpdateTime", now.toString());
-      localStorage.setItem("winStreakUpdateCount", (shownCount + 1).toString());
-    });
-  }
+  showUpdate();
 
   // 弹幕单词
   // 检查并清理旧格式的数据
@@ -4240,7 +4288,7 @@ onMounted(async () => {
         @click-left="isMultiSelectMode ? gotoPreExam() : gobackHomepage()"
       >
         <template #title>
-          <div>任务</div>
+          <div></div>
         </template>
         <template #right>
           <div style="color: #1a89fa; font-size: 15px">
@@ -4248,11 +4296,14 @@ onMounted(async () => {
           </div>
         </template>
         <template #left>
-          <div style="color: #1a89fa; font-size: 15px">
+          <div style="color: #1a89fa; font-size: 14px">
             {{ isMultiSelectMode ? "确定" : "登出" }}&nbsp;
             <span @click.stop="handleCoinClick"> 💰 {{ usercoins }}</span>
             <span @click.stop="handleDiamondClick">
-              💎 {{ userdiamonds }}
+              &nbsp;&nbsp;💎 {{ userdiamonds }}
+            </span>
+            <span @click.stop="handleDiamondClick">
+              &nbsp;&nbsp;🌸 {{ userdiamonds }}
             </span>
           </div>
         </template>
@@ -4260,15 +4311,22 @@ onMounted(async () => {
     </div>
 
     <!-- 本周日历 连胜 -->
-    <div
-      style="
-        font-size: 12px;
-        color: #1989fa;
-        margin: 0.2rem 0rem -0.3rem 0.7rem;
-      "
-    >
-      连胜{{ daysWinningStreak }}天
+    <div style="font-size: 12px; margin: 0.3rem 0rem -0.1rem 0.7rem">
+      <span style="color: #1989fa">连胜{{ daysWinningStreak }}天</span>
+      <span
+        style="margin-left: 1rem"
+        :style="{
+          color: has_enough_today ? '#FFD700' : '#d0d0d0',
+          filter: has_enough_today
+            ? 'brightness(1.2) saturate(1.5) hue-rotate(-40deg)'
+            : 'brightness(0.8) saturate(0.3)',
+          textShadow: has_enough_today ? '0 0 8px #FFD700' : 'none',
+        }"
+      >
+        {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
+      </span>
     </div>
+
     <div class="week-calendar">
       <div
         v-for="day in weekDays"
@@ -4298,7 +4356,8 @@ onMounted(async () => {
             <div class="title-wrapper">
               <span class="calendar-title">连胜{{ daysWinningStreak }}天</span>
               <span class="calendar-subtitle" @click="showMessage"
-                >每周三次背诵可完成一周任务，6次完成金色</span
+                >点击：每周三次背诵完成周任务，6次变金色<br />
+                🔺：背诵1次。🌸：背诵2次及以上</span
               >
             </div>
             <span class="close-btn" @click="onConfirmCalendar">✕</span>
@@ -4334,12 +4393,16 @@ onMounted(async () => {
                     'complete-week-1': dayData.complete_state === 1,
                     'complete-week-2': dayData.complete_state === 2,
                     today: dayData.isToday,
+                    'has-flower': dayData.hasFlower,
                   }"
-                  @click="!dayData.isEmpty && selectDate(dayData)"
+                  @click="!dayData.isEmpty && selectDate2(dayData)"
                 >
                   <span v-if="!dayData.isEmpty" class="day-number">
                     {{ dayData.day }}
                   </span>
+                  <div v-if="dayData.hasFlower" class="flower-indicator">
+                    {{ dayData.recordCount === 1 ? "🔺" : "🌸" }}
+                  </div>
                   <div v-if="dayData.isToday" class="today-indicator"></div>
                 </div>
               </div>
@@ -4509,7 +4572,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="连胜奖励更新，徽章系统持续开发中...有bug联系老师"
+        text="每日奖励更新，新货币上线...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6899,7 +6962,7 @@ onMounted(async () => {
 }
 
 .calendar-body {
-  padding: 0 12px 12px;
+  padding: 12px 12px 12px 12px;
   overflow-y: auto; /* 添加垂直滚动 */
   flex: 1; /* 占据剩余空间 */
   min-height: 0; /* 重要：允许 flex 子元素收缩 */
@@ -7008,6 +7071,21 @@ onMounted(async () => {
   cursor: pointer;
 }
 
+.convert-btn:active {
+  background: rgb(116, 183, 16);
+}
+.convert-btn {
+  width: 100%;
+  padding: 12px;
+  background: rgb(116, 183, 16);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-bottom: 0.2rem;
+}
+
 .confirm-btn:active {
   background: #1677d1;
 }
@@ -7048,5 +7126,9 @@ onMounted(async () => {
 .calendar-fade-leave-from {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.flower-indicator {
+  font-size: 0.8em;
 }
 </style>

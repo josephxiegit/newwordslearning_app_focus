@@ -8,7 +8,7 @@
     <div class="popup-container">
       <!-- 头部标题 -->
       <div class="header-section">
-        <span>本周任务</span>
+        <span>任务清单</span>
         <img
           v-if="isVisible"
           :src="currentThemeImage"
@@ -17,8 +17,55 @@
         />
       </div>
 
-      <!-- 步骤区域（可滚动） -->
+      <!-- 步骤区域 -->
       <div class="steps-section">
+        <!-- 进度条 -->
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-title-group">本组进度</span>
+            <span class="progress-legend">任务完成</span>
+          </div>
+          <div class="progress-bar-wrapper">
+            <van-progress
+              :pivot-text="`${progressPercentagerate}%`"
+              color="#ee0a24"
+              :percentage="progressPercentagerate"
+            />
+            <span class="progress-count-group">{{ rateanimatedStep }}/3</span>
+          </div>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-title-day">日任务(🌸)</span>
+            <span class="progress-legend">任务完成</span>
+          </div>
+          <div class="progress-bar-wrapper">
+            <van-progress
+              :pivot-text="`${progressPercentagedaily}%`"
+              color="#7232dd"
+              :percentage="progressPercentagedaily"
+            />
+            <span class="progress-count-day">{{ dailyanimatedStep }}/2</span>
+          </div>
+        </div>
+
+        <div class="progress-section">
+          <div class="progress-header">
+            <span class="progress-title-week">周任务</span>
+            <span class="progress-requirement">任务完成</span>
+            <span class="progress-legend">金色传说</span>
+          </div>
+          <div class="progress-bar-wrapper">
+            <van-progress
+              :pivot-text="`${progressPercentage}%`"
+              color="#f2826a"
+              :percentage="progressPercentage"
+            />
+            <span class="progress-count-week">{{ animatedStep }}/6</span>
+          </div>
+        </div>
+
         <!-- 圆形箭头按钮 -->
         <button
           v-show="showButton"
@@ -27,35 +74,6 @@
         >
           →
         </button>
-        
-        <van-steps
-          direction="vertical"
-          :active="animatedStep"
-          active-icon="success"
-          class="animated-steps"
-        >
-          <van-step>
-            <h5>开始学习</h5>
-          </van-step>
-          <van-step>
-            <h5>本周首次</h5>
-          </van-step>
-          <van-step>
-            <h5>本周二次</h5>
-          </van-step>
-          <van-step>
-            <h5>任务完成</h5>
-          </van-step>
-          <van-step>
-            <h5>完成四次</h5>
-          </van-step>
-          <van-step>
-            <h5>完成五次</h5>
-          </van-step>
-          <van-step>
-            <h5>金色传说</h5>
-          </van-step>
-        </van-steps>
       </div>
     </div>
   </van-popup>
@@ -81,6 +99,18 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  dailyStep: {
+    type: Number,
+    default: 0,
+  },
+  rateStep: {
+    type: Number,
+    default: 0,
+  },
+  // oldRate: {
+  //   type: Number,
+  //   default: 0,
+  // },
   flagTheme: {
     type: Number,
     default: 1,
@@ -102,6 +132,8 @@ const emit = defineEmits(["update:show", "continue", "auto-close"]);
 const isVisible = ref(props.show);
 const showButton = ref(false);
 const animatedStep = ref(0);
+const dailyanimatedStep = ref(0);
+const rateanimatedStep = ref(0);
 let autoCloseTimer = null;
 let buttonTimer = null;
 
@@ -138,26 +170,22 @@ const startStreakAnimation = () => {
   }, 500);
 
   animatedStep.value = 0;
+  dailyanimatedStep.value = 0;
+  rateanimatedStep.value = 0;
 
-  if (props.activeStep === 0) {
-    return;
-  }
-
-  const duration = 2000;
-  const steps = props.activeStep;
-  const delayPerStep = duration / steps;
-
-  // 逐步激活每个步骤
-  for (let i = 1; i <= steps; i++) {
-    setTimeout(() => {
-      animatedStep.value = i;
-    }, delayPerStep * i);
-  }
+  // 延迟后一步到位跳到目标步骤，这样能看到动画过程
+  setTimeout(() => {
+    animatedStep.value = props.activeStep;
+    dailyanimatedStep.value = props.dailyStep;
+    rateanimatedStep.value = props.rateStep;
+  }, 1200); // 延迟，给用户看到进度条动画的时间
 };
 
 const currentThemeImage = computed(() => {
-  // 如果 animatedStep >= 3，使用第二张图
-  const useSecondImage = animatedStep.value >= 3;
+  const useSecondImage =
+    animatedStep.value === 3 ||
+    animatedStep.value === 6 ||
+    dailyanimatedStep.value === 2;
 
   if (props.flagTheme === 1) {
     return useSecondImage ? winningstreak_goatjpg2 : winningstreak_goatjpg;
@@ -166,16 +194,36 @@ const currentThemeImage = computed(() => {
   }
 });
 
+const progressPercentage = computed(() => {
+  return Math.min(Math.round((animatedStep.value / 6) * 100), 100);
+});
+
+const progressPercentagedaily = computed(() => {
+  return Math.min(Math.round((dailyanimatedStep.value / 2) * 100), 100);
+});
+
+const progressPercentagerate = computed(() => {
+  return Math.min(Math.round((rateanimatedStep.value / 3) * 100), 100);
+});
+
 const playSound = () => {
   let soundFile = null;
-  const value = props.activeStep;
+  const value = props.activeStep; // 周任务
+  const value2 = props.dailyStep; // 日任务
+  // const oldRate = props.oldRate; // 组任务
+  // const rateStep = props.rateStep; // 组任务
 
-  if ([0, 1, 2, 4, 5].includes(value)) {
-    soundFile = winningstreak_1;
-  } else if (value === 3) {
-    soundFile = winningstreak_2;
-  } else if (value === 6) {
+  // 若value=6或value2=2，使用winningstreak_3
+  if (value === 6 || value2 === 2) {
     soundFile = winningstreak_3;
+  }
+  // 若value=3，使用winningstreak_2
+  else if (value === 3) {
+    soundFile = winningstreak_2;
+  }
+  // 其余情况均使用winningstreak_1
+  else {
+    soundFile = winningstreak_1;
   }
 
   if (soundFile) {
@@ -228,7 +276,7 @@ const handleContinue = () => {
 .header-section {
   flex-shrink: 0;
   padding-top: max(2vh, 15px);
-  padding-bottom: 0rem;
+  padding-bottom: 0;
   text-align: center;
   font-size: 24px;
   font-weight: bold;
@@ -248,21 +296,111 @@ const handleContinue = () => {
 
 /* 步骤区域 */
 .steps-section {
-  flex: 0.8;
-  overflow-y: auto;
+  flex: 1;
   display: flex;
-  justify-content: center;
-  padding: 0.5rem 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: top;
+  padding: 2rem 0 0 0;
   min-height: 0;
-  position: relative; /* 为按钮的绝对定位提供参考 */
+  position: relative;
+  overflow: hidden;
 }
 
-/* 圆形箭头按钮 - 使用绝对定位 */
+/* 横向步骤包装器 */
+.horizontal-steps-wrapper {
+  width: 80%;
+  max-width: 80%;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+/* 进度条区域 */
+.progress-section {
+  flex-shrink: 0;
+  width: 80%;
+  margin: 2rem auto 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 2rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.progress-title-week {
+  font-size: 24px;
+  font-weight: 700;
+  color: #f2826a;
+}
+.progress-title-day {
+  font-size: 24px;
+  font-weight: 700;
+  color: #7232dd;
+}
+.progress-title-group {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ee0a24;
+}
+.progress-requirement {
+  font-size: 14px;
+  font-weight: 900;
+  color: #000;
+}
+
+.progress-legend {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.progress-bar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.progress-bar-wrapper :deep(.van-progress) {
+  flex: 1;
+}
+
+.progress-bar-wrapper :deep(.van-progress__bar) {
+  height: 8px;
+}
+
+.progress-count-week {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f2826a;
+  white-space: nowrap;
+}
+.progress-count-day {
+  font-size: 14px;
+  font-weight: 600;
+  color: #7232dd;
+  white-space: nowrap;
+}
+.progress-count-group {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ee0a24;
+  white-space: nowrap;
+}
+
+/* 圆形箭头按钮 */
 .circle-arrow-btn {
-  position: absolute;
-  left: 50px; /* 距离左侧的距离 */
-  top: 50%; /* 垂直居中 */
-  transform: translateY(-50%); /* 精确垂直居中 */
+  flex-shrink: 0;
+  margin: 4rem auto 0;
+
+  transform: translateY(-50%);
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -301,10 +439,44 @@ const handleContinue = () => {
   }
 }
 
+/* 横向步骤样式 */
+.animated-steps {
+  width: 100% !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+}
+
+.animated-steps :deep(.van-steps) {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.animated-steps :deep(.van-step) {
+  flex: 1 !important;
+  min-width: 0 !important;
+  padding: 0 8px !important;
+}
+
+.animated-steps :deep(.van-step__wrapper) {
+  width: 100% !important;
+}
+
+.animated-steps :deep(.van-step__line) {
+  flex: 1 !important;
+}
+
 .animated-steps :deep(.van-step__circle),
 .animated-steps :deep(.van-step__line),
 .animated-steps :deep(.van-step__title) {
   transition: all 0.3s ease-in-out;
+}
+
+.animated-steps :deep(h5) {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 @keyframes slideInFromRight {
@@ -316,16 +488,5 @@ const handleContinue = () => {
     transform: translateY(-50%);
     opacity: 1;
   }
-}
-
-/* 缩小步骤间距 */
-.animated-steps :deep(.van-step) {
-  padding-top: 1px;
-  padding-bottom: 1px;
-}
-
-.animated-steps :deep(h5) {
-  font-size: 18px;
-  font-weight: 600;
 }
 </style>
