@@ -17,6 +17,8 @@ import {
 } from "vant";
 import moment from "moment";
 import loading from "./loading.vue";
+import WinningCalendar from "./WinningCalendar.vue";
+
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -69,7 +71,9 @@ const searchAnswer = (item, index) => {
         answerLogResult.value = [];
       } else {
         // answerLogResult.value = res.filter((item) => item.type === "预习");
-        answerLogResult.value = res.filter((item) => item.type?.includes("预习"));
+        answerLogResult.value = res.filter((item) =>
+          item.type?.includes("预习")
+        );
         console.log("answerLogResult: ", answerLogResult.value);
         reviewLogResult.value = res.filter((item) => item.type == "检查");
         // console.log("reviewLogResult: ", reviewLogResult.value);
@@ -365,7 +369,7 @@ const toggleDetail = async (item, index) => {
   detailMode.value = item["swipe"];
   detailNid.value = item["nid"];
   detailList.value = item["log"];
-  
+
   if (detailMode.value == "挑战") {
     const params = new URLSearchParams();
     params.append("method", "getAccountApplyChallenge");
@@ -379,7 +383,7 @@ const toggleDetail = async (item, index) => {
 
     // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
     const teacherMarkedWords = new Set();
-    
+
     if (response.data.teacher_mark.length > 0) {
       const challengeData = JSON.parse(response.data.teacher_mark);
       challengeData.forEach((item) => {
@@ -389,7 +393,7 @@ const toggleDetail = async (item, index) => {
       });
     }
 
-    console.log('teacherMarkedWords: ', teacherMarkedWords);
+    console.log("teacherMarkedWords: ", teacherMarkedWords);
     // 更新 detailList 中每个项目的 teacher_mark 状态
     detailList.value.forEach((item) => {
       if (teacherMarkedWords.has(item.英文)) {
@@ -410,7 +414,7 @@ const toggleDetail = async (item, index) => {
   diamondConsume.value = item["diamondConsume"];
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
-  
+
   showDetail.value = true;
 
   getUncertain(item["nid"]).then((res) => {
@@ -634,29 +638,7 @@ const dateDaily = ref("");
 const minDateDaily = ref(new Date(2025, 0, 1));
 const formatDate = (date) =>
   `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-// const onConfirmDailyRange = async (values) => {
-//   let toast1 = showLoadingToast({
-//     message: "查询中...",
-//     forbidClick: true,
-//   });
-//   const [start, end] = values;
-//   showDailyRange.value = false;
-//   dateDaily.value = `${formatDate(start)} - ${formatDate(end)}`;
-//   LastDaysDailyTask.value = [];
-//   LastDaysReview.value = [];
-//   listDailyAndReview.value = [];
-//   let params = new URLSearchParams();
-//   params.append("method", "getLastDaysDailyTask");
-//   params.append("user", dailyUser.value);
-//   params.append("dateRange", dateDaily.value);
-//   let res = await axios.post("words/", params);
-//   console.log("res: ", res.data);
-//   listDailyAndReview.value = [
-//     ...res.data.logs_daily,
-//     ...res.data.logs_review,
-//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-//   toast1.close();
-// };
+
 const onConfirmDailyRange = async (values) => {
   let toast1 = showLoadingToast({
     message: "查询中...",
@@ -721,21 +703,6 @@ const LastDaysDailyTask = ref([]);
 const listDailyAndReview = ref([]);
 const showLastDaysDailyTask = ref(false);
 
-// async function getLastDaysDailyTask(username) {
-//   dailyUser.value = username;
-//   let params = new URLSearchParams();
-//   params.append("method", "getLastDaysDailyTask");
-//   params.append("user", username);
-//   let res = await axios.post("words/", params);
-//   console.log("res: ", res.data);
-//   LastDaysDailyTask.value = res.data.logs_daily;
-//   LastDaysReview.value = res.data.logs_review;
-//   listDailyAndReview.value = [
-//     ...LastDaysDailyTask.value,
-//     ...LastDaysReview.value,
-//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-// }
-
 async function getLastDaysDailyTask(username) {
   dailyUser.value = username;
 
@@ -774,30 +741,6 @@ async function getLastDaysDailyTask(username) {
   // 创建完整的排序列表（现在只包含 LastDaysReview 的内容，因为 LastDaysDailyTask 已清空）
   listDailyAndReview.value = [...LastDaysReview.value];
 }
-
-// async function refreshtLastDaysDailyTask() {
-//   let toast1 = showLoadingToast({
-//     message: "查询中...",
-//     forbidClick: true,
-//   });
-//   LastDaysDailyTask.value = [];
-//   LastDaysReview.value = [];
-//   listDailyAndReview.value = [];
-//   dateDaily.value = "";
-//   let params = new URLSearchParams();
-//   params.append("method", "getLastDaysDailyTask");
-//   params.append("user", dailyUser.value);
-//   let res = await axios.post("words/", params);
-//   console.log('res: ', res);
-
-//   LastDaysDailyTask.value = res.data.logs_daily;
-//   LastDaysReview.value = res.data.logs_review;
-//   listDailyAndReview.value = [
-//     ...LastDaysDailyTask.value,
-//     ...LastDaysReview.value,
-//   ].sort((a, b) => new Date(b.create_time) - new Date(a.create_time));
-//   toast1.close();
-// }
 
 async function refreshtLastDaysDailyTask() {
   let toast1 = showLoadingToast({
@@ -1028,6 +971,69 @@ const getSidesNameReviews = async (sidesName) => {
   return response.data.data;
 };
 
+// 连胜日历
+const showWinningCalendar = ref(false);
+const daysWinningStreak = ref(0);
+const completeWeeks = ref([]);
+const dailyCalendarData = ref({});
+const viewUsername = ref("");
+
+const getWinningCalendar = async () => {
+  viewUsername.value = dailyUser.value;
+  // 获取日历数据
+  try {
+    let params = new URLSearchParams();
+    params.append("method", "getUserWinningStreak");
+    params.append("username", viewUsername.value);
+
+    const response = await axios.post("words/", params);
+
+    if (response.data.status === "success") {
+      // 处理周完成数据
+      completeWeeks.value = response.data.data.map((record) => ({
+        monday: record.week_monday.split(" ")[0],
+        state: record.complete_state, // 0, 1, 2
+      }));
+
+      // 设置连胜天数
+      daysWinningStreak.value = response.data.winning_streak * 7;
+
+      // 处理每日数据
+      dailyCalendarData.value = {};
+      response.data.daily_data.forEach((record) => {
+        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
+        dailyCalendarData.value[date] = record.record_count || 0;
+      });
+
+      // 显示日历
+      showWinningCalendar.value = true;
+    }
+  } catch (error) {
+    console.error("获取日历数据失败:", error);
+    showToast("获取数据失败");
+  }
+};
+
+const handleDateClick = (dayData) => {
+  // 点击日期回调
+  const count = dayData.recordCount;
+  if (count > 0) {
+    showToast({
+      message: `${dayData.dateString} 背诵 ${count} 次`,
+      zIndex: 9999,
+    });
+  } else {
+    showToast({
+      message: `${dayData.dateString} 暂无背诵数据`,
+      zIndex: 9999,
+    });
+  }
+};
+
+const onCalendarClose = () => {
+  // 关闭日历回调
+};
+
 const viewername = ref("");
 const usersData = ref("");
 onMounted(async () => {
@@ -1161,10 +1167,21 @@ const reloadPage = () => {
               clickable
               class="custom-cell"
               @click="showDailyDetail = true"
+              style="padding-top: 0.5rem; padding-bottom: 0.5rem"
             >
               <template #title>
-                <div style="margin-bottom: 0.5rem; font-weight: 400">
-                  最近十五天复习 {{ LastDaysReview.length }} 次
+                <div style="display: flex; align-items: center; gap: 0.5rem">
+                  <span style="font-weight: 400; margin-bottom: 0rem">
+                    最近十五天复习 {{ LastDaysReview.length }} 次
+                  </span>
+                  <van-button
+                    round
+                    type="success"
+                    size="small"
+                    style="margin-bottom: 0rem"
+                    @click.stop="getWinningCalendar"
+                    >日历</van-button
+                  >
                 </div>
               </template>
             </van-cell>
@@ -1480,10 +1497,21 @@ const reloadPage = () => {
                 clickable
                 class="custom-cell"
                 @click="showDailyDetail = true"
+                style="padding-top: 0.5rem; padding-bottom: 0.5rem"
               >
                 <template #title>
-                  <div style="margin-bottom: 0.5rem; font-weight: 400">
-                    最近十五天复习 {{ LastDaysReview.length }} 次
+                  <div style="display: flex; align-items: center; gap: 0.5rem">
+                    <span style="font-weight: 400; margin-bottom: 0rem">
+                      最近十五天复习 {{ LastDaysReview.length }} 次
+                    </span>
+                    <van-button
+                      round
+                      type="success"
+                      size="small"
+                      style="margin-bottom: 0rem"
+                      @click.stop="getWinningCalendar"
+                      >日历</van-button
+                    >
                   </div>
                 </template>
               </van-cell>
@@ -1990,7 +2018,7 @@ const reloadPage = () => {
                     margin-left: 0rem;
                   "
                 >
-                  <div v-if="item.type=='预习pro'" style="">预习时间Pro:</div>
+                  <div v-if="item.type == '预习pro'" style="">预习时间Pro:</div>
                   <div v-else style="">预习时间:</div>
                   <div style="margin-top: 0.3rem; width: 140%">
                     {{ item.create_time }}
@@ -2444,6 +2472,19 @@ const reloadPage = () => {
         >关闭</van-button
       >
     </van-popup>
+
+    <!-- 连胜日历 -->
+    <WinningCalendar
+      v-model:visible="showWinningCalendar"
+      :winning-streak="daysWinningStreak"
+      :complete-weeks-data="completeWeeks"
+      :daily-data="dailyCalendarData"
+      :username="viewUsername"
+      subtitle="每周三次背诵可完成一周任务，6次完成金色"
+      :months-to-show="3"
+      @date-click="handleDateClick"
+      @close="onCalendarClose"
+    />
     <loading v-if="isLoading" />
   </div>
 </template>

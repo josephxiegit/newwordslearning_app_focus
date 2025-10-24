@@ -6,7 +6,7 @@ import {
   getCurrentInstance,
   onBeforeUpdate,
   computed,
-  nextTick
+  nextTick,
 } from "vue";
 import { useRouter } from "vue-router";
 import {
@@ -18,6 +18,8 @@ import {
   showToast,
   Dialog,
 } from "vant";
+
+import WinningCalendar from './WinningCalendar.vue';
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -1570,176 +1572,68 @@ const toggleCheckChallenge = (index) => {
   console.log(synonymsSelected.value);
 };
 
-// 显示连胜日历
+// 连胜日历
 const showWinningCalendar = ref(false);
-const weekDays = ref([]);
-const isWeekComplete = ref(false);
 const daysWinningStreak = ref(0);
 const completeWeeks = ref([]);
-const weekCompleteState = ref("");
-const completeWeekStates = ref({});
+const dailyCalendarData = ref({});
 
-const generateWeekDays = async () => {
-  const today = new Date();
-  const currentDay = today.getDay();
-  const weekStart = currentDay === 0 ? -6 : 1 - currentDay; // 从周一开始
+const getWinningCalendar = async () => {
+  // 获取日历数据
+  try {
+    let params = new URLSearchParams();
+    params.append('method', 'getUserWinningStreak');
+    params.append('username', viewUsername.value);
+    
+    const response = await axios.post('words/', params);
+    
+    if (response.data.status === 'success') {
+      // 处理周完成数据
+      completeWeeks.value = response.data.data.map((record) => ({
+        monday: record.week_monday.split(' ')[0],
+        state: record.complete_state, // 0, 1, 2
+      }));
 
-  weekDays.value = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() + weekStart + i);
+      // 设置连胜天数
+      daysWinningStreak.value = response.data.winning_streak * 7;
 
-    const weekNames = ["日", "一", "二", "三", "四", "五", "六"];
-    const isToday = date.toDateString() === today.toDateString();
-
-    weekDays.value.push({
-      date: date.toISOString(),
-      week: weekNames[date.getDay()],
-      day: date.getDate(),
-      isToday: isToday,
-      isSelected: false,
-    });
-  }
-
-  // 获取本周周一的日期
-  const mondayDate = new Date(today);
-  mondayDate.setDate(today.getDate() + weekStart);
-  const mondayString = formatDate(mondayDate);
-
-  console.log("username:", viewUsername.value);
-  let params = new URLSearchParams();
-  params.append("method", "getUserWinningStreak");
-  params.append("username", viewUsername.value);
-  const response = await axios.post("words/", params);
-  console.log("response: ", response.data);
-  if (response.data.status === "success") {
-    completeWeeks.value = response.data.data.map((record) => ({
-      monday: record.week_monday.split(" ")[0],
-      state: record.complete_state, // 0, 1, 2
-    }));
-
-    // 如果找到本周完成的记录，标记为完成
-    daysWinningStreak.value = response.data.winning_streak * 7;
-    const thisWeekRecord = response.data.data.find((record) => {
-      const recordDate = record.week_monday.split(" ")[0];
-      return recordDate === mondayString;
-    });
-
-    isWeekComplete.value =
-      !!thisWeekRecord && thisWeekRecord.complete_state > 0;
-    weekCompleteState.value = thisWeekRecord
-      ? thisWeekRecord.complete_state
-      : 0;
-
-    completeWeekStates.value = {};
-    response.data.data.forEach((record) => {
-      const monday = record.week_monday.split(" ")[0]; // "YYYY-MM-DD"
-      completeWeekStates.value[monday] = record.complete_state || 0;
-    });
-    showWinningCalendar.value = true;
-      nextTick(() => {
-    setTimeout(() => {
-      const calendarBody = document.querySelector(".calendar-body");
-      if (calendarBody) {
-        calendarBody.scrollTop = calendarBody.scrollHeight;
-      }
-    }, 0);
-  });
-  }
-};
-
-const formatWinningDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const getMondayOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return formatWinningDate(monday);
-};
-
-const onConfirmWinningCalendar  = () => {
-  showWinningCalendar.value = false;
-}
-
-// 生成日历数据（本月、上月、上上月）
-const calendarMonths = computed(() => {
-  const today = new Date();
-  const months = [];
-
-  for (let i = 2; i >= 0; i--) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = date.getMonth();
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const days = [];
-
-    for (let j = 0; j < firstDay; j++) {
-      days.push({ date: null, isEmpty: true });
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month, day);
-      const dateString = formatDate(currentDate); // 假设返回 "YYYY-MM-DD"
-      const mondayString = getMondayOfWeek(currentDate); // 也返回 "YYYY-MM-DD"
-
-      // ← 关键：从映射里取状态（不存在则默认 0）
-      const completeState =
-        completeWeekStates.value && completeWeekStates.value[mondayString]
-          ? completeWeekStates.value[mondayString]
-          : 0;
-
-      const isComplete = completeState > 0;
-      const isToday = formatDate(new Date()) === dateString;
-
-      days.push({
-        date: currentDate,
-        day: day,
-        dateString: dateString,
-        isComplete: isComplete,
-        complete_state: completeState, // ← 把状态放进去
-        isToday: isToday,
-        isEmpty: false,
+      // 处理每日数据
+      dailyCalendarData.value = {};
+      response.data.daily_data.forEach((record) => {
+        const date = record.date.split(' ')[0]; // "YYYY-MM-DD"
+        dailyCalendarData.value[date] = record.record_count || 0;
       });
-    }
 
-    months.push({
-      year: year,
-      month: month + 1,
-      title: `${year}年${month + 1}月`,
-      days: days,
+      // 显示日历
+      showWinningCalendar.value = true;
+    }
+  } catch (error) {
+    console.error('获取日历数据失败:', error);
+    showToast('获取数据失败');
+  }
+};
+
+const handleDateClick = (dayData) => {
+  // 点击日期回调
+  const count = dayData.recordCount;
+  if (count > 0) {
+    showToast({
+      message: `${dayData.dateString} 背诵 ${count} 次`,
+      zIndex: 9999,
+    });
+  } else {
+    showToast({
+      message: `${dayData.dateString} 暂无背诵数据`,
+      zIndex: 9999,
     });
   }
-
-  return months;
-});
-
-const selectDate = (day) => {
-  showWinningCalendar.value = true;
-  nextTick(() => {
-    setTimeout(() => {
-      const calendarBody = document.querySelector(".calendar-body");
-      if (calendarBody) {
-        calendarBody.scrollTop = calendarBody.scrollHeight;
-      }
-    }, 0);
-  });
 };
 
-const onWinningConfirmCalendar = (value) => {
-  showWinningCalendar.value = false;
+const onCalendarClose = () => {
+  // 关闭日历回调
 };
-const getWinningCalendar = () => {
-  generateWeekDays();
-};
+
+
 
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
@@ -3897,71 +3791,19 @@ const reloadPage = () => {
     </van-popup>
 
     <!-- 连胜日历 -->
-    <transition name="calendar-fade">
-      <div
-        v-if="showWinningCalendar"
-        class="custom-calendar-overlay"
-        @click="closeCalendar"
-      >
-        <div class="custom-calendar" @click.stop>
-          <div class="calendar-header">
-            <div class="title-wrapper">
-              <span class="calendar-title">连胜{{ daysWinningStreak }}天</span>
-              <span class="calendar-subtitle"
-                >每周三次背诵可完成一周任务，6次完成金色</span
-              >
-            </div>
-            <span class="close-btn" @click="onWinningConfirmCalendar">✕</span>
-          </div>
-
-          <div class="calendar-body">
-            <div
-              v-for="monthData in calendarMonths"
-              :key="monthData.title"
-              class="month-section"
-            >
-              <div class="month-title">{{ monthData.title }}</div>
-
-              <!-- 星期标题 -->
-              <div class="weekday-header">
-                <div class="weekday-cell">日</div>
-                <div class="weekday-cell">一</div>
-                <div class="weekday-cell">二</div>
-                <div class="weekday-cell">三</div>
-                <div class="weekday-cell">四</div>
-                <div class="weekday-cell">五</div>
-                <div class="weekday-cell">六</div>
-              </div>
-
-              <!-- 日期格子 -->
-              <div class="days-grid">
-                <div
-                  v-for="(dayData, index) in monthData.days"
-                  :key="index"
-                  class="day-cell"
-                  :class="{
-                    empty: dayData.isEmpty,
-                    'complete-week-1': dayData.complete_state === 1,
-                    'complete-week-2': dayData.complete_state === 2,
-                    today: dayData.isToday,
-                  }"
-                  @click="!dayData.isEmpty && selectDate(dayData)"
-                >
-                  <span v-if="!dayData.isEmpty" class="day-number">
-                    {{ dayData.day }}
-                  </span>
-                  <div v-if="dayData.isToday" class="today-indicator"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="calendar-footer">
-            <button class="confirm-btn" @click="onConfirmWinningCalendar">确认</button>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <WinningCalendar
+      v-model:visible="showWinningCalendar"
+      :winning-streak="daysWinningStreak"
+      :complete-weeks-data="completeWeeks"
+      :daily-data="dailyCalendarData"
+      :username="viewUsername"
+      subtitle="每周三次背诵可完成一周任务，6次完成金色"
+      :months-to-show="3"
+      @date-click="handleDateClick"
+      @close="onCalendarClose"
+    />
+  
+  
   </div>
 </template>
 
@@ -4130,7 +3972,19 @@ const reloadPage = () => {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
 }
+.week-flower-indicator {
+  position: relative;
+  top: 3px;
+  bottom: 2px;
+  right: px; /* 距离右侧 2px */
+  font-size: 8px; /* 增大字体，让emoji更明显 */
+  line-height: 0.2;
+}
 
+/* 可选：给有花的日期添加背景色或边框 */
+.calendar-day.has-flower {
+  background-color: rgba(255, 192, 203, 0.1); /* 淡粉色背景 */
+}
 .day-cell {
   aspect-ratio: 1;
   display: flex;

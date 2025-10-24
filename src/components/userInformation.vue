@@ -378,6 +378,7 @@ async function getUserCoins() {
 const username = ref(route.query.param);
 const usercoins = ref("");
 const userdiamonds = ref("");
+const userflowers = ref("");
 
 // 主题选择
 const showTheme = ref(false);
@@ -665,6 +666,7 @@ onMounted(async () => {
     console.log("res: ", res);
     usercoins.value = res["data_coins"][0]["coins"];
     userdiamonds.value = res["data_coins"][0]["diamonds"];
+    userflowers.value = res["data_coins"][0]["flowers"];
     userPassiveMagic.value = res["passive_magic"];
 
     console.log("user已经拥有的主题：", res["theme_name_list"]);
@@ -753,6 +755,17 @@ onMounted(async () => {
               @click="exchangeDiamonds"
               >换金币</van-button
             >
+          </div>
+          <div
+            style="
+              font-size: 20px;
+              font-weight: 700;
+              color: red;
+              margin-top: -6px;
+              margin-bottom: 0px;
+            "
+          >
+            🌸 {{ userflowers }} 小花
           </div>
         </div>
       </div>

@@ -45,6 +45,8 @@ import reviewCompleteSrcBears from "../assets/Boonie Bears/review_complete.png";
 import reviewFirstSrcBears from "../assets/Boonie Bears/swipeHelp2.webp";
 import reviewFirstSrcBears2 from "../assets/Boonie Bears/sheep_3.gif";
 
+import WinningCalendar from './WinningCalendar.vue';
+
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
 const srcTheme = ref("");
@@ -3524,6 +3526,7 @@ const processedTitle = (title) => {
 const flagSwipe = ref(1);
 const usercoins = ref(0);
 const userdiamonds = ref(0);
+const userflowers = ref(0);
 const getPassiveRef = ref(null);
 function showPassiveMagic() {
   if (getPassiveRef.value.visible) {
@@ -3744,14 +3747,20 @@ const applyforChallenge = () => {
 
 // 本周日历，连胜
 const weekDays = ref([]);
-const dailyCalendarData = ref({});
+// const dailyCalendarData = ref({});
 const showCalendar = ref(false);
 const isWeekComplete = ref(false);
-const daysWinningStreak = ref(0);
-const completeWeeks = ref([]);
+// const daysWinningStreak = ref(0);
+// const completeWeeks = ref([]);
 const weekCompleteState = ref("");
 const completeWeekStates = ref({});
 const has_enough_today = ref(false);
+
+const showWinningCalendar = ref(false);
+const daysWinningStreak = ref(0);
+const completeWeeks = ref([]);
+const dailyCalendarData = ref({});
+const viewUsername = ref("");
 
 const generateWeekDays = async () => {
   const today = new Date();
@@ -3818,6 +3827,16 @@ const generateWeekDays = async () => {
       dailyCalendarData.value[date] = record.record_count || 0;
     });
     console.log("dailyCalendarData", dailyCalendarData.value);
+    // 将每日数据关联到 weekDays
+    weekDays.value = weekDays.value.map((day) => {
+      const dateKey = formatDate(new Date(day.date)); // 转换为 "YYYY-MM-DD" 格式
+      const recordCount = dailyCalendarData.value[dateKey] || 0;
+      return {
+        ...day,
+        recordCount: recordCount,
+        hasFlower: recordCount > 0,
+      };
+    });
   }
 };
 
@@ -3898,7 +3917,8 @@ const calendarMonths = computed(() => {
 });
 
 const selectDate = (day) => {
-  showCalendar.value = true;
+  // showCalendar.value = true;
+  getWinningCalendar()
   nextTick(() => {
     setTimeout(() => {
       const calendarBody = document.querySelector(".calendar-body");
@@ -3943,39 +3963,104 @@ const showMessage = () => {
   }).then(() => {});
 };
 
+// 连胜日历
+const getWinningCalendar = async () => {
+  viewUsername.value = username.value;
+  // 获取日历数据
+  try {
+    let params = new URLSearchParams();
+    params.append('method', 'getUserWinningStreak');
+    params.append('username', viewUsername.value);
+    
+    const response = await axios.post('words/', params);
+    
+    if (response.data.status === 'success') {
+      // 处理周完成数据
+      completeWeeks.value = response.data.data.map((record) => ({
+        monday: record.week_monday.split(' ')[0],
+        state: record.complete_state, // 0, 1, 2
+      }));
+
+      // 设置连胜天数
+      daysWinningStreak.value = response.data.winning_streak * 7;
+
+      // 处理每日数据
+      dailyCalendarData.value = {};
+      response.data.daily_data.forEach((record) => {
+        const date = record.date.split(' ')[0]; // "YYYY-MM-DD"
+        dailyCalendarData.value[date] = record.record_count || 0;
+      });
+
+      // 显示日历
+      showWinningCalendar.value = true;
+    }
+  } catch (error) {
+    console.error('获取日历数据失败:', error);
+    showToast('获取数据失败');
+  }
+};
+
+const handleDateClick = (dayData) => {
+  // 点击日期回调
+  const count = dayData.recordCount;
+  if (count > 0) {
+    showToast({
+      message: `${dayData.dateString} 背诵 ${count} 次`,
+      zIndex: 9999,
+    });
+  } else {
+    showToast({
+      message: `${dayData.dateString} 暂无背诵数据`,
+      zIndex: 9999,
+    });
+  }
+};
+
+const onCalendarClose = () => {
+  // 关闭日历回调
+};
+
 // 更新版本提示
 const showUpdate = () => {
   // 使用版本号来管理更新提示
-    const UPDATE_VERSION = "v2"; // 新版本号
-    const lastShownTime = localStorage.getItem(`winStreakUpdateTime_${UPDATE_VERSION}`);
-    const shownCount = parseInt(
-      localStorage.getItem(`winStreakUpdateCount_${UPDATE_VERSION}`) || "0"
-    );
-    const now = Date.now();
-    const dayInMs = 24 * 60 * 60 * 1000;
+  const UPDATE_VERSION = "v2"; // 新版本号
+  const lastShownTime = localStorage.getItem(
+    `winStreakUpdateTime_${UPDATE_VERSION}`
+  );
+  const shownCount = parseInt(
+    localStorage.getItem(`winStreakUpdateCount_${UPDATE_VERSION}`) || "0"
+  );
+  const now = Date.now();
+  const dayInMs = 24 * 60 * 60 * 1000;
 
-    // 清理旧版本的 localStorage 数据
-    localStorage.removeItem("winStreakUpdateTime");
-    localStorage.removeItem("winStreakUpdateCount");
+  // 清理旧版本的 localStorage 数据
+  localStorage.removeItem("winStreakUpdateTime");
+  localStorage.removeItem("winStreakUpdateCount");
 
-    // 如果显示次数小于5次，且（从未显示过 或 距离上次显示超过1天）
-    if (
-      shownCount < 5 &&
-      (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
-    ) {
-      showDialog({
-        title: "更新：连胜说明",
-        message:
-          "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上",
-        theme: "round-button",
-        allowHtml: true,
-        messageAlign: "left",
-      }).then(() => {
-        localStorage.setItem(`winStreakUpdateTime_${UPDATE_VERSION}`, now.toString());
-        localStorage.setItem(`winStreakUpdateCount_${UPDATE_VERSION}`, (shownCount + 1).toString());
-      });
-    }
-}
+  // 如果显示次数小于5次，且（从未显示过 或 距离上次显示超过1天）
+  if (
+    shownCount < 5 &&
+    (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
+  ) {
+    showDialog({
+      title: "更新：连胜说明",
+      message:
+        "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上<br>📊：点击显示趋势图",
+      theme: "round-button",
+      allowHtml: true,
+      messageAlign: "left",
+    }).then(() => {
+      localStorage.setItem(
+        `winStreakUpdateTime_${UPDATE_VERSION}`,
+        now.toString()
+      );
+      localStorage.setItem(
+        `winStreakUpdateCount_${UPDATE_VERSION}`,
+        (shownCount + 1).toString()
+      );
+    });
+  }
+};
 // 主题
 onMounted(async () => {
   // 更新pro显示答案次数
@@ -4162,6 +4247,7 @@ onMounted(async () => {
       // console.log('res: ', res);
       usercoins.value = res["data_coins"][0]["coins"];
       userdiamonds.value = res["data_coins"][0]["diamonds"];
+      userflowers.value = res["data_coins"][0]["flowers"];
       // userdiamonds.value = 1;
       // console.log("usercoins: ", usercoins.value);
     });
@@ -4303,7 +4389,7 @@ onMounted(async () => {
               &nbsp;&nbsp;💎 {{ userdiamonds }}
             </span>
             <span @click.stop="handleDiamondClick">
-              &nbsp;&nbsp;🌸 {{ userdiamonds }}
+              &nbsp;&nbsp;🌸 {{ userflowers }}
             </span>
           </div>
         </template>
@@ -4335,17 +4421,21 @@ onMounted(async () => {
         :class="{
           'week-complete-1': weekCompleteState === 1,
           'week-complete-2': weekCompleteState === 2,
+          'has-flower': day.hasFlower,
         }"
         @click="selectDate(day)"
       >
         <div class="week-text">{{ day.week }}</div>
         <div class="date-text">{{ day.day }}</div>
         <div v-if="day.isToday" class="today-dot"></div>
+        <div v-if="day.hasFlower" class="week-flower-indicator">
+          {{ day.recordCount === 1 ? "🔺" : "🌸" }}
+        </div>
       </div>
     </div>
 
     <!-- 自定义日历 -->
-    <transition name="calendar-fade">
+    <!-- <transition name="calendar-fade">
       <div
         v-if="showCalendar"
         class="custom-calendar-overlay"
@@ -4371,7 +4461,6 @@ onMounted(async () => {
             >
               <div class="month-title">{{ monthData.title }}</div>
 
-              <!-- 星期标题 -->
               <div class="weekday-header">
                 <div class="weekday-cell">日</div>
                 <div class="weekday-cell">一</div>
@@ -4382,7 +4471,6 @@ onMounted(async () => {
                 <div class="weekday-cell">六</div>
               </div>
 
-              <!-- 日期格子 -->
               <div class="days-grid">
                 <div
                   v-for="(dayData, index) in monthData.days"
@@ -4414,7 +4502,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-    </transition>
+    </transition> -->
 
     <router-view />
     <van-tabbar route>
@@ -4572,7 +4660,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="每日奖励更新，新货币上线...有bug联系老师"
+        text="每日奖励，趋势图，新货币上线...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6569,6 +6657,21 @@ onMounted(async () => {
       v-if="showPassiveMagic"
       :textGive="'不灭的意志'"
     />
+
+    <!-- 连胜日历 -->
+    <WinningCalendar
+      v-model:visible="showWinningCalendar"
+      :winning-streak="daysWinningStreak"
+      :complete-weeks-data="completeWeeks"
+      :daily-data="dailyCalendarData"
+      :username="viewUsername"
+      subtitle="点击：每周三次背诵完成周任务，6次变金色<br />
+                🔺：背诵1次。🌸：背诵2次及以上</span"
+      :months-to-show="3"
+      @date-click="handleDateClick"
+      @close="onCalendarClose"
+    />
+    
   </div>
 </template>
 
@@ -6822,10 +6925,23 @@ onMounted(async () => {
   position: relative;
 }
 
+.week-flower-indicator {
+  position: relative; 
+  top: 3px; 
+  bottom:2px;
+  right: px; /* 距离右侧 2px */
+  font-size: 8px; /* 增大字体，让emoji更明显 */
+  line-height: 0.2;
+}
+
+/* 可选：给有花的日期添加背景色或边框 */
+.calendar-day.has-flower {
+  background-color: rgba(255, 192, 203, 0.1); /* 淡粉色背景 */
+}
 .week-text {
   font-size: 12px;
   color: #969799;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .date-text {

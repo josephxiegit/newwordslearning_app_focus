@@ -437,6 +437,7 @@ const showViewers = (item, index) => {
   valueGrade.value = item["grade__grade_name"];
   valueLocation.value = item["location__location_name"];
   userAccount.value = item["username"];
+  valueFlowers.value = item["flowers"];
   selectedLocationIndex.value = [valueLocation.value];
   selectedGradeIndex.value = [valueGrade.value];
 
@@ -597,6 +598,7 @@ const onConfirmPassiveMagic = ({ selectedValues }) => {
 const showNewStudent = ref(false);
 const showGradePicker = ref(false); //年级
 const valueGrade = ref("");
+const valueFlowers = ref(0)
 const selectedGradeIndex = ref([]);
 const columnsGrade = [
   { text: "七年级", value: "七年级" },
@@ -687,6 +689,7 @@ const reviseCoins = (index) => {
   userCoins.value = filterStudentData.value[index]["coins"];
   userDiamonds.value = filterStudentData.value[index]["diamonds"];
   usernameCoins.value = filterStudentData.value[index]["username"];
+  valueFlowers.value = filterStudentData.value[index]["flowers"];
 };
 
 const confirmReviseCoins = () => {
@@ -701,6 +704,7 @@ const confirmReviseCoins = () => {
       params.append("nid", filterStudentData.value[index]["nid"]);
       params.append("coins", userCoins.value);
       params.append("diamonds", userDiamonds.value);
+      params.append("flowers", valueFlowers.value);
       return await axios.post("words/", params).then((ret) => {
         return ret.data;
       });
@@ -1707,7 +1711,7 @@ const viewersConfirm = () => {
                     round
                     plain
                     color="goldenrod"
-                    :text="`${item2.coins}/${item2.diamonds}`"
+                    :text="`${item2.coins}/${item2.diamonds}/${item2.flowers}`"
                     @click.stop="reviseCoins(index2)"
                   />
                   <!-- <div style="font-size: 13px;color: goldenrod;margin-top: 2px;">{{ item2.diamonds }}</div> -->
@@ -1744,6 +1748,11 @@ const viewersConfirm = () => {
             v-model="userDiamonds"
             label="钻石"
             placeholder="请输入钻石"
+          />
+          <van-field
+            v-model="valueFlowers"
+            label="小花 🌸"
+            placeholder="请输入小花"
           />
           <div style="margin-top: 1rem">
             <van-button

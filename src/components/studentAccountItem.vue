@@ -28,11 +28,7 @@ import submitloading from "./submitloading.vue";
 import WinningStreakPopup from "./WinningStreakPopup.vue";
 
 import happyhalf from "../assets/sound/happyhalf.mp3";
-import winningstreak_1 from "../assets/sound/winningstreak-1.mp3";
-import winningstreak_2 from "../assets/sound/winningstreak-2.mp3";
-import winningstreak_3 from "../assets/sound/winningstreak-3.mp3";
-import winningstreak_goatjpg from "../assets/winningstreak.jpg";
-import winningstreak_bearjpg from "../assets/Boonie Bears/winningstreak.jpg";
+
 
 const flagTheme = inject("flagTheme");
 const router = useRouter();
