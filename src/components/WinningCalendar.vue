@@ -21,7 +21,11 @@
                 <span class="close-btn" @click="handleClose">✕</span>
               </div>
             </div>
-            <span v-if="subtitle" class="calendar-subtitle" v-html="subtitle"></span>
+            <span
+              v-if="subtitle"
+              class="calendar-subtitle"
+              v-html="subtitle"
+            ></span>
           </div>
         </div>
 
@@ -81,10 +85,19 @@
                 v-for="month in availableMonths"
                 :key="month.value"
                 class="month-btn"
-                :class="{ active: selectedMonth === month.value }"
-                @click="selectedMonth = month.value"
+                :class="{ active: selectedMonth === month.value && viewMode === 'month' }"
+                @click="viewMode = 'month'; selectedMonth = month.value"
               >
                 {{ month.label }}
+              </button>
+            </div>
+            <div class="chart-controls" style="margin-top: 8px;">
+              <button
+                class="month-btn recent-weeks-btn"
+                :class="{ active: viewMode === 'recent4weeks' }"
+                @click="viewMode = 'recent4weeks'"
+              >
+                近4周
               </button>
             </div>
             <div class="chart-container">
@@ -128,6 +141,7 @@ const calendarBody = ref(null);
 const chartCanvas = ref(null);
 const showChart = ref(false);
 const selectedMonth = ref(0);
+const viewMode = ref('month'); // 'month' 或 'recent4weeks'
 let chartInstance = null;
 
 // 周状态映射
@@ -202,42 +216,55 @@ const availableMonths = computed(() => {
   return arr;
 });
 
-// 折线图数据，按实际周一到周日分组
-// 折线图数据，按自然周（周一到周日）分组
+// 折线图数据，按自然周（周一到周日）分组，支持月份或近4周视图
 const prepareChartData = () => {
   const today = new Date();
-  const target = new Date(
-    today.getFullYear(),
-    today.getMonth() - selectedMonth.value,
-    1
-  );
-  const y = target.getFullYear();
-  const m = target.getMonth();
-  const firstDayOfMonth = new Date(y, m, 1);
-  const lastDayOfMonth = new Date(y, m + 1, 0);
+  const todayMonday = getMondayOfWeek(today);
 
-  // 找到包含该月第一天的周一
-  let currentMonday = getMondayOfWeek(firstDayOfMonth);
+  let currentMonday, endDate;
+  
+  if (viewMode.value === 'recent4weeks') {
+    // 近4周模式：从今天往前推3周（包括本周共4周）
+    endDate = todayMonday;
+    currentMonday = new Date(todayMonday);
+    currentMonday.setDate(currentMonday.getDate() - 21); // 往前推3周
+  } else {
+    // 月份模式
+    const target = new Date(
+      today.getFullYear(),
+      today.getMonth() - selectedMonth.value,
+      1
+    );
+    const y = target.getFullYear();
+    const m = target.getMonth();
+    const firstDayOfMonth = new Date(y, m, 1);
+    const lastDayOfMonth = new Date(y, m + 1, 0);
 
-  // 找到包含该月最后一天的周日
-  const lastDayNum = lastDayOfMonth.getDay();
-  const lastSunday = new Date(lastDayOfMonth);
-  if (lastDayNum !== 0) {
-    lastSunday.setDate(lastDayOfMonth.getDate() + (7 - lastDayNum));
+    // 找到包含该月第一天的周一
+    currentMonday = getMondayOfWeek(firstDayOfMonth);
+
+    // 确定结束日期：如果是当前月份，则到今天所在的周；否则到月末所在的周
+    if (selectedMonth.value === 0) {
+      // 当前月份，只显示到今天所在的周
+      endDate = todayMonday;
+    } else {
+      // 历史月份，显示到月末所在的周一
+      endDate = getMondayOfWeek(lastDayOfMonth);
+    }
   }
 
   const weekData = [];
   let currentDate = new Date(currentMonday);
 
-  // 遍历所有自然周
-  while (currentDate <= lastSunday) {
+  // 遍历自然周
+  while (currentDate <= endDate) {
     const weekStart = new Date(currentDate);
     const weekEnd = new Date(currentDate);
     weekEnd.setDate(weekEnd.getDate() + 6);
 
     const week = { start: weekStart, data: 0, isTodayWeek: false };
 
-    // 累加这一周的数据（只统计在选定月份内的天数）
+    // 累加这一周的数据
     for (
       let d = new Date(weekStart);
       d <= weekEnd;
@@ -248,7 +275,6 @@ const prepareChartData = () => {
     }
 
     // 检查今天是否在这一周
-    const todayMonday = getMondayOfWeek(today);
     if (formatDate(todayMonday) === formatDate(weekStart)) {
       week.isTodayWeek = true;
     }
@@ -363,6 +389,7 @@ const drawChart = () => {
 const toggleView = () => {
   showChart.value = !showChart.value;
   if (showChart.value) {
+    viewMode.value = 'month';
     selectedMonth.value = 0;
     nextTick(() => {
       if (!window.Chart) {
@@ -376,8 +403,8 @@ const toggleView = () => {
   }
 };
 
-// 监听月份切换
-watch(selectedMonth, () => {
+// 监听月份切换和视图模式切换
+watch([selectedMonth, viewMode], () => {
   if (showChart.value) nextTick(drawChart);
 });
 
@@ -505,11 +532,15 @@ const handleDateClick = (d) => emit("date-click", d);
   background: white;
   border-radius: 4px;
   font-size: 9px;
+  cursor: pointer;
 }
 .month-btn.active {
   background: #1989fa;
   color: white;
   border-color: #1989fa;
+}
+.recent-weeks-btn {
+  width: 100%;
 }
 .chart-container {
   height: 280px;
