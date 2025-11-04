@@ -283,6 +283,7 @@ const detailDate = ref("");
 const detailXlsmName = ref("");
 const detailRate = ref("");
 const detailMode = ref("");
+const detailTeacherMmark = ref("");
 const detailNid = ref("");
 const detailList = ref([]);
 const numberprev = ref(0);
@@ -369,6 +370,7 @@ const toggleDetail = async (item, index) => {
   detailMode.value = item["swipe"];
   detailNid.value = item["nid"];
   detailList.value = item["log"];
+  detailTeacherMmark.value = item["teacher_mark"];
 
   if (detailMode.value == "挑战") {
     const params = new URLSearchParams();
@@ -1172,7 +1174,7 @@ const reloadPage = () => {
               <template #title>
                 <div style="display: flex; align-items: center; gap: 0.5rem">
                   <span style="font-weight: 400; margin-bottom: 0rem">
-                    最近十五天复习 {{ LastDaysReview.length }} 次
+                    最近十五天 复习滑动 {{ LastDaysReview.length }} 次
                   </span>
                   <van-button
                     round
@@ -1502,7 +1504,7 @@ const reloadPage = () => {
                 <template #title>
                   <div style="display: flex; align-items: center; gap: 0.5rem">
                     <span style="font-weight: 400; margin-bottom: 0rem">
-                      最近十五天复习 {{ LastDaysReview.length }} 次
+                      最近十五天 复习滑动 {{ LastDaysReview.length }} 次
                     </span>
                     <van-button
                       round
@@ -1884,13 +1886,16 @@ const reloadPage = () => {
         />
         <div v-for="(item, index) in listDailyAndReview" :key="index">
           <van-cell :label="processedTitle(item.title)">
+            <template #label>
+              <div class="label-line">{{ processedTitle(item.title) }}&nbsp;&nbsp;&nbsp;{{ item.teacher_mark }}</div>
+            </template>
             <template #title>
               <div style="width: 120%">
                 {{ formatDate_log(item.create_time) }}
               </div>
             </template>
             <template #value>
-              <div v-if="item.swipe == '周长'" style="color: red">复习</div>
+              <div v-if="item.swipe == '滑动'" style="color: red">滑动</div>
               <div v-if="item.swipe == '复习'" style="color: red">
                 {{ item.swipe }}
               </div>
@@ -1958,7 +1963,7 @@ const reloadPage = () => {
           </div>
           <div v-for="(item, index) in reviewLogList" :key="index">
             <van-cell
-              :label="`正确率：${item.true_length} / ${item.log.length}`"
+              :label="`正确率：${item.true_length} / ${item.log.length}  &nbsp;&nbsp;&nbsp; ${item.teacher_mark}`"
               is-link
               @click="toggleDetail(item, index)"
             >
@@ -2091,7 +2096,7 @@ const reloadPage = () => {
                   style="display: flex; justify-content: flex-start"
                 >
                   <van-tag type="primary" plain mark size="medium">
-                    正确率{{ item.true_length }} / {{ item.log.length }}
+                    正确率{{ item.true_length }} / {{ item.log.length }} &nbsp;&nbsp;&nbsp; {{ item.teacher_mark }}
                   </van-tag>
                   <div
                     v-if="
@@ -2103,7 +2108,7 @@ const reloadPage = () => {
                   </div>
                 </div>
                 <div v-else style="display: flex; justify-content: flex-start">
-                  正确率{{ item.true_length }} / {{ item.log.length }}
+                  正确率{{ item.true_length }} / {{ item.log.length }} &nbsp;&nbsp;&nbsp; {{ item.teacher_mark }}
                   <div
                     v-if="
                       item.diamondConsume != null && item.diamondConsume != ''
@@ -2209,7 +2214,7 @@ const reloadPage = () => {
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
               {{ detailName }} | {{ detailMode }}
               <div style="font-size: 10px; color: gray; margin-bottom: -0.5rem">
-                ID: {{ detailNid }}
+                ID: {{ detailNid }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ detailTeacherMmark }}
               </div>
             </div>
 

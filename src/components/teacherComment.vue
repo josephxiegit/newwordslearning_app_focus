@@ -205,6 +205,7 @@ const answerSwipe = ref("");
 const answerLens = ref("");
 const answerRate = ref("");
 const answerTitle = ref("");
+const answerTeacherMark = ref("");
 const searchAnswer = (item, index) => {
   // console.log(item, index);
   answerUsername.value = item.username;
@@ -227,23 +228,6 @@ const searchAnswer = (item, index) => {
       showToast("没有查询到数据");
     } else {
       showAnswerLog.value = true;
-      // function parseDate(dateString) {
-      //   const formattedDate = dateString
-      //     .replace("年", "-")
-      //     .replace("月", "-")
-      //     .replace("日", "T")
-      //     .replace("时", ":")
-      //     .replace("分", ":")
-      //     .replace("秒", "");
-
-      //   return new Date(formattedDate);
-      // }
-
-      // const sortedData = res.sort(
-      //   (a, b) => parseDate(a.create_time) - parseDate(b.create_time)
-      // );
-      // console.log('sortedData:', sortedData);
-      // answerLogResult.value = sortedData;
       answerLogResult.value = res;
     }
   });
@@ -680,6 +664,7 @@ const detailRate = ref("");
 const detailMode = ref("");
 const detailNid = ref("");
 const detailList = ref([]);
+const detailTeacherMark = ref("");
 const numberprev = ref(0);
 const numbershowanswer = ref(0);
 const numbertransparent = ref(0);
@@ -801,6 +786,7 @@ const toggleDetail = async (item, index) => {
   detailName.value = item["username"];
   detailDate.value = item["create_time"];
   detailXlsmName.value = item["title"];
+  detailTeacherMark.value = item["teacher_mark"];
 
   numberprev.value = item["numberprev"];
   numbershowanswer.value = item["numbershowanswer"];
@@ -1774,7 +1760,7 @@ const reloadPage = () => {
         </div>
         <div v-for="(item, index) in answerLogList" :key="index">
           <van-cell
-            :label="formatDate_log(item.create_time)"
+            :label="`${formatDate_log(item.create_time)}\n${item.teacher_mark}`"
             is-link
             @click="toggleDetail(item, index)"
           >
@@ -1954,7 +1940,7 @@ const reloadPage = () => {
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
               {{ detailName }} | {{ detailMode }}
               <div style="font-size: 10px; color: gray; margin-bottom: -0.5rem">
-                ID: {{ detailNid }}
+                ID: {{ detailNid }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {{ detailTeacherMark }}
               </div>
             </div>
 

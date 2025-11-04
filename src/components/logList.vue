@@ -66,6 +66,7 @@ function processData(res) {
         alias,
         complement,
         diamondConsume,
+        teacher_mark,
       } = item;
       const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
@@ -112,6 +113,7 @@ function processData(res) {
       }
 
       const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
+      // console.log('parsedLog: ', parsedLog);
       if (!hasFlagField) {
         parsedLog.forEach((logItem) => {
           const correctAnswer = logItem.答案;
@@ -169,6 +171,7 @@ function processData(res) {
         alias,
         complement,
         diamondConsume,
+        teacher_mark
       };
     })
     .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
@@ -362,7 +365,6 @@ const toggleDetail = async (index) => {
     detailChallenge.value = response.data.apply_challenge;
     checkedChallenge.value = !detailChallenge.value;
 
-    // console.log("teacher_mark", response.data.teacher_mark);
 
     // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
     const teacherMarkedWords = new Set();
@@ -709,10 +711,14 @@ const reloadPage = () => {
         </template>
         <van-cell
           :title="generateTitle(item)"
-          :label="item.create_time"
+          :label="`${item.create_time}\n${item.teacher_mark}`"
           is-link
           @click="toggleDetail(index)"
         >
+        <template #label>
+          <div class="label-line">{{ item.create_time }}</div>
+          <div class="label-line">{{ item.teacher_mark }}</div>
+        </template>
           <template #title>
             <div v-if="item.title == '多组复习'">
               <div
@@ -751,7 +757,7 @@ const reloadPage = () => {
                   {{ item.log.length }}
                   <div
                     v-if="
-                      item.diamondConsume != null && item.diamondConsume != ''
+                      item.diamondConsume != null && item.diamondConsume != '' && item.swipe != '滑动'
                     "
                   >
                     &nbsp;💎

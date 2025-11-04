@@ -26,6 +26,7 @@ import PurchaseLog from './components/purchaseLog.vue';
 import Viewers from './components/viewers.vue';
 import ViewersHomepage from './components/viewersHomepage.vue';
 import Complete3star from './components/complete3star.vue';
+import WordSwipeReview from './components/wordSwipeReview.vue';
 import 'vant/lib/index.css';
 import Global from "./components/Global.vue";
 
@@ -42,7 +43,16 @@ const routes = [
         component: HomePage,
         meta: {
             index: 1,
-            preventBack: true
+            preventBack: false
+        }
+    },
+    {
+        path: '/wordSwipeReview',
+        name: 'wordSwipeReview',
+        component: WordSwipeReview,
+        meta: {
+            index: 1,
+            preventBack: false
         }
     },
     {
@@ -265,6 +275,7 @@ router.beforeEach((to, from, next) => {
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountList' && to.path === '/complete3star') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
+            (from.path === '/wordSwipeReview' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
             (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||

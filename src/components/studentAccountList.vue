@@ -45,7 +45,7 @@ import reviewCompleteSrcBears from "../assets/Boonie Bears/review_complete.png";
 import reviewFirstSrcBears from "../assets/Boonie Bears/swipeHelp2.webp";
 import reviewFirstSrcBears2 from "../assets/Boonie Bears/sheep_3.gif";
 
-import WinningCalendar from './WinningCalendar.vue';
+import WinningCalendar from "./WinningCalendar.vue";
 
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
@@ -2443,15 +2443,6 @@ const handleReviewMode = () => {
 const startReview = () => {
   // console.log("dataPreExam: ", dataPreExam.value);
 
-  // router.push({
-  //   path: "/studentAccountPreExam",
-  //   state: {
-  //     data: JSON.stringify(dataPreExam.value),
-  //     username: username.value,
-  //     account_id_list: nidReview.value,
-  //     basicPreExam: basicPreExam.value,
-  //   },
-  // });
   console.log("reviewRequired: ", reviewRequired.value);
 
   router.push({
@@ -2489,84 +2480,6 @@ const finishedReviewData = ref(false);
 const pageIndexReviewData = ref(0);
 const reviewListLength = ref(0);
 const reviewList_first = ref(1);
-// const onLoadReviewData = async (title = "全部") => {
-//   if (loadingReviewData.value || finishedReviewData.value) {
-//     return;
-//   }
-//   loadingReviewData.value = true;
-//   isLoading.value = true;
-//   try {
-//     const params = new URLSearchParams();
-//     params.append("method", "getUserReviewPage");
-//     params.append("user", username.value);
-//     params.append("page", pageIndexReviewData.value + 1);
-//     params.append("page_size", 20);
-
-//     const response = await axios.post("words/", params);
-//     let moreData = response.data.data;
-//     console.log("reviewListData: ", moreData);
-//     moreData = moreData.map((item) => {
-//       const progress = Math.min(Math.floor((item.coins / 2000) * 100), 100);
-//       return { ...item, progressPercentage: progress };
-//     });
-
-//     if (moreData.length) {
-//       moreData.sort(
-//         (a, b) => new Date(b.create_time) - new Date(a.create_time)
-//       );
-//       moreData.forEach((item) => {
-//         const answers = JSON.parse(item.answers);
-//         const synonyms = JSON.parse(item.synonyms);
-//         // 解析日期并格式化
-//         const date = new Date(item.create_time);
-//         const viewDate = new Date(item.view_time);
-//         const formatter = new Intl.DateTimeFormat("zh-CN", {
-//           year: "numeric",
-//           month: "long",
-//           day: "numeric",
-//           hour: "numeric",
-//           minute: "numeric",
-//           hour12: false,
-//         });
-//         const formattedCreateTime = formatter.format(date);
-//         const formattedViewTime = formatter.format(viewDate);
-//         const newItem = {
-//           ...item,
-//           answers: answers,
-//           synonyms: synonyms,
-//           create_time: formattedCreateTime,
-//           view_time: formattedViewTime,
-//         };
-//         reviewList.value.push(newItem);
-//       });
-//       if (reviewList.value.length > 0) {
-//         flagReview.value = true;
-//         reviewListLength.value = reviewList.value.length;
-//       } else {
-//         reviewListLength.value = 0;
-//       }
-
-//       if (reviewList.value.length == 0) {
-//         if (flagTheme.value == 1) {
-//           srcReview.value = reviewCompleteSrcGoatAndWolf;
-//         }
-//         if (flagTheme.value == 2) {
-//           srcReview.value = reviewCompleteSrcBears;
-//         }
-//       }
-//       pageIndexReviewData.value++;
-//     }
-//     finishedReviewData.value = !response.data.has_more;
-//   } catch (error) {
-//     console.error("Failed to fetch data:", error);
-//   }
-//   loadingReviewData.value = false;
-//   isLoading.value = false;
-//   console.log("reviewList", reviewList.value);
-//   return reviewList.value;
-// };
-
-// 日常任务
 
 const onLoadReviewData = async (title = "全部") => {
   if (loadingReviewData.value || finishedReviewData.value) {
@@ -3794,7 +3707,7 @@ const generateWeekDays = async () => {
   params.append("method", "getUserWinningStreak");
   params.append("username", username.value);
   const response = await axios.post("words/", params);
-  console.log("response: ", response.data);
+  // console.log("response: ", response.data);
   if (response.data.status === "success") {
     completeWeeks.value = response.data.data.map((record) => ({
       monday: record.week_monday.split(" ")[0],
@@ -3918,7 +3831,7 @@ const calendarMonths = computed(() => {
 
 const selectDate = (day) => {
   // showCalendar.value = true;
-  getWinningCalendar()
+  getWinningCalendar();
   nextTick(() => {
     setTimeout(() => {
       const calendarBody = document.querySelector(".calendar-body");
@@ -3969,15 +3882,15 @@ const getWinningCalendar = async () => {
   // 获取日历数据
   try {
     let params = new URLSearchParams();
-    params.append('method', 'getUserWinningStreak');
-    params.append('username', viewUsername.value);
-    
-    const response = await axios.post('words/', params);
-    
-    if (response.data.status === 'success') {
+    params.append("method", "getUserWinningStreak");
+    params.append("username", viewUsername.value);
+
+    const response = await axios.post("words/", params);
+
+    if (response.data.status === "success") {
       // 处理周完成数据
       completeWeeks.value = response.data.data.map((record) => ({
-        monday: record.week_monday.split(' ')[0],
+        monday: record.week_monday.split(" ")[0],
         state: record.complete_state, // 0, 1, 2
       }));
 
@@ -3987,7 +3900,7 @@ const getWinningCalendar = async () => {
       // 处理每日数据
       dailyCalendarData.value = {};
       response.data.daily_data.forEach((record) => {
-        const date = record.date.split(' ')[0]; // "YYYY-MM-DD"
+        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
         dailyCalendarData.value[date] = record.record_count || 0;
       });
 
@@ -3995,8 +3908,8 @@ const getWinningCalendar = async () => {
       showWinningCalendar.value = true;
     }
   } catch (error) {
-    console.error('获取日历数据失败:', error);
-    showToast('获取数据失败');
+    console.error("获取日历数据失败:", error);
+    showToast("获取数据失败");
   }
 };
 
@@ -4020,15 +3933,36 @@ const onCalendarClose = () => {
   // 关闭日历回调
 };
 
+// 滑动模式
+const gotoWordSwipe = (item, index) => {
+  console.log("item: ", item);
+  console.log("answers: ", item.answers);
+  console.log("index: ", index);
+  router.push({
+    path: "/wordSwipeReview",
+    state: {
+      answers: JSON.stringify(item.answers),
+      username: item["username"],
+      alias: item.alias,
+      account_nid: item.nid,
+      title: item.title,
+      basicPreExam: basicPreExam.value,
+      reviewRequired: reviewRequired.value,
+
+      
+    },
+  });
+};
+
 // 更新版本提示
 const showUpdate = () => {
   // 使用版本号来管理更新提示
-  const UPDATE_VERSION = "v2"; // 新版本号
+  const UPDATE_VERSION = "v3"; // 新版本号
   const lastShownTime = localStorage.getItem(
-    `winStreakUpdateTime_${UPDATE_VERSION}`
+    `wordSwipeReview_${UPDATE_VERSION}`
   );
   const shownCount = parseInt(
-    localStorage.getItem(`winStreakUpdateCount_${UPDATE_VERSION}`) || "0"
+    localStorage.getItem(`wordSwipeReview_${UPDATE_VERSION}`) || "0"
   );
   const now = Date.now();
   const dayInMs = 24 * 60 * 60 * 1000;
@@ -4043,19 +3977,19 @@ const showUpdate = () => {
     (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
   ) {
     showDialog({
-      title: "更新：连胜说明",
+      title: "更新：滑动跟读说明",
       message:
-        "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上<br>📊：点击显示趋势图",
+        "滑动复习：轻松且快捷，暂无奖励，后期调整</br>跟读方案试：测试流畅度，不同手机兼容性和成本控制（未上线）",
       theme: "round-button",
       allowHtml: true,
       messageAlign: "left",
     }).then(() => {
       localStorage.setItem(
-        `winStreakUpdateTime_${UPDATE_VERSION}`,
+        `wordSwipeReview_${UPDATE_VERSION}`,
         now.toString()
       );
       localStorage.setItem(
-        `winStreakUpdateCount_${UPDATE_VERSION}`,
+        `wordSwipeReview_${UPDATE_VERSION}`,
         (shownCount + 1).toString()
       );
     });
@@ -4434,76 +4368,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 自定义日历 -->
-    <!-- <transition name="calendar-fade">
-      <div
-        v-if="showCalendar"
-        class="custom-calendar-overlay"
-        @click="closeCalendar"
-      >
-        <div class="custom-calendar" @click.stop>
-          <div class="calendar-header">
-            <div class="title-wrapper">
-              <span class="calendar-title">连胜{{ daysWinningStreak }}天</span>
-              <span class="calendar-subtitle" @click="showMessage"
-                >点击：每周三次背诵完成周任务，6次变金色<br />
-                🔺：背诵1次。🌸：背诵2次及以上</span
-              >
-            </div>
-            <span class="close-btn" @click="onConfirmCalendar">✕</span>
-          </div>
-
-          <div class="calendar-body">
-            <div
-              v-for="monthData in calendarMonths"
-              :key="monthData.title"
-              class="month-section"
-            >
-              <div class="month-title">{{ monthData.title }}</div>
-
-              <div class="weekday-header">
-                <div class="weekday-cell">日</div>
-                <div class="weekday-cell">一</div>
-                <div class="weekday-cell">二</div>
-                <div class="weekday-cell">三</div>
-                <div class="weekday-cell">四</div>
-                <div class="weekday-cell">五</div>
-                <div class="weekday-cell">六</div>
-              </div>
-
-              <div class="days-grid">
-                <div
-                  v-for="(dayData, index) in monthData.days"
-                  :key="index"
-                  class="day-cell"
-                  :class="{
-                    empty: dayData.isEmpty,
-                    'complete-week-1': dayData.complete_state === 1,
-                    'complete-week-2': dayData.complete_state === 2,
-                    today: dayData.isToday,
-                    'has-flower': dayData.hasFlower,
-                  }"
-                  @click="!dayData.isEmpty && selectDate2(dayData)"
-                >
-                  <span v-if="!dayData.isEmpty" class="day-number">
-                    {{ dayData.day }}
-                  </span>
-                  <div v-if="dayData.hasFlower" class="flower-indicator">
-                    {{ dayData.recordCount === 1 ? "🔺" : "🌸" }}
-                  </div>
-                  <div v-if="dayData.isToday" class="today-indicator"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="calendar-footer">
-            <button class="confirm-btn" @click="onConfirmCalendar">确认</button>
-          </div>
-        </div>
-      </div>
-    </transition> -->
-
     <router-view />
     <van-tabbar route>
       <van-tabbar-item icon="home-o" replace to="/studentAccountList"
@@ -4649,7 +4513,7 @@ onMounted(async () => {
       <van-notice-bar
         style="
           --van-notice-bar-icon-min-width: 16px;
-          --van-notice-bar-padding: 0 0; /* 调整内边距，减少图标与文本的间距 */
+          --van-notice-bar-padding: 0 0;
           flex: 1;
           height: 20px;
           margin-left: 0.5rem;
@@ -4660,7 +4524,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="每日奖励，趋势图，新货币上线...有bug联系老师"
+        text="滑动跟读模式上线...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6137,10 +6001,20 @@ onMounted(async () => {
           <van-button
             size="small"
             type="default"
+            plain
             @click="viewAnswer(originalData[gotoIndex], gotoIndex)"
-            style="margin: 0 8px; font-size: 12px"
+            style="margin: 0 4px; font-size: 10px"
           >
-            查看预习
+            预习
+          </van-button>
+          <van-button
+            size="small"
+            type="default"
+            plain
+            @click="gotoWordSwipe(originalData[gotoIndex], gotoIndex)"
+            style="margin: 0 4px; font-size: 10px"
+          >
+            跟读
           </van-button>
 
           <van-button
@@ -6671,7 +6545,6 @@ onMounted(async () => {
       @date-click="handleDateClick"
       @close="onCalendarClose"
     />
-    
   </div>
 </template>
 
@@ -6926,9 +6799,9 @@ onMounted(async () => {
 }
 
 .week-flower-indicator {
-  position: relative; 
-  top: 3px; 
-  bottom:2px;
+  position: relative;
+  top: 3px;
+  bottom: 2px;
   right: px; /* 距离右侧 2px */
   font-size: 8px; /* 增大字体，让emoji更明显 */
   line-height: 0.2;

@@ -80,6 +80,15 @@
 
           <!-- 折线图视图 -->
           <div v-else class="chart-view">
+            <div class="chart-controls" style="margin-top: 8px;">
+              <button
+                class="month-btn recent-weeks-btn"
+                :class="{ active: viewMode === 'recent4weeks' }"
+                @click="viewMode = 'recent4weeks'"
+              >
+                近4周
+              </button>
+            </div>
             <div class="chart-controls">
               <button
                 v-for="month in availableMonths"
@@ -89,15 +98,6 @@
                 @click="viewMode = 'month'; selectedMonth = month.value"
               >
                 {{ month.label }}
-              </button>
-            </div>
-            <div class="chart-controls" style="margin-top: 8px;">
-              <button
-                class="month-btn recent-weeks-btn"
-                :class="{ active: viewMode === 'recent4weeks' }"
-                @click="viewMode = 'recent4weeks'"
-              >
-                近4周
               </button>
             </div>
             <div class="chart-container">
@@ -141,7 +141,7 @@ const calendarBody = ref(null);
 const chartCanvas = ref(null);
 const showChart = ref(false);
 const selectedMonth = ref(0);
-const viewMode = ref('month'); // 'month' 或 'recent4weeks'
+const viewMode = ref('recent4weeks'); // 'month' 或 'recent4weeks'，默认近4周
 let chartInstance = null;
 
 // 周状态映射
@@ -389,7 +389,7 @@ const drawChart = () => {
 const toggleView = () => {
   showChart.value = !showChart.value;
   if (showChart.value) {
-    viewMode.value = 'month';
+    viewMode.value = 'recent4weeks';
     selectedMonth.value = 0;
     nextTick(() => {
       if (!window.Chart) {

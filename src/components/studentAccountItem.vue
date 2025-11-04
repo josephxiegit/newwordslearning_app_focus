@@ -18,6 +18,7 @@ import {
   showConfirmDialog,
   showLoadingToast,
   showToast,
+  Toast,
 } from "vant";
 
 import { useRouter } from "vue-router";
@@ -28,7 +29,6 @@ import submitloading from "./submitloading.vue";
 import WinningStreakPopup from "./WinningStreakPopup.vue";
 
 import happyhalf from "../assets/sound/happyhalf.mp3";
-
 
 const flagTheme = inject("flagTheme");
 const router = useRouter();
@@ -430,6 +430,7 @@ const clickSubmitUser = async (action, done) => {
       compareResult2.value = compareResult;
       rate2.value = rate;
 
+      const timeDiff = submittoken.value ? Date.now() - submittoken.value : 0;
       async function updateAccountData() {
         // 更新AccountData
         let params = new URLSearchParams();
@@ -453,6 +454,7 @@ const clickSubmitUser = async (action, done) => {
         params.append("numbertransparent", 0);
         params.append("checkedNoneOfAbove", checkedNoneOfAbove.value);
         params.append("checkedSpell", checkedSpell.value);
+        params.append("teacher_mark", timeDiff);
 
         // 更新spell vocabulary
         params.append("data_words", JSON.stringify(spellVocabulary.value));
@@ -1289,6 +1291,33 @@ const handlePageHide = (event) => {
   sessionStorage.setItem("showMagic", JSON.stringify(showMagic.value));
   sessionStorage.setItem("flagHelp", JSON.stringify(flagHelp.value));
 };
+
+const handleVisibilityChange = () => {
+  if (document.hidden) {
+    console.log("用户离开了页面");
+
+    // 执行你的逻辑,比如暂停视频、停止请求等
+  } else {
+    console.log("用户回到了页面");
+    showDialog({
+      title: "警告",
+      message: "中途退出，重新背诵",
+      theme: "round-button",
+    }).then(() => {
+            router.push({
+        path: "/homepage",
+      });
+    });
+
+    setTimeout(() => {
+      router.push({
+        path: "/homepage",
+      });
+    }, 3000);
+
+    // 执行恢复逻辑
+  }
+};
 const checkedNoneOfAbove = ref(false);
 const checkedSpell = ref(false);
 const RateOrigin = ref(0);
@@ -1297,12 +1326,14 @@ onBeforeUnmount(() => {
 });
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 function handleBeforeUnload(event) {
   event.preventDefault();
   event.returnValue = ""; // 显示浏览器默认的“离开页面”确认对话框
 }
 onMounted(async () => {
+  document.addEventListener("visibilitychange", handleVisibilityChange);
   // shoWinningStreak.value = true;
   // activeWinningStreak.value = 14;
   // dailyWinningStreak.value = 4;
