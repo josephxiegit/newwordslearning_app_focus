@@ -200,7 +200,7 @@ const showVarietyPicker = ref(false);
 const columnsVarieties = [
   { text: "普通", value: "普通" },
   { text: "游戏", value: "游戏" },
-  { text: "周长", value: "周长" },
+  { text: "滑动", value: "滑动" },
   { text: "复习", value: "复习" },
 ];
 const onConfirmVariety = ({ selectedValues }) => {

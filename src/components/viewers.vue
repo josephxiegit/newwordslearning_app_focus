@@ -72,7 +72,7 @@ const searchAnswer = (item, index) => {
       } else {
         // answerLogResult.value = res.filter((item) => item.type === "预习");
         answerLogResult.value = res.filter((item) =>
-          item.type?.includes("预习")
+          item.type?.includes("预习") || item.type?.includes("滑动")
         );
         console.log("answerLogResult: ", answerLogResult.value);
         reviewLogResult.value = res.filter((item) => item.type == "检查");
@@ -268,7 +268,7 @@ const searchLog = (item, index) => {
         });
         // console.log("isLateNight:", isLateNight.value);
 
-        answerLogList.value = res.filter((item) => item.swipe !== "复习");
+        answerLogList.value = res.filter((item) => item.swipe !== "复习" && item.swipe !== "滑动");
         reviewLogList.value = res.filter((item) => item.swipe == "复习");
       }
       resolve();
@@ -715,12 +715,12 @@ async function getLastDaysDailyTask(username) {
   let res = await axios.post("words/", params);
   console.log("res: ", res.data);
 
-  // 合并 logs_daily 到 logs_review
-  if (res.data.logs_daily && res.data.logs_daily.length > 0) {
-    // 将 logs_daily 的内容合并到 logs_review
+  // 合并 logs_swipe 到 logs_review
+  if (res.data.logs_swipe && res.data.logs_swipe.length > 0) {
+    // 将 logs_swipe 的内容合并到 logs_review
     const mergedReview = [
       ...(res.data.logs_review || []),
-      ...res.data.logs_daily,
+      ...res.data.logs_swipe,
     ];
 
     // 按时间排序合并后的数据
@@ -728,14 +728,14 @@ async function getLastDaysDailyTask(username) {
       (a, b) => new Date(b.create_time) - new Date(a.create_time)
     );
 
-    // 清空 logs_daily
+    // 清空 logs_swipe
     LastDaysDailyTask.value = [];
 
     console.log(
-      `已将 ${res.data.logs_daily.length} 项从 logs_daily 合并到 logs_review`
+      `已将 ${res.data.logs_swipe.length} 项从 logs_swipe 合并到 logs_review`
     );
   } else {
-    // 如果没有 logs_daily 数据，直接使用 logs_review
+    // 如果没有 logs_swipe 数据，直接使用 logs_review
     LastDaysReview.value = res.data.logs_review || [];
     LastDaysDailyTask.value = [];
   }
@@ -1174,7 +1174,7 @@ const reloadPage = () => {
               <template #title>
                 <div style="display: flex; align-items: center; gap: 0.5rem">
                   <span style="font-weight: 400; margin-bottom: 0rem">
-                    最近十五天 复习滑动 {{ LastDaysReview.length }} 次
+                    十五天：复习 {{ LastDaysReview.filter(r => r.swipe === '复习').length }} 次 · 滑动 {{ LastDaysReview.filter(r => r.swipe === '滑动').length }} 次
                   </span>
                   <van-button
                     round
@@ -1504,7 +1504,7 @@ const reloadPage = () => {
                 <template #title>
                   <div style="display: flex; align-items: center; gap: 0.5rem">
                     <span style="font-weight: 400; margin-bottom: 0rem">
-                      最近十五天 复习滑动 {{ LastDaysReview.length }} 次
+                      十五天：复习 {{ LastDaysReview.filter(r => r.swipe === '复习').length }} 次 · 滑动 {{ LastDaysReview.filter(r => r.swipe === '滑动').length }} 次
                     </span>
                     <van-button
                       round
@@ -2024,7 +2024,7 @@ const reloadPage = () => {
                   "
                 >
                   <div v-if="item.type == '预习pro'" style="">预习时间Pro:</div>
-                  <div v-else style="">预习时间:</div>
+                  <div v-else style="">预习时间: 『{{ item.type }}』</div>
                   <div style="margin-top: 0.3rem; width: 140%">
                     {{ item.create_time }}
                   </div>

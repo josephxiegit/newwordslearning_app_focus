@@ -3973,13 +3973,13 @@ const showUpdate = () => {
 
   // 如果显示次数小于5次，且（从未显示过 或 距离上次显示超过1天）
   if (
-    shownCount < 5 &&
+    shownCount < 3 &&
     (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
   ) {
     showDialog({
       title: "更新：滑动跟读说明",
       message:
-        "滑动复习：轻松且快捷，暂无奖励，后期调整</br>跟读方案试：测试流畅度，不同手机兼容性和成本控制（未上线）",
+        "滑动复习：轻松且快捷，暂无奖励，后期调整",
       theme: "round-button",
       allowHtml: true,
       messageAlign: "left",

@@ -132,6 +132,14 @@
       :src="srcswipeEncouragement"
       alt="鼓励动画"
       class="encouragement-overlay"
+      style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 999;
+        pointer-events: none;
+      "
     />
 
     <!-- 滑动提示动画 -->
@@ -287,14 +295,17 @@ const handleKnow = () => {
       setTimeout(() => showEncouragement.value = false, 2000);
     }
     
+    // if (currentIndex.value < cards.value.length) {
+    //   setTimeout(() => {
+    //     speakWord(cards.value[currentIndex.value]["英文"]);
+    //   }, 100);
+    // }
     if (currentIndex.value < cards.value.length) {
-      setTimeout(() => {
-        speakWord(cards.value[currentIndex.value]["英文"]);
-      }, 100);
+      speakWord(cards.value[currentIndex.value]["英文"]);
     }
     
     // 立即解锁，不管是否到一半
-    setTimeout(() => isLocked.value = false, 800);
+    setTimeout(() => isLocked.value = false, 1200);
   }, 300);
 };
 
@@ -321,13 +332,16 @@ const handleUnknown = () => {
       setTimeout(() => showEncouragement.value = false, 2000);
     }
     
+    // if (currentIndex.value < cards.value.length) {
+    //   setTimeout(() => {
+    //     speakWord(cards.value[currentIndex.value]["英文"]);
+    //   }, 100);
+    // }
     if (currentIndex.value < cards.value.length) {
-      setTimeout(() => {
-        speakWord(cards.value[currentIndex.value]["英文"]);
-      }, 100);
+      speakWord(cards.value[currentIndex.value]["英文"]);
     }
     
-    setTimeout(() => isLocked.value = false, 800);
+    setTimeout(() => isLocked.value = false, 1200);
   }, 300);
 };
 
@@ -353,7 +367,7 @@ const nextCard = () => {
   if (currentIndex.value < cards.value.length) {
     speakWord(cards.value[currentIndex.value]["英文"]);
 
-    const unlockDelay = isHalfway ? 2500 : 800; // 到一半时延迟2500ms，否则800ms
+    const unlockDelay = isHalfway ? 2500 : 1200; // 到一半时延迟2500ms，否则800ms
     setTimeout(() => {
       isLocked.value = false;
     }, unlockDelay);
@@ -417,82 +431,122 @@ const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
   return new Blob([byteArray], { type: mimeType });
 };
 
-const speakWord = (english) => {
-  // 1) 优先从缓存获取
-  const cached = audioCache.get(english);
-  if (cached) {
-    if (cached instanceof Blob) {
-      const audioUrl = URL.createObjectURL(cached);
-      const audio = new Audio(audioUrl);
-      audio.currentTime = 0;
+// const speakWord = (english) => {
+//   // 1) 优先从缓存获取
+//   const cached = audioCache.get(english);
+//   if (cached) {
+//     if (cached instanceof Blob) {
+//       const audioUrl = URL.createObjectURL(cached);
+//       const audio = new Audio(audioUrl);
+//       audio.currentTime = 0;
 
-      audio.addEventListener("ended", () => {
-        URL.revokeObjectURL(audioUrl);
-      });
+//       audio.addEventListener("ended", () => {
+//         URL.revokeObjectURL(audioUrl);
+//       });
 
-      audio.addEventListener("error", () => {
-        URL.revokeObjectURL(audioUrl);
-        console.warn("缓存 Blob 播放失败，回退 TTS：", audio.error);
-        fallbackSpeech(english);
-      });
+//       audio.addEventListener("error", () => {
+//         URL.revokeObjectURL(audioUrl);
+//         console.warn("缓存 Blob 播放失败，回退 TTS：", audio.error);
+//         fallbackSpeech(english);
+//       });
 
-      audio.play().catch((err) => {
-        URL.revokeObjectURL(audioUrl);
-        console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
-        fallbackSpeech(english);
-      });
-      return;
-    }
+//       audio.play().catch((err) => {
+//         URL.revokeObjectURL(audioUrl);
+//         console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
+//         fallbackSpeech(english);
+//       });
+//       return;
+//     }
 
-    if (cached instanceof Audio) {
-      cached.currentTime = 0;
-      cached.play().catch((err) => {
-        console.warn("播放被拒或失败（Audio cache），回退 TTS：", err);
-        fallbackSpeech(english);
-      });
-      return;
-    }
-  }
+//     if (cached instanceof Audio) {
+//       cached.currentTime = 0;
+//       cached.play().catch((err) => {
+//         console.warn("播放被拒或失败（Audio cache），回退 TTS：", err);
+//         fallbackSpeech(english);
+//       });
+//       return;
+//     }
+//   }
 
-  // 2) 从接口返回的 audio_data 查找
-  if (window.preloadedAudioData && window.preloadedAudioData[english]) {
-    try {
-      const base64 = window.preloadedAudioData[english].data;
-      const blob = base64ToBlob(base64, "audio/mpeg");
-      audioCache.set(english, blob);
-      return speakWord(english);
-    } catch (err) {
-      console.warn("base64 转换失败：", err);
-    }
-  }
+//   // 2) 从接口返回的 audio_data 查找
+//   if (window.preloadedAudioData && window.preloadedAudioData[english]) {
+//     try {
+//       const base64 = window.preloadedAudioData[english].data;
+//       const blob = base64ToBlob(base64, "audio/mpeg");
+//       audioCache.set(english, blob);
+//       return speakWord(english);
+//     } catch (err) {
+//       console.warn("base64 转换失败：", err);
+//     }
+//   }
 
-  // 3) 从有道词典获取
-  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
-    english
-  )}&type=1`;
-  const audio = new Audio(url);
+//   // 3) 从有道词典获取
+//   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+//     english
+//   )}&type=1`;
+//   const audio = new Audio(url);
   
-  // 添加音频加载完成事件
-  audio.addEventListener('canplaythrough', function() {
-    audio.play().catch(() => {
-      console.log("Fallback to SpeechSynthesis");
+//   // 添加音频加载完成事件
+//   audio.addEventListener('canplaythrough', function() {
+//     audio.play().catch(() => {
+//       console.log("Fallback to SpeechSynthesis");
+//       fallbackSpeech(english);
+//     });
+//   });
+  
+//   // 音频加载失败时直接使用TTS
+//   audio.addEventListener('error', function() {
+//     console.log("Audio load error, fallback to SpeechSynthesis");
+//     fallbackSpeech(english);
+//   });
+  
+//   // 如果音频已经加载完成，直接播放
+//   if (audio.readyState >= 4) {
+//     audio.play().catch(() => {
+//       console.log("Fallback to SpeechSynthesis");
+//       fallbackSpeech(english);
+//     });
+//   }
+// };
+
+const speakWord = (english) => {
+  const cached = audioCache.get(english);
+
+  // --- 如果缓存是 Blob ---
+  if (cached instanceof Blob) {
+    const audioUrl = URL.createObjectURL(cached);
+    const audio = new Audio(audioUrl);
+    audio.currentTime = 0;
+    audio.play().catch((err) => {
+      console.warn('播放被拒（缓存 Blob），回退 TTS：', err);
       fallbackSpeech(english);
     });
-  });
-  
-  // 音频加载失败时直接使用TTS
-  audio.addEventListener('error', function() {
-    console.log("Audio load error, fallback to SpeechSynthesis");
+    audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl));
+    audio.addEventListener('error', () => {
+      URL.revokeObjectURL(audioUrl);
+      fallbackSpeech(english);
+    });
+    return;
+  }
+
+  // --- 如果缓存是 Audio 对象 ---
+  if (cached instanceof Audio) {
+    cached.currentTime = 0;
+    cached.play().catch((err) => {
+      console.warn('播放失败（Audio cache），回退 TTS：', err);
+      fallbackSpeech(english);
+    });
+    return;
+  }
+
+  // --- 无缓存则尝试远程 URL ---
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(english)}&type=1`;
+  const audio = new Audio(url);
+  audio.play().catch((err) => {
+    console.warn('远程音频播放失败，回退 TTS：', err);
     fallbackSpeech(english);
   });
-  
-  // 如果音频已经加载完成，直接播放
-  if (audio.readyState >= 4) {
-    audio.play().catch(() => {
-      console.log("Fallback to SpeechSynthesis");
-      fallbackSpeech(english);
-    });
-  }
+  audio.addEventListener('error', () => fallbackSpeech(english));
 };
 
 const fallbackSpeech = (english) => {
@@ -528,17 +582,30 @@ const startTime = ref(null);
 const timeDiff = ref(null);
 const basicPreExam = ref(null);
 const reviewRequired = ref(null);
-
+const setVH = () => {
+  const vh = window.innerHeight * 0.01
+  document.documentElement.style.setProperty('--vh', `${vh}px`)
+}
 onUnmounted(() => {
   document.body.style.overflow = ''
   window.removeEventListener('resize', setVH)
 })
 
-onMounted(async () => {
-  const setVH = () => {
-    const vh = window.innerHeight * 0.01
-    document.documentElement.style.setProperty('--vh', `${vh}px`)
+const audioCtx = ref(null);
+const unlockAudio = () => {
+  if (!audioCtx.value && (window.AudioContext || window.webkitAudioContext)) {
+    audioCtx.value = new (window.AudioContext || window.webkitAudioContext)();
+    audioCtx.value.resume && audioCtx.value.resume().catch(() => {});
   }
+  if (window.speechSynthesis && window.speechSynthesis.paused) {
+    try { window.speechSynthesis.resume(); } catch(e){ }
+  }
+  window.removeEventListener('touchstart', unlockAudio);
+  window.removeEventListener('mousedown', unlockAudio);
+};
+onMounted(async () => {
+  window.addEventListener('touchstart', unlockAudio, { once: true });
+  window.addEventListener('mousedown', unlockAudio, { once: true });
 
   setVH()
   window.addEventListener('resize', setVH)
@@ -555,6 +622,7 @@ onMounted(async () => {
   basicPreExam.value = history.state.basicPreExam;
   reviewRequired.value = history.state.reviewRequired;
   startTime.value = Date.now();
+  console.log('submittoken: ', startTime.value);
 
   if (flagTheme.value == 1) {
     srcswipeEncouragement.value = goodjob1;

@@ -5,6 +5,7 @@
 <script>
 // const BASE_URL = 'http://39.105.1.189:8000/newwordslearning'
 const BASE_URL = 'http://127.0.0.1:8000/newwordslearning'
+// const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/newwordslearning'
 export default {
   BASE_URL,
 }
