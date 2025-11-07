@@ -36,7 +36,7 @@
           </div>
         </div>
 
-        <van-button type="primary" block round @click="finishCards"
+        <van-button type="primary" block round @click="finishCards" :disabled="isSubmitting"
           >完成复习</van-button
         >
       </div>
@@ -190,7 +190,7 @@
 
 <script setup>
 import { ref, computed, onMounted, inject, onUnmounted } from "vue";
-import { showLoadingToast, showConfirmDialog } from "vant";
+import { showLoadingToast, showConfirmDialog, showFailToast } from "vant";
 import axios from "axios";
 import turnpage from "../assets/sound/turnpage.mp3";
 import halfencouragement from "../assets/sound/goodjob.mp3";
@@ -376,14 +376,21 @@ const nextCard = () => {
   }
 };
 
+// 添加加载状态变量
+const isSubmitting = ref(false);
+
 const finishCards = async () => {
-  // console.log("unknownWords", unknownWords.value);
-  // console.log("cards", cards.value);
+  // 防止重复提交
+  if (isSubmitting.value) return;
+  
+  // 计算时间差
   if (startTime.value) {
     const currentTime = Date.now();
     timeDiff.value = currentTime - startTime.value;
     console.log("timeDiff: ", timeDiff);
   }
+  
+  // 准备数据
   cards.value.forEach((card) => {
     const isUnknown = unknownWords.value.some(
       (unknown) => unknown.英文 === card.英文 && unknown.序号 === card.序号
@@ -395,8 +402,7 @@ const finishCards = async () => {
 
     card.用户选择 = isUnknown ? ["false"] : [card.中文];
   });
-  // console.log("cards", cards.value);
-  // console.log('timeDiff: ', timeDiff);
+  
   const params = new URLSearchParams();
   params.append("method", "updateWordSwipeReview");
   params.append("username", username.value);
@@ -406,17 +412,77 @@ const finishCards = async () => {
   params.append("teacher_mark", timeDiff.value);
   params.append("submittoken", startTime.value);
   params.append("data", JSON.stringify(cards.value));
-
-  const response = await axios.post("words/", params);
-  // console.log(response.data);
-  router.push({
-    path: "/studentAccountList",
-    state: {
-      username: username.value,
-      data: basicPreExam.value,
-      reviewRequired: reviewRequired.value,
-    },
+  
+  // 显示加载状态
+  isSubmitting.value = true;
+  const toast = showLoadingToast({
+    duration: 0, // 持续显示直到手动关闭
+    forbidClick: true,
+    message: "提交中...",
+    loadingType: "spinner",
   });
+  
+  try {
+    // 设置超时的请求
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('请求超时')), 8000); // 8秒超时
+    });
+    
+    const axiosPromise = axios.post("words/", params);
+    
+    // 使用Promise.race来处理超时
+    const response = await Promise.race([axiosPromise, timeoutPromise]);
+    
+    console.log('提交成功:', response.data);
+    
+    // 请求成功后跳转
+    router.push({
+      path: "/studentAccountList",
+      state: {
+        username: username.value,
+        data: basicPreExam.value,
+        reviewRequired: reviewRequired.value,
+      },
+    });
+  } catch (error) {
+    console.error('提交失败:', error);
+    
+    // 显示错误提示
+    showFailToast({
+      message: error.message === '请求超时' ? '网络请求超时，重新提交' : '网络请求超时，重新提交',
+      duration: 3000,
+    });
+    
+    // 提供重试或返回选项
+    setTimeout(() => {
+      showConfirmDialog({
+        title: '操作失败',
+        message: '是否重试提交？',
+        confirmButtonText: '重试',
+        cancelButtonText: '返回',
+        theme: 'round-button',
+      })
+      .then(() => {
+        // 用户确认重试
+        finishCards();
+      })
+      .catch(() => {
+        // 用户取消，返回上一页
+        router.push({
+          path: "/studentAccountList",
+          state: {
+            username: username.value,
+            data: basicPreExam.value,
+            reviewRequired: reviewRequired.value,
+          },
+        });
+      });
+    }, 1000);
+  } finally {
+    // 无论成功失败都关闭加载提示并重置状态
+    toast.close();
+    isSubmitting.value = false;
+  }
 };
 
 // 预加载语音

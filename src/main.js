@@ -275,7 +275,7 @@ router.beforeEach((to, from, next) => {
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
             (from.path === '/studentAccountList' && to.path === '/complete3star') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
-            (from.path === '/wordSwipeReview' && to.path === '/studentAccountList') ||
+            
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
             (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||

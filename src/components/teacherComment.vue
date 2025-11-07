@@ -19,7 +19,7 @@ import {
   Dialog,
 } from "vant";
 
-import WinningCalendar from './WinningCalendar.vue';
+import WinningCalendar from "./WinningCalendar.vue";
 const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -1568,15 +1568,15 @@ const getWinningCalendar = async () => {
   // 获取日历数据
   try {
     let params = new URLSearchParams();
-    params.append('method', 'getUserWinningStreak');
-    params.append('username', viewUsername.value);
-    
-    const response = await axios.post('words/', params);
-    
-    if (response.data.status === 'success') {
+    params.append("method", "getUserWinningStreak");
+    params.append("username", viewUsername.value);
+
+    const response = await axios.post("words/", params);
+
+    if (response.data.status === "success") {
       // 处理周完成数据
       completeWeeks.value = response.data.data.map((record) => ({
-        monday: record.week_monday.split(' ')[0],
+        monday: record.week_monday.split(" ")[0],
         state: record.complete_state, // 0, 1, 2
       }));
 
@@ -1586,7 +1586,7 @@ const getWinningCalendar = async () => {
       // 处理每日数据
       dailyCalendarData.value = {};
       response.data.daily_data.forEach((record) => {
-        const date = record.date.split(' ')[0]; // "YYYY-MM-DD"
+        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
         dailyCalendarData.value[date] = record.record_count || 0;
       });
 
@@ -1594,8 +1594,8 @@ const getWinningCalendar = async () => {
       showWinningCalendar.value = true;
     }
   } catch (error) {
-    console.error('获取日历数据失败:', error);
-    showToast('获取数据失败');
+    console.error("获取日历数据失败:", error);
+    showToast("获取数据失败");
   }
 };
 
@@ -1618,8 +1618,6 @@ const handleDateClick = (dayData) => {
 const onCalendarClose = () => {
   // 关闭日历回调
 };
-
-
 
 onMounted(async () => {
   let res = new Promise((resolve, reject) => {
@@ -1759,11 +1757,13 @@ const reloadPage = () => {
           </div>
         </div>
         <div v-for="(item, index) in answerLogList" :key="index">
-          <van-cell
-            :label="`${formatDate_log(item.create_time)}\n${item.teacher_mark}`"
-            is-link
-            @click="toggleDetail(item, index)"
-          >
+          <van-cell is-link @click="toggleDetail(item, index)">
+            <template #label>
+              <div>
+                {{ formatDate_log(item.create_time) }}<br />
+                {{ item.teacher_mark }}
+              </div>
+            </template>
             <template #title>
               <div style="font-size: larger; font-weight: 700">
                 ID: {{ item.nid }}
@@ -1800,7 +1800,9 @@ const reloadPage = () => {
                     {{ item.true_length }} / {{ item.log.length }}
                     <div
                       v-if="
-                        item.diamondConsume != null && item.diamondConsume != ''
+                        item.diamondConsume != null &&
+                        item.diamondConsume != '' &&
+                        item.swipe != '滑动'
                       "
                     >
                       &nbsp;💎
@@ -1940,7 +1942,8 @@ const reloadPage = () => {
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
               {{ detailName }} | {{ detailMode }}
               <div style="font-size: 10px; color: gray; margin-bottom: -0.5rem">
-                ID: {{ detailNid }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {{ detailTeacherMark }}
+                ID: {{ detailNid }} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                {{ detailTeacherMark }}
               </div>
             </div>
 
@@ -3788,8 +3791,6 @@ const reloadPage = () => {
       @date-click="handleDateClick"
       @close="onCalendarClose"
     />
-  
-  
   </div>
 </template>
 
