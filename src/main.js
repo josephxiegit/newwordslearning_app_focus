@@ -4,29 +4,38 @@ import App from './App.vue'
 import { createRouter, createWebHistory } from 'vue-router';
 import axiosPlugin from './plugins/axios';
 import HomePage from './components/homepage.vue';
+import HomePagePc from './components/homepagePc.vue';
 import Teacher from './components/teacher.vue';
 import TeacherList from './components/teacherList.vue';
 import StudentAnswer from './components/studentAnswer.vue';
 import StudentAccountAnswerChallenge from './components/studentAccountAnswerChallenge.vue';
 
 import StudentAccountList from './components/studentAccountList.vue';
+import StudentAccountListPc from './components/studentAccountListPc.vue';
 import StudentAccountItem from './components/studentAccountItem.vue';
+import StudentAccountItemPc from './components/studentAccountItemPc.vue';
 import StudentAccountSwipe from './components/studentAccountSwipe.vue';
+import StudentAccountSwipePc from './components/studentAccountSwipePc.vue';
 import StudentAccountChallenge from './components/studentAccountChallenge.vue';
 import StudentAccountTest from './components/studentAccountTest.vue';
 import StudentAccountAnswer from './components/studentAccountAnswer.vue';
+import StudentAccountAnswerPc from './components/studentAccountAnswerPc.vue';
 import StudentAccountPreExam from './components/studentAccountPreExam.vue';
 import StudentAccountDaily from './components/studentAccountDaily.vue';
+import StudentAccountDailyPc from './components/studentAccountDailyPc.vue';
 import XlsmList from './components/xlsmList.vue';
 import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
 import TextbookList from './components/textbookList.vue';
 import UserInformation from './components/userInformation.vue';
+import UserInformationPc from './components/userInformationPc.vue';
 import PurchaseLog from './components/purchaseLog.vue';
 import Viewers from './components/viewers.vue';
 import ViewersHomepage from './components/viewersHomepage.vue';
 import Complete3star from './components/complete3star.vue';
+import Complete3starPc from './components/complete3starPc.vue';
 import WordSwipeReview from './components/wordSwipeReview.vue';
+import WordSwipeReviewPc from './components/wordSwipeReviewPc.vue';
 import 'vant/lib/index.css';
 import Global from "./components/Global.vue";
 
@@ -47,6 +56,15 @@ const routes = [
         }
     },
     {
+        path: '/homepagePc',
+        name: 'homepagePc',
+        component: HomePagePc,
+        meta: {
+            index: 1,
+            preventBack: false
+        }
+    },
+    {
         path: '/wordSwipeReview',
         name: 'wordSwipeReview',
         component: WordSwipeReview,
@@ -56,9 +74,27 @@ const routes = [
         }
     },
     {
+        path: '/wordSwipeReviewPc',
+        name: 'wordSwipeReviewPc',
+        component: WordSwipeReviewPc,
+        meta: {
+            index: 1,
+            preventBack: false
+        }
+    },
+    {
         path: '/studentAccountSwipe',
         name: 'studentAccountSwipe',
         component: StudentAccountSwipe,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/studentAccountSwipePc',
+        name: 'studentAccountSwipePc',
+        component: StudentAccountSwipePc,
         meta: {
             index: 1,
             preventBack: true
@@ -125,6 +161,15 @@ const routes = [
         }
     },
     {
+        path: '/studentAccountListPc',
+        name: 'studentAccountListPc',
+        component: StudentAccountListPc,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
         path: '/studentAccountPreExam',
         name: 'studentAccountPreExam',
         component: StudentAccountPreExam,
@@ -143,6 +188,15 @@ const routes = [
         }
     },
     {
+        path: '/studentAccountDailyPc',
+        name: 'studentAccountDailyPc',
+        component: StudentAccountDailyPc,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
         path: '/userinformation',
         name: 'userinformation',
         component: UserInformation,
@@ -152,9 +206,27 @@ const routes = [
         }
     },
     {
+        path: '/userinformationPc',
+        name: 'userinformationPc',
+        component: UserInformationPc,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
         path: '/studentAccountItem',
         name: 'studentAccountItem',
         component: StudentAccountItem,
+        meta: {
+            index: 1,
+
+        }
+    },
+    {
+        path: '/studentAccountItemPc',
+        name: 'studentAccountItemPc',
+        component: StudentAccountItemPc,
         meta: {
             index: 1,
 
@@ -187,6 +259,14 @@ const routes = [
         }
     },
     {
+        path: '/studentAccountAnswerPc',
+        name: 'studentAccountAnswerPc',
+        component: StudentAccountAnswerPc,
+        meta: {
+            index: 1,
+        }
+    },
+    {
         path: '/xlsmList',
         name: 'xlsmList',
         component: XlsmList,
@@ -203,7 +283,7 @@ const routes = [
             preventBack: true
         }
     },
-        {
+    {
         path: '/studentAccountAnswerChallenge',
         name: 'studentAccountAnswerChallenge',
         component: StudentAccountAnswerChallenge,
@@ -239,6 +319,15 @@ const routes = [
             preventBack: true
         }
     },
+    {
+        path: '/complete3starPc',
+        name: 'complete3starPc',
+        component: Complete3starPc,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
 ];
 // 创建router实例
 const router = createRouter({
@@ -246,8 +335,53 @@ const router = createRouter({
     routes, // 使用路由配置
 });
 
+// 判断手机还是电脑
+function _isMobile() {
+    let flag = navigator.userAgent.match(/(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i)
+    // console.log(flag)
+    return flag;
+}
+function _isPc() {
+    let userAgentInfo = navigator.userAgent;
+    let agents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"];
+    let flag = true;
+    for (let v = 0; v < agents.length; v++) {
+        if (userAgentInfo.indexOf(agents[v]) > 0) {
+            flag = false;
+            break;
+        }
+    }
+    return flag;  // true = PC, false = Mobile + Pad
+}
+function _isPad() {
+    return /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+}
+
 // 设置全局前置守卫
 router.beforeEach((to, from, next) => {
+    if (to.path === '/' || to.path === '/homepage') {
+        if (_isPc() || _isPad()) {
+            if (to.path !== '/homepagePc') {
+                return next('/homepagePc');
+            }
+        } else {
+            if (to.path !== '/homepage') {
+                return next('/homepage');
+            }
+        }
+    }
+
+    if (to.path === '/studentAccountList') {
+        if (_isPc() || _isPad()) {
+            return next('/studentAccountListPc');
+        }
+    }
+
+    if (to.path === '/studentAccountListPc') {
+        if (!_isPc() && !_isPad()) {
+            return next('/studentAccountList');
+        }
+    }
     let localTeacherPassword = window.localStorage.getItem('teacherPassword');
     // localTeacherPassword = atob(localTeacherPassword);
     // console.log('localTeacherPassword: ', localTeacherPassword)
@@ -272,18 +406,27 @@ router.beforeEach((to, from, next) => {
         };
         if ((from.path === '/studentAnswer' && to.meta.preventBack) ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountItem') ||
+            (from.path === '/studentAccountAnswerPc' && to.path === '/studentAccountItemPc') ||
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswer') ||
+            (from.path === '/studentAccountListPc' && to.path === '/studentAccountAnswerPc') ||
             (from.path === '/studentAccountList' && to.path === '/complete3star') ||
+            (from.path === '/studentAccountListPc' && to.path === '/complete3starPc') ||
             (from.path === '/studentAccountSwipe' && to.path === '/studentAccountList') ||
-            
+            (from.path === '/studentAccountSwipePc' && to.path === '/studentAccountListPc') ||
+
             (from.path === '/studentAccountTest' && to.path === '/studentAccountList') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountSwipe') ||
+            (from.path === '/studentAccountAnswerPc' && to.path === '/studentAccountSwipePc') ||
             (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||
+            (from.path === '/complete3starPc' && to.path === '/studentAccountAnswerPc') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
 
             (from.path === '/studentAccountAnswerChallenge' && to.path === '/studentAccountChallenge') ||
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswerChallenge') ||
-            (from.path === '/studentAccountItem' && to.meta.preventBack)) {
+            (from.path === '/studentAccountItem' && to.meta.preventBack) ||
+            (from.path === '/studentAccountItemPc' && to.meta.preventBack)
+
+        ) {
             // 如果满足以上任何条件，阻止导航
             next(false);
         }
@@ -297,13 +440,6 @@ router.beforeEach((to, from, next) => {
 
 
 });
-// 判断手机还是电脑
-function _isMobile() {
-    let flag = navigator.userAgent.match(/(phone|pad|pod|iPhone|iPod|ios|iPad|Android|Mobile|BlackBerry|IEMobile|MQQBrowser|JUC|Fennec|wOSBrowser|BrowserNG|WebOS|Symbian|Windows Phone)/i)
-    // console.log(flag)
-    return flag;
-}
-// console.log(_isMobile());
 
 // 定义全局变量
 const globalState = reactive({

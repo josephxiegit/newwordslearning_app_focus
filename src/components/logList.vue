@@ -79,7 +79,9 @@ function processData(res) {
         .replace(/"t /g, "'t ")
         .replace(/"m /g, "'m ")
         .replace(/can"t/g, "can't")
+        .replace(/couldn"t/g, "could't")
         .replace(/mustn"t/g, "mustn't")
+        .replace(/must"t/g, "mustn't")
         .replace(/nustn"t/g, "nustn't")
         .replace(/needn"t/g, "needn't")
         .replace(/o"clock/g, "o'clock")
@@ -712,13 +714,12 @@ const reloadPage = () => {
         </template>
         <van-cell
           :title="generateTitle(item)"
-          :label="`${item.create_time}\n${item.teacher_mark}`"
           is-link
           @click="toggleDetail(index)"
         >
         <template #label>
           <div class="label-line">{{ item.create_time }}</div>
-          <div class="label-line">{{ item.teacher_mark }}</div>
+          <div v-if="item.teacher_mark != ''">{{ item.teacher_mark }}</div>
         </template>
           <template #title>
             <div v-if="item.title == '多组复习'">

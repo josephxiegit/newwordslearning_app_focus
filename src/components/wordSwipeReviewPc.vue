@@ -1,129 +1,153 @@
 <template>
   <div class="word-swipe-container">
-    <!-- 进度条 -->
-    <div class="progress-wrapper">
-      <div class="progress-info">
-        <span
-          >{{
-            currentIndex >= cards.length ? cards.length : currentIndex + 1
-          }}
-          / {{ cards.length }}</span
-        >
-        <span>不认识: {{ unknownWords.length }}</span>
-      </div>
-      <div class="progress-bar">
-        <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+    <!-- 顶部导航栏 -->
+    <div class="top-nav">
+      <div class="nav-content">
+        <span class="nav-title">{{ title }}</span>
+        <span class="nav-username">{{ username }}</span>
       </div>
     </div>
 
-    <!-- 完成页面 -->
-    <div v-if="currentIndex >= cards.length" class="completion-screen">
-      <div class="completion-card">
-
-        <div class="unknown-count">
-          <p class="count-label">需要复习的单词</p>
-          <div class="count-number">{{ unknownWords.length }}</div>
-        </div>
-
-        <div v-if="unknownWords.length > 0" class="unknown-list">
-          <div
-            v-for="(word, idx) in unknownWords"
-            :key="idx"
-            class="unknown-item"
+    <!-- 主内容区 -->
+    <div class="main-content">
+    <!-- 左侧控制区 -->
+    <div class="left-control-area">
+      <!-- 进度条 -->
+      <div class="progress-wrapper">
+        <div class="progress-info">
+          <span
+            >{{
+              currentIndex >= cards.length ? cards.length : currentIndex + 1
+            }}
+            / {{ cards.length }}</span
           >
-            <div class="unknown-english">{{ word.英文 }}</div>
-            <div class="unknown-answer">{{ word.中文 }}</div>
-          </div>
+          <span>不认识: {{ unknownWords.length }}</span>
         </div>
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: `${progress}%` }"></div>
+        </div>
+      </div>
 
-        <van-button type="primary" block round @click="finishCards" :disabled="isSubmitting"
-          >完成复习</van-button
-        >
+      <!-- 操作按钮 -->
+      <div v-if="currentIndex < cards.length" class="action-buttons">
+        <div class="button-row">
+          <button
+            @click="handleUnknown"
+            class="action-btn unknown-btn"
+            :disabled="isLocked"
+          >
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <span class="button-label">不认识</span>
+        </div>
+        <div class="button-row">
+          <button
+            @click="handleKnow"
+            class="action-btn know-btn"
+            :disabled="isLocked"
+          >
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+            >
+              <path
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+              ></path>
+            </svg>
+          </button>
+          <span class="button-label">认识</span>
+        </div>
       </div>
     </div>
 
-    <!-- 卡片区域 -->
-    <div v-else class="cards-wrapper">
-      <!-- 下一张卡片预览 -->
-      <div v-if="currentIndex + 1 < cards.length" class="card-preview"></div>
+    <!-- 右侧卡片区域 -->
+    <div class="right-card-area">
+      <!-- 完成页面 -->
+      <div v-if="currentIndex >= cards.length" class="completion-screen">
+        <div class="completion-card">
 
-      <!-- 当前卡片 -->
-      <div
-        ref="cardRef"
-        class="card"
-        :class="{ dragging: isDragging, locked: isLocked }"
-        :style="cardStyle"
-        @mousedown="handleDragStart"
-        @mousemove="handleDragMove"
-        @mouseup="handleDragEnd"
-        @mouseleave="handleDragEnd"
-        @touchstart="handleDragStart"
-        @touchmove="handleDragMove"
-        @touchend="handleDragEnd"
-      >
-        <!-- 滑动提示 -->
-        <div class="swipe-hint left" :style="{ opacity: leftHintOpacity }">
-          不认识
-        </div>
-        <div class="swipe-hint right" :style="{ opacity: rightHintOpacity }">
-          认识
-        </div>
-
-        <!-- 卡片内容 -->
-        <div class="card-content">
-          <div class="english-text">{{ currentCard.英文 }}</div>
-          <div class="answer-text">
-            {{ currentCard.中文 }}
+          <div class="unknown-count">
+            <p class="count-label">需要复习的单词</p>
+            <div class="count-number">{{ unknownWords.length }}</div>
           </div>
-        </div>
 
-        <!-- 提示文字 -->
-        <div class="tap-hint">左右滑动进行选择</div>
+          <div v-if="unknownWords.length > 0" class="unknown-list">
+            <div
+              v-for="(word, idx) in unknownWords"
+              :key="idx"
+              class="unknown-item"
+            >
+              <div class="unknown-english">{{ word.英文 }}</div>
+              <div class="unknown-answer">{{ word.中文 }}</div>
+            </div>
+          </div>
+
+          <van-button 
+              type="primary" 
+              round 
+              @click="finishCards" 
+              :disabled="isSubmitting" 
+              size="large"
+              
+            >完成复习</van-button
+          >
+        </div>
+      </div>
+
+      <!-- 卡片区域 -->
+      <div v-else class="cards-wrapper">
+        <!-- 下一张卡片预览 -->
+        <div v-if="currentIndex + 1 < cards.length" class="card-preview"></div>
+
+        <!-- 当前卡片 -->
+        <div
+          ref="cardRef"
+          class="card"
+          :class="{ dragging: isDragging, locked: isLocked }"
+          :style="cardStyle"
+          @mousedown="handleDragStart"
+          @mousemove="handleDragMove"
+          @mouseup="handleDragEnd"
+          @mouseleave="handleDragEnd"
+          @touchstart="handleDragStart"
+          @touchmove="handleDragMove"
+          @touchend="handleDragEnd"
+        >
+          <!-- 滑动提示 -->
+          <div class="swipe-hint left" :style="{ opacity: leftHintOpacity }">
+            不认识
+          </div>
+          <div class="swipe-hint right" :style="{ opacity: rightHintOpacity }">
+            认识
+          </div>
+
+          <!-- 卡片内容 -->
+          <div class="card-content">
+            <div class="english-text">{{ currentCard.英文 }}</div>
+            <div class="answer-text">
+              {{ currentCard.中文 }}
+            </div>
+          </div>
+
+          <!-- 提示文字 -->
+          <div class="tap-hint">上下滑动或点击按钮选择</div>
+        </div>
       </div>
     </div>
-
-    <!-- 操作按钮 -->
-    <div v-if="currentIndex < cards.length" class="action-buttons">
-      <button
-        @click="handleUnknown"
-        class="action-btn unknown-btn"
-        :disabled="isLocked"
-      >
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-        >
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-      <button
-        @click="handleKnow"
-        class="action-btn know-btn"
-        :disabled="isLocked"
-      >
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="3"
-        >
-          <path
-            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-          ></path>
-        </svg>
-      </button>
-    </div>
-
-    <!-- 提示文字 -->
-    <div v-if="currentIndex < cards.length" class="hint-text">
-      <p>← 不认识 | 认识 →</p>
     </div>
 
     <!-- 鼓励动画 -->
@@ -694,6 +718,7 @@ html, body {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
 .word-swipe-container {
   height: 100dvh;
   max-height: 100dvh;
@@ -703,9 +728,9 @@ html, body {
   background: linear-gradient(135deg, #e0c3fc 0%, #fce4ec 50%, #bbdefb 100%);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-start;
-  padding: 20px;
+  padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
   box-sizing: border-box;
@@ -713,19 +738,100 @@ html, body {
   touch-action: pan-y;
 }
 
+.top-nav {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px 32px;
+  flex-shrink: 0;
+  z-index: 100;
+}
+
+.nav-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+.nav-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  flex: 1;
+  margin-right: 20px;
+  background: linear-gradient(90deg, #9c27b0 0%, #e91e63 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.nav-username {
+  font-size: 18px;
+  font-weight: 600;
+  color: #6b7280;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 20px;
+  flex-shrink: 0;
+  max-width: 200px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-right: 5rem;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  padding: 20px;
+  gap: 24px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.left-control-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  width: 280px;
+  flex-shrink: 0;
+  margin-left: 5rem;
+}
+
+.right-card-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  position: relative;
+}
+
 .progress-wrapper {
   flex-shrink: 0;
-  width: 100%;
-  max-width: 448px;
-  margin-bottom: 24px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .progress-info {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 18px;
   color: #666;
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .progress-bar {
@@ -742,13 +848,11 @@ html, body {
 }
 
 .cards-wrapper {
-  flex: 1;
-  min-height: 0;
   position: relative;
   width: 100%;
-  max-width: 448px;
-  margin-bottom: 28px;
-  overflow: hidden;
+  max-width: 600px;
+  height: 100%;
+  overflow: visible;
 }
 
 .card-preview {
@@ -760,6 +864,7 @@ html, body {
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
   transform: scale(0.95);
   opacity: 0.5;
+  z-index: 5;
 }
 
 .card {
@@ -775,6 +880,7 @@ html, body {
   padding: 32px;
   touch-action: none;
   transition: opacity 0.2s ease;
+  z-index: 10;
 }
 
 .card.locked {
@@ -812,37 +918,58 @@ html, body {
 
 .card-content {
   text-align: center;
+  z-index: 20;
+  position: relative;
 }
 
 .english-text {
-  font-size: 48px;
+  font-size: 64px;
   font-weight: bold;
   color: #1f2937;
   margin-bottom: 32px;
+  z-index: 30;
+  position: relative;
 }
 
 .answer-text {
-  font-size: 24px;
+  font-size: 32px;
   color: #6b7280;
   font-weight: 500;
+  z-index: 30;
+  position: relative;
 }
 
 .tap-hint {
   position: absolute;
   bottom: 16px;
-  font-size: 14px;
+  font-size: 16px;
   color: #9ca3af;
 }
 
 .action-buttons {
   display: flex;
-  gap: 24px;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 32px;
+  width: 280px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.button-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.button-label {
+  font-size: 20px;
+  font-weight: 600;
+  color: #374151;
 }
 
 .action-btn {
-  width: 64px;
-  height: 64px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   background: white;
   border: none;
@@ -853,6 +980,11 @@ html, body {
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.action-btn svg {
+  width: 48px;
+  height: 48px;
 }
 
 .action-btn:disabled {
@@ -878,15 +1010,9 @@ html, body {
   color: #10b981;
 }
 
-.hint-text {
-  text-align: center;
-  color: #6b7280;
-  font-size: 14px;
-}
-
 .completion-screen {
   display: flex;
-  align-items: top;
+  align-items: center;
   justify-content: center;
   padding: 16px;
   width: 100%;
@@ -898,43 +1024,44 @@ html, body {
   background: white;
   border-radius: 24px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  padding: 32px;
+  padding: 48px;
   width: 100%;
+  max-width: 600px;
+  height: 80%;
   text-align: center;
   display: flex;
   flex-direction: column;
-  max-height: 100%;
   overflow: hidden;
 }
 
 .unknown-count {
   background: #fef2f2;
   border-radius: 16px;
-  padding: 8px;
-  margin-bottom: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
 }
 
 .count-label {
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 600;
   color: #374151;
-  margin-bottom: 2px;
+  margin-bottom: 8px;
 }
 
 .count-number {
-  font-size: 20px;
+  font-size: 48px;
   font-weight: bold;
   color: #ef4444;
   margin-bottom: 0.8rem;
-  margin-top: 0.3rem;
+  margin-top: 0.5rem;
 }
 
 .unknown-list {
   background: #f9fafb;
   border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 12px;
-  max-height: 300px;
+  padding: 15px;
+  margin-bottom: 20px;
+  max-height: 500px;
   overflow-y: auto;
   flex-shrink: 1;
 }
@@ -942,8 +1069,8 @@ html, body {
 .unknown-item {
   background: white;
   border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 8px;
+  padding: 16px 20px;
+  margin-bottom: 12px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
@@ -953,11 +1080,13 @@ html, body {
 
 .unknown-english {
   font-weight: 600;
+  font-size: 22px;
   color: #9c27b0;
+  margin-bottom: 4px;
 }
 
 .unknown-answer {
-  font-size: 14px;
+  font-size: 18px;
   color: #6b7280;
 }
 
@@ -984,6 +1113,15 @@ html, body {
 
 .reset-button:active {
   transform: translateY(0);
+}
+
+/* 自定义完成复习按钮样式 */
+.completion-card .van-button--large {
+  height: 70px;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 10px 32px;
+  margin-top: 20px;
 }
 
 .encouragement-overlay {

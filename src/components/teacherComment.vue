@@ -290,6 +290,8 @@ const searchLog = (item, index) => {
           .replace(/"m /g, "'m ")
           .replace(/can"t/g, "can't")
           .replace(/mustn"t/g, "mustn't")
+          .replace(/must"t/g, "mustn't")
+          .replace(/nustn"t/g, "nustn't")
           .replace(/needn"t/g, "needn't")
           .replace(/o"clock/g, "o'clock")
           .replace(/won"t/g, "won't")
@@ -302,11 +304,14 @@ const searchLog = (item, index) => {
           .replace(/I"ll/gi, "I'll")
           .replace(/you"ll/gi, "you'll")
           .replace(/one"s/gi, "one's")
-          .replace(/let"s/gi, "let's");
+          .replace(/let"s/gi, "let's")
+          .replace(/it" hard/gi, "it' hard")
+          .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
         dataString = dataString
           .replace(/\bFalse\b/g, "false")
-          .replace(/\bTrue\b/g, "true");
+          .replace(/\bTrue\b/g, "true")
+          .replace(/\bNone\b/g, "null");
 
         item.log = JSON.parse(dataString);
 
@@ -1641,7 +1646,7 @@ const reloadPage = () => {
 
 <template>
   <div>
-    <div class="nav-bar-container">
+    <div class="nav-bar-container-teachercomment">
       <van-nav-bar
         title="学生答题统计"
         :right-text="
@@ -3795,10 +3800,15 @@ const reloadPage = () => {
 </template>
 
 
-
-
 <style>
-.nav-bar-container {
+html, body {
+  overflow-y: auto !important;
+  height: auto !important;
+}
+body::-webkit-scrollbar {
+  width: 8px;
+}
+.nav-bar-container-teachercomment {
   position: sticky;
   top: 0;
   z-index: 100;

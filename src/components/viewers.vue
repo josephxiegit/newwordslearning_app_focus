@@ -195,6 +195,8 @@ const searchLog = (item, index) => {
             .replace(/"m /g, "'m ")
             .replace(/can"t/g, "can't")
             .replace(/mustn"t/g, "mustn't")
+            .replace(/must"t/g, "mustn't")
+            .replace(/nustn"t/g, "nustn't")
             .replace(/o"clock/g, "o'clock")
             .replace(/needn"t/g, "needn't")
             .replace(/o"clock/g, "o'clock")
@@ -208,7 +210,9 @@ const searchLog = (item, index) => {
             .replace(/I"ll/gi, "I'll")
             .replace(/you"ll/gi, "you'll")
             .replace(/one"s/gi, "one's")
-            .replace(/let"s/gi, "let's");
+            .replace(/let"s/gi, "let's")
+            .replace(/it" hard/gi, "it' hard")
+            .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
           dataString = dataString
             .replace(/\bFalse\b/g, "false")
