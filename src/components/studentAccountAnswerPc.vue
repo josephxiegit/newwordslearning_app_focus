@@ -286,8 +286,8 @@ const offsetDaily = ref({
   y: 90,
 });
 const handleConfirmResult = async () => {
-  if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
-    // if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
+  // if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
+    if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
     // console.log('补全单词');
     let toast1 = showLoadingToast({
       message: "查询中...",
@@ -824,7 +824,7 @@ onMounted(async () => {
       <van-popup
         v-model:show="showVideoPopup"
         position="bottom"
-        :style="{ height: '100%' }"
+        :style="{ height: '100%', overflow: 'hidden' }"
         closeable
         :lock-scroll="false"
       >

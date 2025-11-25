@@ -48,7 +48,7 @@ import reviewFirstSrcBears from "../assets/Boonie Bears/swipeHelp2.webp";
 import reviewFirstSrcBears2 from "../assets/Boonie Bears/sheep_3.gif";
 
 import WinningCalendarPc from "./WinningCalendarPc.vue";
-import UserInformationPc from './userInformationPc.vue';
+import UserInformationPc from "./userInformationPc.vue";
 
 const flagTheme = inject("flagTheme");
 const passive_magic = inject("passive_magic");
@@ -82,7 +82,7 @@ const backToMain = () => {
     userdiamonds.value = res["data_coins"][0]["diamonds"];
     userflowers.value = res["data_coins"][0]["flowers"];
   });
-  
+
   // 刷新原始数据
   originalData.value = [];
   pageIndexOriginalData.value = 0;
@@ -101,7 +101,7 @@ const updateThemeImages = () => {
     srcTheme.value = chooseModelSrcGoatAndWolf;
     srcReview_first.value = reviewFirstSrcGoatAndWolf;
     srcReview_first2.value = reviewFirstSrcGoatAndWolf2;
-    
+
     // 如果没有待复习项，显示完成图片
     if (reviewListLength.value === 0 || !flagReview.value) {
       srcReview.value = reviewCompleteSrcGoatAndWolf;
@@ -110,7 +110,7 @@ const updateThemeImages = () => {
     srcTheme.value = chooseModelSrcBears;
     srcReview_first.value = reviewFirstSrcBears;
     srcReview_first2.value = reviewFirstSrcBears2;
-    
+
     // 如果没有待复习项，显示完成图片
     if (reviewListLength.value === 0 || !flagReview.value) {
       srcReview.value = reviewCompleteSrcBears;
@@ -132,7 +132,7 @@ const gobackHomepage = () => {
 
 // 刷新页面方法
 const reloadPage = () => {
-  window.location.reload();
+  window.location.replace(window.location.href);
 };
 
 // 显示答案
@@ -381,7 +381,7 @@ const clickShowAnswerPro = async () => {
   // 检查今日使用次数
   const todayCount = getTodayUsageCount();
   // console.log("todayCount: ", todayCount);
-  let dailyLimit = 3;
+  let dailyLimit = 6;
   let localTeacherPassword = window.localStorage.getItem("teacherPassword");
   // console.log('localTeacherPassword: ', localTeacherPassword);
   if (localTeacherPassword == "ss654321") {
@@ -3742,7 +3742,7 @@ const showCalendar = ref(false);
 const weekCompleteState = ref("");
 const completeWeekStates = ref({});
 const has_enough_today = ref(false);
-const showChartMode = ref(false);
+const showChartMode = ref(true);
 
 const realCurrentYear = new Date().getFullYear();
 const realCurrentMonth = new Date().getMonth(); // 0-11
@@ -3756,19 +3756,25 @@ const toggleChartMode = () => {
   showChartMode.value = !showChartMode.value;
 };
 
+// 新增：计算最近四周的数据
 const getLastFourWeeksData = computed(() => {
   const today = new Date();
   const weeks = [];
-  
+
   for (let i = 3; i >= 0; i--) {
     const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - (i * 7) - today.getDay() + 1);
-    
+    weekStart.setDate(today.getDate() - i * 7 - today.getDay() + 1);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
     const weekData = {
-      label: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
-      count: 0
+      label: `${weekStart.getMonth() + 1}.${weekStart.getDate()}-${
+        weekEnd.getMonth() + 1
+      }.${weekEnd.getDate()}`,
+      count: 0,
     };
-    
+
     // 统计这一周的背诵次数
     for (let j = 0; j < 7; j++) {
       const currentDate = new Date(weekStart);
@@ -3776,10 +3782,10 @@ const getLastFourWeeksData = computed(() => {
       const dateString = formatDate(currentDate);
       weekData.count += dailyCalendarData.value[dateString] || 0;
     }
-    
+
     weeks.push(weekData);
   }
-  
+
   return weeks;
 });
 
@@ -3947,33 +3953,6 @@ const changeMonth = (offset) => {
 };
 
 // 计算是否可以点击上/下月按钮（用于按钮禁用状态）
-const canGoPrevMonth = computed(() => {
-  let targetYear = currentYear.value;
-  let targetMonth = currentMonthIndex.value - 1;
-
-  if (targetMonth < 0) {
-    targetMonth = 11;
-    targetYear -= 1;
-  }
-
-  const monthDiff =
-    (targetYear - realCurrentYear) * 12 + (targetMonth - realCurrentMonth);
-  return monthDiff >= -3;
-});
-
-const canGoNextMonth = computed(() => {
-  let targetYear = currentYear.value;
-  let targetMonth = currentMonthIndex.value + 1;
-
-  if (targetMonth > 11) {
-    targetMonth = 0;
-    targetYear += 1;
-  }
-
-  const monthDiff =
-    (targetYear - realCurrentYear) * 12 + (targetMonth - realCurrentMonth);
-  return monthDiff <= 0;
-});
 
 const formatDate = (date) => {
   const year = date.getFullYear();
@@ -4005,237 +3984,194 @@ const selectDate = (day) => {
   }
 };
 
-// 生成日历数据（本月、上月、上上月）
-const calendarMonths = computed(() => {
-  const today = new Date();
-  const months = [];
-
-  for (let i = 2; i >= 0; i--) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = date.getMonth();
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const days = [];
-
-    for (let j = 0; j < firstDay; j++) {
-      days.push({ date: null, isEmpty: true });
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month, day);
-      const dateString = formatDate(currentDate); // 假设返回 "YYYY-MM-DD"
-      const mondayString = getMondayOfWeek(currentDate); // 也返回 "YYYY-MM-DD"
-
-      // 关键：从映射里取状态（不存在则默认 0）
-      const completeState =
-        completeWeekStates.value && completeWeekStates.value[mondayString]
-          ? completeWeekStates.value[mondayString]
-          : 0;
-
-      const isComplete = completeState > 0;
-      const isToday = formatDate(new Date()) === dateString;
-
-      // ← 新增：检查dailyCalendarData中是否有对应日期
-      const hasFlower = dailyCalendarData.value[dateString] !== undefined;
-      const recordCount = dailyCalendarData.value[dateString] || 0;
-
-      days.push({
-        date: currentDate,
-        day: day,
-        dateString: dateString,
-        isComplete: isComplete,
-        complete_state: completeState,
-        isToday: isToday,
-        isEmpty: false,
-        hasFlower: hasFlower,
-        recordCount: recordCount,
-      });
-    }
-
-    months.push({
-      year: year,
-      month: month + 1,
-      title: `${year}年${month + 1}月`,
-      days: days,
-    });
-  }
-
-  return months;
-});
-
-const selectDate2 = (day) => {
-  // console.log("day: ", day.dateString);
-  // console.log("dailyCalendarData: ", dailyCalendarData.value);
-  const count = dailyCalendarData.value[day.dateString];
-  // console.log("count: ", count);
-  if (count !== undefined) {
-    showToast({
-      message: `${day.dateString} 背诵 ${count} 次`,
-      zIndex: 9999,
-    });
-  } else {
-    showToast({
-      message: `${day.dateString} 暂无背诵数据`,
-      zIndex: 9999,
-    });
-  }
-};
-
-const onConfirmCalendar = (value) => {
-  showCalendar.value = false;
-};
-
-const showMessage = () => {
-  showDialog({
-    title: "连胜说明",
-    message:
-      "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上",
-    theme: "round-button",
-    teleport: "body",
-    zIndex: 9999,
-    allowHtml: true,
-    messageAlign: "left",
-  }).then(() => {});
-};
-
-// 连胜日历
-const getWinningCalendar = async () => {
-  viewUsername.value = username.value;
-  // 获取日历数据
-  try {
-    let params = new URLSearchParams();
-    params.append("method", "getUserWinningStreak");
-    params.append("username", viewUsername.value);
-
-    const response = await axios.post("words/", params);
-
-    if (response.data.status === "success") {
-      // 处理周完成数据
-      completeWeeks.value = response.data.data.map((record) => ({
-        monday: record.week_monday.split(" ")[0],
-        state: record.complete_state, // 0, 1, 2
-      }));
-
-      // 设置连胜天数
-      daysWinningStreak.value = response.data.winning_streak * 7;
-
-      // 处理每日数据
-      dailyCalendarData.value = {};
-      response.data.daily_data.forEach((record) => {
-        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
-        dailyCalendarData.value[date] = record.record_count || 0;
-      });
-
-      // 显示日历
-      showWinningCalendar.value = true;
-    }
-  } catch (error) {
-    console.error("获取日历数据失败:", error);
-    showToast("获取数据失败");
-  }
-};
-
 // 新增：绘制曲线图
+// 新增：绘制柱状图
 const chartCanvas = ref(null);
+const fourWeekAvg = ref(0);
+const eightWeekAvg = ref(0);
+
 const drawChart = () => {
   if (!chartCanvas.value) return;
-  
+
   const canvas = chartCanvas.value;
-  const ctx = canvas.getContext('2d');
+  const container = canvas.parentElement;
+
+  // 设置画布尺寸为容器尺寸，支持高DPI屏幕
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+
   const data = getLastFourWeeksData.value;
-  
-  // 清空画布
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // 设置样式
-  const padding = 40;
-  const chartWidth = canvas.width - padding * 2;
-  const chartHeight = canvas.height - padding * 2;
-  const maxCount = Math.max(...data.map(d => d.count), 1);
-  
-  // 绘制坐标轴
-  ctx.strokeStyle = '#ddd';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  // Y轴
-  ctx.moveTo(padding, padding);
-  ctx.lineTo(padding, canvas.height - padding);
-  // X轴
-  ctx.lineTo(canvas.width - padding, canvas.height - padding);
-  ctx.stroke();
-  
-  // 绘制Y轴刻度和网格线
-  ctx.fillStyle = '#666';
-  ctx.font = '12px Arial';
-  ctx.textAlign = 'right';
-  for (let i = 0; i <= 5; i++) {
-    const y = canvas.height - padding - (chartHeight / 5) * i;
-    const value = Math.round((maxCount / 5) * i);
-    ctx.fillText(value.toString(), padding - 10, y + 4);
-    
-    // 绘制网格线
-    ctx.strokeStyle = '#f0f0f0';
-    ctx.beginPath();
-    ctx.moveTo(padding, y);
-    ctx.lineTo(canvas.width - padding, y);
-    ctx.stroke();
+
+  // 计算四周和八周平均数
+  // 取最近4周数据计算四周平均
+  const recentFourWeeks = data.slice(-4);
+  if (recentFourWeeks.length > 0) {
+    fourWeekAvg.value =
+      recentFourWeeks.reduce((acc, item) => acc + item.count, 0) /
+      recentFourWeeks.length;
   }
-  
-  // 计算点的位置
-  const points = data.map((d, i) => ({
-    x: padding + (chartWidth / (data.length - 1)) * i,
-    y: canvas.height - padding - (d.count / maxCount) * chartHeight,
-    count: d.count,
-    label: d.label
-  }));
-  
-  // 绘制曲线
-  ctx.strokeStyle = '#1989fa';
+
+  // 取最近8周数据计算八周平均
+  const recentEightWeeks = data.slice(-8);
+  if (recentEightWeeks.length > 0) {
+    eightWeekAvg.value =
+      recentEightWeeks.reduce((acc, item) => acc + item.count, 0) /
+      recentEightWeeks.length;
+  }
+
+  // 清空画布
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  // 设置样式
+  const padding = { top: 30, right: 20, bottom: 65, left: 50 };
+  const chartWidth = rect.width - padding.left - padding.right;
+  const chartHeight = rect.height - padding.top - padding.bottom;
+  const maxCount = Math.max(
+    ...data.map((d) => d.count),
+    fourWeekAvg.value + 5,
+    10
+  );
+
+  // 绘制渐变背景
+  const bgGradient = ctx.createLinearGradient(
+    0,
+    padding.top,
+    0,
+    rect.height - padding.bottom
+  );
+  bgGradient.addColorStop(0, "rgba(25, 137, 250, 0.05)");
+  bgGradient.addColorStop(1, "rgba(25, 137, 250, 0.01)");
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(padding.left, padding.top, chartWidth, chartHeight);
+
+  // 绘制Y轴网格线和刻度
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#999";
+  ctx.font =
+    '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  for (let i = 0; i <= 5; i++) {
+    const y = padding.top + (chartHeight / 5) * i;
+    const value = Math.round(maxCount - (maxCount / 5) * i);
+
+    // 网格线
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(rect.width - padding.right, y);
+    ctx.stroke();
+
+    // Y轴刻度
+    ctx.fillText(value.toString(), padding.left - 10, y);
+  }
+
+  // 绘制X轴
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  
-  if (points.length > 0) {
-    ctx.moveTo(points[0].x, points[0].y);
-    
-    for (let i = 1; i < points.length; i++) {
-      const prev = points[i - 1];
-      const curr = points[i];
-      const cpx = (prev.x + curr.x) / 2;
-      ctx.quadraticCurveTo(prev.x, prev.y, cpx, (prev.y + curr.y) / 2);
-      ctx.quadraticCurveTo(cpx, (prev.y + curr.y) / 2, curr.x, curr.y);
-    }
-    
-    ctx.stroke();
-  }
-  
-  // 绘制数据点
-  points.forEach(point => {
-    // 圆点
-    ctx.fillStyle = '#1989fa';
+  ctx.moveTo(padding.left, rect.height - padding.bottom);
+  ctx.lineTo(rect.width - padding.right, rect.height - padding.bottom);
+  ctx.stroke();
+
+  // 取最近4周数据
+  const recentData = data.slice(-4);
+  const barWidth = (chartWidth / recentData.length) * 0.7;
+  const barSpacing = chartWidth / recentData.length;
+
+  // 绘制柱状图
+  recentData.forEach((d, i) => {
+    const barHeight = (d.count / maxCount) * chartHeight;
+    const x = padding.left + barSpacing * i + (barSpacing - barWidth) / 2;
+    const y = rect.height - padding.bottom - barHeight;
+
+    // 绘制柱子渐变
+    const barGradient = ctx.createLinearGradient(
+      x,
+      y,
+      x,
+      rect.height - padding.bottom
+    );
+    barGradient.addColorStop(0, "rgba(59, 130, 246, 0.9)");
+    barGradient.addColorStop(1, "rgba(59, 130, 246, 0.7)");
+
+    ctx.fillStyle = barGradient;
+    ctx.strokeStyle = "rgb(59, 130, 246)";
+    ctx.lineWidth = 2;
+
+    // 绘制圆角矩形柱子
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+    const radius = 6;
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + barWidth - radius, y);
+    ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+    ctx.lineTo(x + barWidth, rect.height - padding.bottom);
+    ctx.lineTo(x, rect.height - padding.bottom);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
     ctx.fill();
-    
-    // 数值标签
-    ctx.fillStyle = '#333';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(point.count.toString(), point.x, point.y - 10);
+    ctx.stroke();
+
+    // 绘制柱子内的数据标签
+    ctx.font =
+      'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(d.count.toString(), x + barWidth / 2, y + 10);
+
+    // X轴日期标签（45度倾斜）
+    ctx.save();
+    ctx.translate(x + barWidth / 2, rect.height - padding.bottom + 20);
+    ctx.rotate(-Math.PI / 6);
+    ctx.font =
+      '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(d.label, 0, 0);
+    ctx.restore();
   });
-  
-  // 绘制X轴标签
-  ctx.fillStyle = '#666';
-  ctx.font = '11px Arial';
-  ctx.textAlign = 'center';
-  points.forEach(point => {
-    ctx.fillText(point.label, point.x, canvas.height - padding + 20);
-  });
+
+  // 绘制四周平均线
+  if (fourWeekAvg.value > 0) {
+    const avgY =
+      rect.height -
+      padding.bottom -
+      (fourWeekAvg.value / maxCount) * chartHeight;
+
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, avgY);
+    ctx.lineTo(rect.width - padding.right, avgY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 绘制Y轴标题"背诵次数"（垂直显示）
+  ctx.save();
+  ctx.translate(15, rect.height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font =
+    'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+  ctx.fillStyle = "#666";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("背诵次数", 0, 0);
+  ctx.restore();
 };
 
-// 新增：监听图表模式切换
 watch(showChartMode, (newVal) => {
   if (newVal) {
     nextTick(() => {
@@ -4245,14 +4181,17 @@ watch(showChartMode, (newVal) => {
 });
 
 // 新增：监听数据变化重绘
-watch(dailyCalendarData, () => {
-  if (showChartMode.value) {
-    nextTick(() => {
-      drawChart();
-    });
-  }
-}, { deep: true });
-
+watch(
+  dailyCalendarData,
+  () => {
+    if (showChartMode.value) {
+      nextTick(() => {
+        drawChart();
+      });
+    }
+  },
+  { deep: true }
+);
 
 const handleDateClick = (dayData) => {
   // 点击日期回调
@@ -4335,7 +4274,7 @@ onMounted(async () => {
   // 更新pro显示答案次数
   updateRemainingCount();
   // 检查是否已经显示过更新提示
-  showUpdate();
+  // showUpdate();
 
   // 弹幕单词
   // 检查并清理旧格式的数据
@@ -4642,10 +4581,10 @@ onMounted(async () => {
     <!-- 导航栏 -->
     <div class="nav-bar-container">
       <van-nav-bar
-          style="
-    --van-nav-bar-text-color: black;
-    --van-nav-bar-title-font-size: 18px;
-  "
+        style="
+          --van-nav-bar-text-color: black;
+          --van-nav-bar-title-font-size: 18px;
+        "
         :left-text="isMultiSelectMode ? '确定选择' : '登出'"
         @click-left="isMultiSelectMode ? gotoPreExam() : gobackHomepage()"
       >
@@ -4691,7 +4630,7 @@ onMounted(async () => {
               商城
             </van-button>
             <van-button
-              style="--van-button-border-width: 0; padding-left: -5px;"
+              style="--van-button-border-width: 0; padding-left: -5px"
               plain
               type="default"
               square
@@ -4725,10 +4664,17 @@ onMounted(async () => {
           >
             {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
           </span>
-          
         </div>
 
-        <div style="display: flex; justify-content: flex-start; align-items: center; gap: 10px; width: 160%;">
+        <div
+          style="
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 10px;
+            width: 160%;
+          "
+        >
           <div style="">
             <van-button
               type="default"
@@ -4740,7 +4686,7 @@ onMounted(async () => {
             </van-button>
           </div>
           <!-- 待复习按钮 -->
-          <div class="review-section" v-if="flagReview" style="width: 40%;">
+          <div class="review-section" v-if="flagReview" style="width: 40%">
             <van-badge :content="reviewList_first || ''" class="flashing-icon">
               <van-button
                 block
@@ -4758,12 +4704,11 @@ onMounted(async () => {
               class="review-mascot"
             />
           </div>
-          <div v-else class="review-complete" style="width: 40%;">
+          <div v-else class="review-complete" style="width: 40%">
             <img :src="srcReview" class="review-complete-img" />
           </div>
         </div>
         <!-- 本月日历 -->
-<!-- 本月日历 -->
         <div class="month-calendar">
           <!-- 月份标题 + 切换按钮 -->
           <div class="month-header">
@@ -4774,8 +4719,10 @@ onMounted(async () => {
               plain
               @click="changeMonth(-1)"
             />
-            <span class="month-title" v-if="!showChartMode">{{ currentMonth }}</span>
-            <span class="month-title" v-else>最近四周趋势</span>
+            <span class="month-title" v-if="!showChartMode">{{
+              currentMonth
+            }}</span>
+            <span class="month-title" v-else style="margin-left: 4rem;">最近四周趋势</span>
             <van-button
               v-if="!showChartMode"
               icon="arrow"
@@ -4784,13 +4731,14 @@ onMounted(async () => {
               @click="changeMonth(1)"
             />
             <van-button
-              :icon="showChartMode ? 'calendar-o' : 'chart-trending-o'"
               size="small"
               type="primary"
               plain
               @click="toggleChartMode"
               style="margin-left: auto"
-            />
+            >
+              {{ showChartMode ? "变日历" : "变曲线" }}
+            </van-button>
           </div>
 
           <!-- 日历视图 -->
@@ -4829,8 +4777,136 @@ onMounted(async () => {
           </div>
 
           <!-- 曲线图视图 -->
-          <div v-else class="chart-container">
-            <canvas ref="chartCanvas" width="300" height="180"></canvas>
+          <div v-else>
+            <div class="chart-container">
+              <canvas ref="chartCanvas" width="350" height="180"></canvas>
+            </div>
+
+            <!-- 平均数标注 - 横线形式（放在图表下方） -->
+            <div
+              style="
+                padding: 12px;
+                background-color: #f3f4f6;
+                border-radius: 8px;
+                margin-top: 1rem;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+              "
+            >
+              <!-- 根据数值大小动态排序 -->
+              <template v-if="fourWeekAvg >= eightWeekAvg">
+                <!-- 近四周平均（数值较大，排在上面） -->
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span
+                    style="font-size: 13px; color: #6b7280; white-space: nowrap"
+                  >
+                    近四周平均
+                  </span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 3px;
+                      background: linear-gradient(
+                        to right,
+                        #ef4444,
+                        #ef4444 70%,
+                        transparent
+                      );
+                      border-radius: 2px;
+                    "
+                  ></div>
+                  <span
+                    style="font-size: 15px; font-weight: 600; color: #ef4444"
+                  >
+                    {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+                  </span>
+                </div>
+
+                <!-- 近八周平均 -->
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span
+                    style="font-size: 13px; color: #6b7280; white-space: nowrap"
+                  >
+                    近八周平均
+                  </span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 3px;
+                      background: linear-gradient(
+                        to right,
+                        #10b981,
+                        #10b981 70%,
+                        transparent
+                      );
+                      border-radius: 2px;
+                    "
+                  ></div>
+                  <span
+                    style="font-size: 15px; font-weight: 600; color: #10b981"
+                  >
+                    {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+                  </span>
+                </div>
+              </template>
+
+              <template v-else>
+                <!-- 近八周平均（数值较大，排在上面） -->
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span
+                    style="font-size: 13px; color: #6b7280; white-space: nowrap"
+                  >
+                    近八周平均
+                  </span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 3px;
+                      background: linear-gradient(
+                        to right,
+                        #10b981,
+                        #10b981 70%,
+                        transparent
+                      );
+                      border-radius: 2px;
+                    "
+                  ></div>
+                  <span
+                    style="font-size: 15px; font-weight: 600; color: #10b981"
+                  >
+                    {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+                  </span>
+                </div>
+
+                <!-- 近四周平均 -->
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span
+                    style="font-size: 13px; color: #6b7280; white-space: nowrap"
+                  >
+                    近四周平均
+                  </span>
+                  <div
+                    style="
+                      flex: 1;
+                      height: 3px;
+                      background: linear-gradient(
+                        to right,
+                        #ef4444,
+                        #ef4444 70%,
+                        transparent
+                      );
+                      border-radius: 2px;
+                    "
+                  ></div>
+                  <span
+                    style="font-size: 15px; font-weight: 600; color: #ef4444"
+                  >
+                    {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+                  </span>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
 
@@ -4875,14 +4951,12 @@ onMounted(async () => {
               :stroke-width="60"
             />
           </div>
-          
         </div>
-        
       </div>
 
       <!-- 右侧内容区 -->
       <div class="right-content">
-        <div v-if="!showShop" >
+        <div v-if="!showShop" class="list-container">
           <!-- 模式切换 -->
           <div class="mode-switch-bar">
             <div class="mode-label">{{ switchText }}</div>
@@ -4899,7 +4973,7 @@ onMounted(async () => {
               scrollable
               :delay="1"
               :speed="80"
-              text="滑动跟读模式上线...有bug联系老师"
+              text="横屏（pc,平板）适配...有bug联系老师"
             />
           </div>
 
@@ -4917,7 +4991,7 @@ onMounted(async () => {
               </div>
             </template>
           </van-toast>
-          
+
           <!-- 任务列表 Tabs -->
           <van-tabs
             v-model:active="activeTabs"
@@ -5024,7 +5098,9 @@ onMounted(async () => {
                         >
                           <div class="attempt-info">
                             尝试了
-                            <span class="attempt-count">{{ item.attempt }}</span>
+                            <span class="attempt-count">{{
+                              item.attempt
+                            }}</span>
                             次
                           </div>
                           <div class="word-count">
@@ -5172,7 +5248,9 @@ onMounted(async () => {
                         </div>
                       </template>
                       <template #value>
-                        <div class="word-count">{{ item.answers.length }}词</div>
+                        <div class="word-count">
+                          {{ item.answers.length }}词
+                        </div>
                       </template>
                       <template #label>
                         <van-rate
@@ -5242,8 +5320,8 @@ onMounted(async () => {
         <!-- 商城组件 -->
         <div v-else class="shop-container">
           <div class="shop-header">
-            <van-button 
-              icon="arrow-left" 
+            <van-button
+              icon="arrow-left"
               @click="backToMain()"
               type="primary"
               plain
@@ -5253,10 +5331,10 @@ onMounted(async () => {
             </van-button>
             <span class="shop-title">用户商城</span>
           </div>
-          
+
           <!-- 这里嵌入商城组件的内容 -->
           <div class="shop-content">
-            <UserInformationPc 
+            <UserInformationPc
               :username="username"
               :usercoins="usercoins"
               :userdiamonds="userdiamonds"
@@ -5268,9 +5346,6 @@ onMounted(async () => {
             />
           </div>
         </div>
-
-
-
       </div>
     </div>
 
@@ -5859,7 +5934,6 @@ onMounted(async () => {
       "
       :style="{ maxWidth: '400px' }"
     >
-      >
       <template #title>
         <div>
           <div
@@ -6459,9 +6533,9 @@ onMounted(async () => {
 
 /* ========== 左侧边栏 ========== */
 .left-sidebar {
-  width: 360px;
-  min-width: 320px;
-  max-width: 400px;
+  width: 480px;
+  /* min-width: 320px;
+  max-width: 400px; */
   overflow-y: auto;
   overflow-x: hidden;
   padding: 1.5rem 1rem;
@@ -6572,7 +6646,7 @@ onMounted(async () => {
 .days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 1px;
 }
 
 /* 日期单元格 */
@@ -6818,10 +6892,12 @@ onMounted(async () => {
 
 /* ========== 右侧内容区 ========== */
 .right-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem 1.5rem;
-  background: #ffffff;
+  height: 100vh; /* 必须设高度，占据全屏 */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 关键：禁止父级滚动 */
+  background-color: #f7f8fa;
 }
 
 .right-content::-webkit-scrollbar {
@@ -6833,6 +6909,13 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
+.list-container {
+  flex: 1; /* 占据所有空间 */
+  overflow-y: auto; /* 关键：内容多了在这里滚动 */
+  /* iOS 顺滑滚动 */
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 60px;
+}
 /* 模式切换栏 */
 .mode-switch-bar {
   display: flex;
@@ -7246,7 +7329,7 @@ onMounted(async () => {
 .days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 1px;
 }
 
 .day-cell {
@@ -7469,34 +7552,27 @@ onMounted(async () => {
 }
 /* 商城组件 */
 .shop-container {
-  width: 100%;
-  height: 100%;
+  flex: 1; /* 占据所有空间 */
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* 商城整体不滚，交给内部 content 滚 */
+  height: 100%;
 }
 
 .shop-header {
+  padding: 10px;
+  background: #fff;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  margin-bottom: 1rem;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0; /* 防止头部被压缩 */
   z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .shop-title {
-  font-size: 18px;
   font-weight: 700;
-  flex: 1;
-  text-align: center;
+  margin-left: 1rem;
+  font-size: 18px;
 }
 
 .shop-user-info {
@@ -7516,9 +7592,11 @@ onMounted(async () => {
 }
 
 .shop-content {
-  flex: 1;
-  overflow-y: auto;
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* 关键：UserInformationPc 在这里滚动 */
   padding: 0 0.5rem;
+  /* iOS 顺滑滚动 */
+  -webkit-overflow-scrolling: touch;
 }
 
 .shop-content::-webkit-scrollbar {
@@ -7586,15 +7664,17 @@ onMounted(async () => {
 /* 曲线图容器 */
 .chart-container {
   width: 100%;
+  height: 280px;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 1rem 0;
-  min-height: 200px;
+  padding: 0;
+  position: relative;
 }
 
 .chart-container canvas {
-  max-width: 100%;
-  height: auto;
+  width: 100%;
+  height: 80%;
+  display: block;
 }
 </style>

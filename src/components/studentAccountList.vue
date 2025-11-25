@@ -22,6 +22,7 @@ import { useRouter } from "vue-router";
 import loading from "./loading.vue";
 import getPassive from "./getPassive.vue";
 import bearWarmup from "./bearWarmup.vue";
+import { Chart, registerables } from "chart.js";
 import {
   showFailToast,
   showToast,
@@ -32,6 +33,7 @@ import {
   Toast,
   closeToast,
 } from "vant";
+Chart.register(...registerables);
 // 主题路径
 import chooseModelSrcGoatAndWolf from "../assets/choose.webp";
 import chooseModelSrcGoatAndWolfReview from "../assets/review.png";
@@ -314,7 +316,7 @@ const clickShowAnswerPro = async () => {
   // 检查今日使用次数
   const todayCount = getTodayUsageCount();
   // console.log("todayCount: ", todayCount);
-  let dailyLimit = 3;
+  let dailyLimit = 6;
   let localTeacherPassword = window.localStorage.getItem("teacherPassword");
   // console.log('localTeacherPassword: ', localTeacherPassword);
   if (localTeacherPassword == "ss654321") {
@@ -3674,11 +3676,252 @@ const daysWinningStreak = ref(0);
 const completeWeeks = ref([]);
 const dailyCalendarData = ref({});
 const viewUsername = ref("");
+const eightWeekAvg = ref(0);
+const fourWeekAvg = ref(0);
+
+// 首页弹出趋势
+const showfourweeksPopup = ref(false);
+let recitationChart = null;
+
+function getStartOfWeek(dateStr) {
+  const date = new Date(dateStr + "T00:00:00Z");
+  const day = date.getUTCDay();
+  // 计算到周一的偏移量（周日是 0，需要特殊处理）
+  const diff = day === 0 ? -6 : 1 - day;
+  
+  const startOfWeek = new Date(date);
+  startOfWeek.setUTCDate(date.getUTCDate() + diff);
+  startOfWeek.setUTCHours(0, 0, 0, 0);
+  
+  return startOfWeek.toISOString().split("T")[0];
+}
+
+function formatDate2(dateStr) {
+  const parts = dateStr.split("-");
+  return `${parts[1]}.${parts[2]}`;
+}
+
+function processDataForChart(data) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // 获取最近 8 周的周一日期（用于计算 8 周平均）
+  const allWeeks = [];
+  for (let i = 7; i >= 0; i--) {
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() - (i * 7));
+    
+    const startOfWeek = getStartOfWeek(targetDate.toISOString().split('T')[0]);
+    
+    const endDate = new Date(startOfWeek + 'T00:00:00Z');
+    endDate.setUTCDate(endDate.getUTCDate() + 6);
+    const endDateStr = endDate.toISOString().split('T')[0];
+    
+    allWeeks.push({
+      startDate: startOfWeek,
+      endDate: endDateStr,
+    });
+  }
+  
+  // 为每一周聚合数据
+  const weeklyData = allWeeks.map(week => {
+    let sum = 0;
+    
+    const startDate = new Date(week.startDate + 'T00:00:00Z');
+    for (let day = 0; day < 7; day++) {
+      const currentDate = new Date(startDate);
+      currentDate.setUTCDate(startDate.getUTCDate() + day);
+      const dateStr = currentDate.toISOString().split('T')[0];
+      
+      sum += data[dateStr] || 0;
+    }
+    
+    return {
+      startDate: week.startDate,
+      endDate: week.endDate,
+      count: sum,
+    };
+  });
+  
+  // 最近 4 周用于显示
+  const recentFourWeeks = weeklyData.slice(-4);
+  
+  // 计算 4 周平均
+  const fourWeekAvg = recentFourWeeks.reduce((acc, item) => acc + item.count, 0) / 4;
+  
+  // 计算 8 周平均
+  const eightWeekAvg = weeklyData.reduce((acc, item) => acc + item.count, 0) / 8;
+  
+  // 生成图表标签和数据
+  const labels = recentFourWeeks.map(
+    (item) => `${formatDate2(item.startDate)}-${formatDate2(item.endDate)}`
+  );
+  const counts = recentFourWeeks.map((item) => item.count);
+  
+  return { labels, counts, fourWeekAvg, eightWeekAvg };
+}
+
+function renderChart(labels, counts, fourWeekAvg, eightWeekAvg) {
+  const ctx = document.getElementById("recitationChart")?.getContext("2d");
+  if (!ctx) return;
+
+  // 销毁旧图表实例（如果存在）
+  if (recitationChart) {
+    recitationChart.destroy();
+  }
+
+  recitationChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "背诵次数 (周总计)",
+          data: counts,
+          backgroundColor: "rgba(59, 130, 246, 0.7)",
+          borderColor: "rgb(59, 130, 246)",
+          borderWidth: 0.2,
+          borderRadius: 6,
+          barThickness: 50,
+        },
+        {
+          label: "近四周平均",
+          data: Array(labels.length).fill(fourWeekAvg),
+          type: "line",
+          borderColor: "rgb(239, 68, 68)",
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: "top",
+          labels: {
+            usePointStyle: true,
+            padding: 15,
+            font: { size: 12 },
+          },
+        },
+        tooltip: {
+          backgroundColor: "rgba(30, 41, 59, 0.9)",
+          titleFont: { size: 14 },
+          bodyFont: { size: 14 },
+          padding: 10,
+          callbacks: {
+            label: function(context) {
+              if (context.datasetIndex === 0) {
+                return `背诵次数: ${context.parsed.y}`;
+              } else {
+                return `四周平均: ${fourWeekAvg.toFixed(1)}`;
+              }
+            }
+          }
+        },
+
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "背诵次数",
+            color: "#4b5563",
+            font: { size: 14, weight: "bold" },
+          },
+          grid: { color: "rgba(0, 0, 0, 0.05)" },
+          ticks: {
+            color: "#6b7280",
+            callback: function (value) {
+              if (Number.isInteger(value)) {
+                return value;
+              }
+            },
+          },
+        },
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: "#6b7280",
+            maxRotation: 45,
+            minRotation: 45,
+            autoSkip: false,
+          },
+        },
+      },
+    },
+  });
+  
+  // 手动绘制数据标签
+  const originalDraw = recitationChart.draw;
+  recitationChart.draw = function() {
+    originalDraw.apply(this, arguments);
+    
+    const ctx = this.ctx;
+    ctx.textAlign = 'center';
+    
+    this.data.datasets.forEach((dataset, datasetIndex) => {
+      const meta = this.getDatasetMeta(datasetIndex);
+      
+      if (datasetIndex === 0) {
+        // 柱状图数据标签（放在柱子内部）
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'top';
+        
+        meta.data.forEach((bar, index) => {
+          const data = dataset.data[index];
+          // 标签放在柱子顶部内侧，往下偏移10px
+          ctx.fillText(data, bar.x, bar.y + 10);
+        });
+      } else if (datasetIndex === 1) {
+        // 平均线数据标签（只在最后一个点显示）
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.textBaseline = 'top';
+        
+        const lastPoint = meta.data[meta.data.length - 1];
+        const avgValue = fourWeekAvg.toFixed(1);
+        
+        // 绘制背景
+        const textWidth = ctx.measureText(avgValue).width;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(lastPoint.x - textWidth / 2 - 4, lastPoint.y + 5, textWidth + 8, 18);
+        
+        // 绘制文字
+        ctx.fillStyle = '#ef4444';
+        ctx.fillText(avgValue, lastPoint.x, lastPoint.y + 8);
+      }
+    });
+  };
+  
+  // 将 8 周平均数存储到全局变量，供模板使用
+  window.eightWeekAverage = eightWeekAvg;
+}
+
+const onOpenedfourweeks = () => {
+  const { labels, counts, fourWeekAvg: avg4, eightWeekAvg: avg8 } = processDataForChart(dailyCalendarData.value);
+  fourWeekAvg.value = avg4; // 保存四周平均
+  eightWeekAvg.value = avg8; // 保存八周平均
+  renderChart(labels, counts, avg4, avg8);
+
+  window.addEventListener("resize", () => {
+    if (recitationChart) {
+      recitationChart.resize();
+    }
+  });
+};
 
 const generateWeekDays = async () => {
   const today = new Date();
   const currentDay = today.getDay();
-  const weekStart = currentDay === 0 ? -6 : 1 - currentDay; // 从周一开始
+  const weekStart = currentDay === 0 ? -6 : 1 - currentDay;
 
   weekDays.value = [];
   for (let i = 0; i < 7; i++) {
@@ -3697,7 +3940,6 @@ const generateWeekDays = async () => {
     });
   }
 
-  // 获取本周周一的日期
   const mondayDate = new Date(today);
   mondayDate.setDate(today.getDate() + weekStart);
   const mondayString = formatDate(mondayDate);
@@ -3707,14 +3949,13 @@ const generateWeekDays = async () => {
   params.append("method", "getUserWinningStreak");
   params.append("username", username.value);
   const response = await axios.post("words/", params);
-  // console.log("response: ", response.data);
+  
   if (response.data.status === "success") {
     completeWeeks.value = response.data.data.map((record) => ({
       monday: record.week_monday.split(" ")[0],
-      state: record.complete_state, // 0, 1, 2
+      state: record.complete_state,
     }));
 
-    // 如果找到本周完成的记录，标记为完成
     daysWinningStreak.value = response.data.winning_streak * 7;
     const thisWeekRecord = response.data.data.find((record) => {
       const recordDate = record.week_monday.split(" ")[0];
@@ -3729,20 +3970,23 @@ const generateWeekDays = async () => {
 
     completeWeekStates.value = {};
     response.data.data.forEach((record) => {
-      const monday = record.week_monday.split(" ")[0]; // "YYYY-MM-DD"
+      const monday = record.week_monday.split(" ")[0];
       completeWeekStates.value[monday] = record.complete_state || 0;
     });
 
     has_enough_today.value = response.data.has_enough_today;
     dailyCalendarData.value = {};
     response.data.daily_data.forEach((record) => {
-      const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
+      const date = record.date.split(" ")[0];
       dailyCalendarData.value[date] = record.record_count || 0;
     });
     console.log("dailyCalendarData", dailyCalendarData.value);
-    // 将每日数据关联到 weekDays
+    if (Object.keys(dailyCalendarData.value).length > 0) {
+      showfourweeksPopup.value = true;
+    }
+    
     weekDays.value = weekDays.value.map((day) => {
-      const dateKey = formatDate(new Date(day.date)); // 转换为 "YYYY-MM-DD" 格式
+      const dateKey = formatDate(new Date(day.date));
       const recordCount = dailyCalendarData.value[dateKey] || 0;
       return {
         ...day,
@@ -3760,75 +4004,7 @@ const formatDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const getMondayOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return formatDate(monday);
-};
-
-// 生成日历数据（本月、上月、上上月）
-const calendarMonths = computed(() => {
-  const today = new Date();
-  const months = [];
-
-  for (let i = 2; i >= 0; i--) {
-    const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = date.getMonth();
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    const days = [];
-
-    for (let j = 0; j < firstDay; j++) {
-      days.push({ date: null, isEmpty: true });
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month, day);
-      const dateString = formatDate(currentDate); // 假设返回 "YYYY-MM-DD"
-      const mondayString = getMondayOfWeek(currentDate); // 也返回 "YYYY-MM-DD"
-
-      // 关键：从映射里取状态（不存在则默认 0）
-      const completeState =
-        completeWeekStates.value && completeWeekStates.value[mondayString]
-          ? completeWeekStates.value[mondayString]
-          : 0;
-
-      const isComplete = completeState > 0;
-      const isToday = formatDate(new Date()) === dateString;
-
-      // ← 新增：检查dailyCalendarData中是否有对应日期
-      const hasFlower = dailyCalendarData.value[dateString] !== undefined;
-      const recordCount = dailyCalendarData.value[dateString] || 0;
-
-      days.push({
-        date: currentDate,
-        day: day,
-        dateString: dateString,
-        isComplete: isComplete,
-        complete_state: completeState,
-        isToday: isToday,
-        isEmpty: false,
-        hasFlower: hasFlower,
-        recordCount: recordCount,
-      });
-    }
-
-    months.push({
-      year: year,
-      month: month + 1,
-      title: `${year}年${month + 1}月`,
-      days: days,
-    });
-  }
-
-  return months;
-});
-
+// 连胜日历
 const selectDate = (day) => {
   // showCalendar.value = true;
   getWinningCalendar();
@@ -3841,42 +4017,7 @@ const selectDate = (day) => {
     }, 0);
   });
 };
-const selectDate2 = (day) => {
-  // console.log("day: ", day.dateString);
-  // console.log("dailyCalendarData: ", dailyCalendarData.value);
-  const count = dailyCalendarData.value[day.dateString];
-  // console.log("count: ", count);
-  if (count !== undefined) {
-    showToast({
-      message: `${day.dateString} 背诵 ${count} 次`,
-      zIndex: 9999,
-    });
-  } else {
-    showToast({
-      message: `${day.dateString} 暂无背诵数据`,
-      zIndex: 9999,
-    });
-  }
-};
 
-const onConfirmCalendar = (value) => {
-  showCalendar.value = false;
-};
-
-const showMessage = () => {
-  showDialog({
-    title: "连胜说明",
-    message:
-      "每周完成3次背诵（不是三颗星，3组词），包含普通，游戏，复习三种模式，周连胜即可完成。6次后成为金色。<br>🔺：当天背诵一次。<br>🌸：当天背诵2次及以上",
-    theme: "round-button",
-    teleport: "body",
-    zIndex: 9999,
-    allowHtml: true,
-    messageAlign: "left",
-  }).then(() => {});
-};
-
-// 连胜日历
 const getWinningCalendar = async () => {
   viewUsername.value = username.value;
   // 获取日历数据
@@ -3948,8 +4089,6 @@ const gotoWordSwipe = (item, index) => {
       title: item.title,
       basicPreExam: basicPreExam.value,
       reviewRequired: reviewRequired.value,
-
-      
     },
   });
 };
@@ -3978,16 +4117,12 @@ const showUpdate = () => {
   ) {
     showDialog({
       title: "更新：滑动跟读说明",
-      message:
-        "滑动复习：轻松且快捷，暂无奖励，后期调整",
+      message: "滑动复习：轻松且快捷，暂无奖励，后期调整",
       theme: "round-button",
       allowHtml: true,
       messageAlign: "left",
     }).then(() => {
-      localStorage.setItem(
-        `wordSwipeReview_${UPDATE_VERSION}`,
-        now.toString()
-      );
+      localStorage.setItem(`wordSwipeReview_${UPDATE_VERSION}`, now.toString());
       localStorage.setItem(
         `wordSwipeReview_${UPDATE_VERSION}`,
         (shownCount + 1).toString()
@@ -4000,7 +4135,7 @@ onMounted(async () => {
   // 更新pro显示答案次数
   updateRemainingCount();
   // 检查是否已经显示过更新提示
-  showUpdate();
+  // showUpdate();
 
   // 弹幕单词
   // 检查并清理旧格式的数据
@@ -4524,7 +4659,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="滑动跟读模式上线...有bug联系老师"
+        text="横屏（pc,平板）适配...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6545,6 +6680,135 @@ onMounted(async () => {
       @date-click="handleDateClick"
       @close="onCalendarClose"
     />
+
+    <!-- 近四周曲线 -->
+<!-- 近四周曲线 -->
+<van-popup
+  v-model:show="showfourweeksPopup"
+  position="center"
+  style="width: 90%; max-width: 500px; padding: 16px; border-radius: 12px"
+  :close-on-click-overlay="true"
+  @opened="onOpenedfourweeks"
+>
+  <div class="p-2">
+    <div
+      style="
+        font-size: 19px;
+        font-weight: 700;
+        display: flex;
+        justify-content: flex-start;
+        margin-bottom: 1.5rem;
+      "
+    >
+      近四周趋势
+      <div
+        style="
+          font-size: 14px;
+          color: gray;
+          margin-left: 0.5rem;
+          margin-top: 0.4rem;
+        "
+      >
+        {{ username }}
+      </div>
+    </div>
+
+    <!-- canvas 组件用于 Chart.js 绘图 -->
+    <div class="chart-container" style="margin-bottom: 1rem">
+      <canvas id="recitationChart"></canvas>
+    </div>
+
+    <!-- 平均数标注 - 横线形式 -->
+    <div
+      style="
+        padding: 12px;
+        background-color: #f3f4f6;
+        border-radius: 8px;
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      "
+    >
+      <!-- 根据数值大小动态排序 -->
+      <template v-if="fourWeekAvg >= eightWeekAvg">
+        <!-- 近四周平均（数值较大，排在上面） -->
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
+            近四周平均
+          </span>
+          <div
+            style="
+              flex: 1;
+              height: 3px;
+              background: linear-gradient(to right, #ef4444, #ef4444 70%, transparent);
+              border-radius: 2px;
+            "
+          ></div>
+          <span style="font-size: 15px; font-weight: 600; color: #ef4444">
+            {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+          </span>
+        </div>
+
+        <!-- 近八周平均 -->
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
+            近八周平均
+          </span>
+          <div
+            style="
+              flex: 1;
+              height: 3px;
+              background: linear-gradient(to right, #10b981, #10b981 70%, transparent);
+              border-radius: 2px;
+            "
+          ></div>
+          <span style="font-size: 15px; font-weight: 600; color: #10b981">
+            {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+          </span>
+        </div>
+      </template>
+
+      <template v-else>
+        <!-- 近八周平均（数值较大，排在上面） -->
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
+            近八周平均
+          </span>
+          <div
+            style="
+              flex: 1;
+              height: 3px;
+              background: linear-gradient(to right, #10b981, #10b981 70%, transparent);
+              border-radius: 2px;
+            "
+          ></div>
+          <span style="font-size: 15px; font-weight: 600; color: #10b981">
+            {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+          </span>
+        </div>
+
+        <!-- 近四周平均 -->
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
+            近四周平均
+          </span>
+          <div
+            style="
+              flex: 1;
+              height: 3px;
+              background: linear-gradient(to right, #ef4444, #ef4444 70%, transparent);
+              border-radius: 2px;
+            "
+          ></div>
+          <span style="font-size: 15px; font-weight: 600; color: #ef4444">
+            {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+          </span>
+        </div>
+      </template>
+    </div>
+  </div>
+</van-popup>
   </div>
 </template>
 
@@ -6552,6 +6816,10 @@ onMounted(async () => {
 
 
 <style>
+.chart-container {
+  width: 100%;
+  height: 280px;
+}
 .flashing-icon {
   animation: flash 0.4s infinite alternate;
   margin-left: 1rem;

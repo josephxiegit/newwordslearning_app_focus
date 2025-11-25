@@ -22,8 +22,8 @@ import { useIntervalFn } from "@vueuse/core";
 import { useRouter } from "vue-router";
 import swipeHelp from "./swipeHelpPc.vue";
 import submitloading from "./submitloading.vue";
-import passiveMagic from "./passiveMagic.vue";
-import passiveMagic2 from "./passiveMagic2.vue";
+import passiveMagic from "./passiveMagicPc.vue";
+import passiveMagic2 from "./passiveMagic2Pc.vue";
 import WinningStreakPopup from "./WinningStreakPopupPc.vue";
 
 import shouxieSrcGoatAndWolf from "../assets/test.gif";
@@ -2358,7 +2358,7 @@ onMounted(async () => {
             </van-button>
           </div>
 
-          <div class="button-group">
+          <div class="button-group" style="margin-top: 30px;">
             <van-button 
               type="warning" 
               @click="pauseSwipe" 
@@ -2682,12 +2682,13 @@ html {
 
 .encouragement-img {
   position: fixed;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  left: 0;
+  top: 0;
   width: 400px;
   z-index: 1000;
   pointer-events: none;
+  margin-left: 20px;
+  margin-top: 20px;
 }
 
 .control-section {

@@ -24,7 +24,7 @@ import {
 import { useRouter } from "vue-router";
 import preExamAnimation from "./preExam.vue";
 import dailyAnimation from "./dailyAnimation.vue";
-import WinningStreakPopup from "./WinningStreakPopup.vue";
+import WinningStreakPopupPc from "./WinningStreakPopupPc.vue";
 import chineseMeaningSrcGoatAndWolf from "../assets/chinese_meaning.png";
 import chineseMeaningSrcBears from "../assets/Boonie Bears/chinese_meaning.png";
 import successSound from "../assets/sound/success.mp3";

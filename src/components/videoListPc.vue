@@ -90,18 +90,37 @@ function isOverlap(rect1, rect2) {
 function getRandomPosition() {
   let candidate;
   let attempts = 0;
+  
+  // 设定一个安全距离，比如 10px 或 20px
+  // 让文字不要紧贴着屏幕边缘
+  const padding = 15; 
+
   do {
-    const x = Math.floor(Math.random() * (window.innerWidth - wordWidth.value));
-    const y = Math.floor(
-      Math.random() *
-        (window.innerHeight - progressAreaHeight - wordHeight.value)
-    );
+    // 1. 计算 X 轴可用空间
+    // 窗口宽度 - 文字宽度 - 双倍padding(左边和右边都要留空)
+    const availableWidth = window.innerWidth - wordWidth.value - (padding * 2);
+    
+    // 生成 x: 在可用空间内随机 + 左侧 padding
+    // Math.max(0, ...) 是为了防止屏幕太窄导致负数报错
+    const x = Math.floor(Math.random() * Math.max(0, availableWidth)) + padding;
+
+    // 2. 计算 Y 轴可用空间
+    // 窗口高度 - 底部进度条高度 - 文字高度 - 双倍padding(顶部和底部都要留空)
+    const availableHeight = window.innerHeight - progressAreaHeight - wordHeight.value - (padding * 2);
+    
+    // 生成 y: 在可用空间内随机 + 顶部 padding
+    const y = Math.floor(Math.random() * Math.max(0, availableHeight)) + padding;
+
     candidate = { x, y, width: wordWidth.value, height: wordHeight.value };
     attempts++;
+    
+    // 增加尝试次数上限，防止死循环
     if (attempts > 100) break;
+    
   } while (
     wordPositions.value.some((existing) => isOverlap(existing, candidate))
   );
+  
   return candidate;
 }
 
@@ -377,12 +396,13 @@ onUnmounted(() => {
 <style scoped>
 .container {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background-image: url("../assets/background_video.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  overflow: hidden;
 }
 
 .word {
@@ -393,10 +413,13 @@ onUnmounted(() => {
 }
 
 .measure {
-  visibility: hidden;
-  position: absolute;
-  top: -9999px;
-  left: -9999px;
+position: fixed; /* 或者 absolute */
+  top: 0;
+  left: 0;
+  visibility: hidden; /* 占位但不显示 */
+  opacity: 0;         /* 双重保险 */
+  z-index: -999;      /* 放在最底层 */
+  pointer-events: none; /* 确保点不到 */
 }
 
 .progress-area {

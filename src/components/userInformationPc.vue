@@ -50,7 +50,7 @@ const emit = defineEmits([
   "update:usercoins",
   "update:userdiamonds",
   "update:userflowers",
-  'update:theme'
+  "update:theme",
 ]);
 
 // 显示订单
@@ -434,10 +434,10 @@ const onSelectTheme = (themeName) => {
     showTheme.value = false;
     return;
   }
-  
+
   valueTheme.value = themeName;
   loadingOrderList.value = true;
-  
+
   async function reviseUserTheme() {
     let params = new URLSearchParams();
     params.append("method", "reviseUserTheme");
@@ -454,7 +454,7 @@ const onSelectTheme = (themeName) => {
       flagTheme.value = res.theme_nid;
       localStorage.setItem("theme_name", res.theme_name);
       valueTheme.value = res.theme_name;
-      
+
       // 更新主题选中状态
       actionsTheme.value = actionsTheme.value.map((item) => {
         if (item.name === valueTheme.value) {
@@ -464,8 +464,8 @@ const onSelectTheme = (themeName) => {
           return rest;
         }
       });
-      
-      emit('update:theme', res.theme_nid);
+
+      emit("update:theme", res.theme_nid);
       showTheme.value = false;
       showSuccessToast("主题切换成功");
     })
@@ -509,7 +509,7 @@ const purchaseBears = () => {
     valueTheme.value = "熊出没";
     flagTheme.value = 2;
     localStorage.setItem("theme_name", "熊出没");
-    
+
     // 更新主题列表
     actionsTheme.value = actionsTheme.value.map((item) => {
       if (item.name === valueTheme.value) {
@@ -519,7 +519,7 @@ const purchaseBears = () => {
         return rest;
       }
     });
-    emit('update:theme', 2);
+    emit("update:theme", 2);
     isLoading.value = false;
     showToggleTheme();
     showSuccessToast("购买成功");
@@ -782,7 +782,7 @@ onMounted(async () => {
           <h3>选择主题</h3>
           <p class="theme-subtitle">当前主题：{{ valueTheme }}</p>
         </div>
-        
+
         <div class="theme-list">
           <div
             v-for="theme in actionsTheme"
@@ -790,26 +790,30 @@ onMounted(async () => {
             class="theme-item"
             :class="{
               'theme-item-disabled': theme.disabled,
-              'theme-item-selected': theme.icon === 'checked'
+              'theme-item-selected': theme.icon === 'checked',
             }"
             @click="!theme.disabled && onSelectTheme(theme.name)"
           >
             <div class="theme-content">
               <div class="theme-info">
                 <span class="theme-name">{{ theme.name }}</span>
-                <span v-if="theme.disabled" class="theme-locked">🔒 未拥有</span>
-                <span v-else-if="theme.icon === 'checked'" class="theme-current">✓ 当前使用</span>
+                <span v-if="theme.disabled" class="theme-locked"
+                  >🔒 未拥有</span
+                >
+                <span v-else-if="theme.icon === 'checked'" class="theme-current"
+                  >✓ 当前使用</span
+                >
               </div>
-              
+
               <!-- 主题预览图标 -->
               <div class="theme-icon">
-                <img 
+                <img
                   v-if="theme.name === '喜羊羊与灰太狼'"
                   src="../assets/choose.webp"
                   alt="喜羊羊主题"
                   class="theme-preview"
                 />
-                <img 
+                <img
                   v-else-if="theme.name === '熊出没'"
                   src="../assets/Boonie Bears/choose.gif"
                   alt="熊出没主题"
@@ -820,7 +824,6 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-  
     </van-popup>
 
     <div class="card-container">
@@ -933,7 +936,11 @@ onMounted(async () => {
         <template #title>
           <div style="margin-bottom: 0rem; font-size: larger">不灭意志</div>
           <div
-            style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+            style="
+              font-size: smaller;
+              color: lightsalmon;
+              margin-bottom: 0.5rem;
+            "
           >
             仅在游戏模式中生效
           </div>
@@ -943,7 +950,11 @@ onMounted(async () => {
       <!-- pro增加数量 -->
       <van-card desc="增加当天预习pro数量" title="预习售卖" class="custom-cell">
         <template #thumb>
-          <img :src="shopPreviewPro" class="custom-thumb-image" alt="thumbnail" />
+          <img
+            :src="shopPreviewPro"
+            class="custom-thumb-image"
+            alt="thumbnail"
+          />
         </template>
         <template #price>
           <div class="price-container">
@@ -975,7 +986,11 @@ onMounted(async () => {
         <template #title>
           <div style="margin-bottom: 0rem; font-size: larger">预习pro次数</div>
           <div
-            style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+            style="
+              font-size: smaller;
+              color: lightsalmon;
+              margin-bottom: 0.5rem;
+            "
           >
             可以购买当天使用10次
           </div>
@@ -1021,13 +1036,18 @@ onMounted(async () => {
         <template #title>
           <div style="margin-bottom: 0rem; font-size: larger">弹幕消除</div>
           <div
-            style="font-size: smaller; color: lightsalmon; margin-bottom: 0.5rem"
+            style="
+              font-size: smaller;
+              color: lightsalmon;
+              margin-bottom: 0.5rem;
+            "
           >
             弹幕生成后三天才能消除
           </div>
         </template>
       </van-dialog>
 
+      <!-- 消除尝试 -->
       <van-card desc="尝试减少一次" title="消除尝试" class="custom-cell">
         <template #thumb>
           <img
@@ -1053,8 +1073,13 @@ onMounted(async () => {
           </div>
         </template>
       </van-card>
-
-      <van-card desc="查看答案减少一次" title="消除查看答案" class="custom-cell">
+      
+      <!-- 消除查看答案 -->
+      <van-card
+        desc="查看答案减少一次"
+        title="消除查看答案"
+        class="custom-cell"
+      >
         <template #thumb>
           <img :src="viewPurchase" class="custom-thumb-image" alt="thumbnail" />
         </template>
@@ -1074,6 +1099,7 @@ onMounted(async () => {
           </div>
         </template>
       </van-card>
+      
     </div>
 
     <!-- 购买列表 -->
@@ -1310,19 +1336,35 @@ onMounted(async () => {
   </div>
 </template>
 
-
-
-
 <style scoped>
+.container {
+  padding-bottom: 200px;
+  min-height: 100vh;
+  overflow: visible;
+}
 
+/* 双列布局区域 */
 .card-container {
-  width: 100%;
-  height: 150%;
-  padding-bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* ★ 两列 */
+  gap: 16px; /* 两列之间的间距 */
+  padding: 10px;
+  padding-bottom: 20px; /* 防止最后被挡住 */
+}
+
+/* 每个卡片自身 */
+.custom-cell {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+  padding: 15px 10px 8px 10px;
+  transition: box-shadow 0.3s ease;
+  width: 100%; /* ★ 自动适应网格宽度 */
+  box-sizing: border-box;
 }
 
 .custom-cell:last-child {
-  margin-bottom: 2rem;
+  margin-bottom: 50px; /* 最后一个卡片额外间距 */
 }
 
 .custom-card {
@@ -1330,9 +1372,10 @@ onMounted(async () => {
 }
 
 .custom-thumb-image {
-  width:100px;
+  width: 100px;
   height: auto;
 }
+
 .price-container {
   display: flex;
   justify-content: space-between;
@@ -1341,6 +1384,7 @@ onMounted(async () => {
   margin-top: -20px;
   height: 80px;
 }
+
 .button-purchase {
   margin-top: 70px;
 }
@@ -1354,21 +1398,76 @@ onMounted(async () => {
   cursor: pointer;
   font-size: 15px;
 }
+
 .dialog-content {
   margin: 20px;
   font-size: 14px;
   text-align: center;
 }
+
 .custom-button-checkAnswer-group {
   display: flex;
 }
 
 .container {
+  height: auto;
+  overflow: visible; /* 确保内容可见 */
+  margin-bottom: 20px;
+  padding-bottom: 30px;
+  min-height: 100vh; /* 确保容器至少占满视口 */
+}
+
+.card-container {
   width: 100%;
-  height: 100%;
-  /* margin: 0 auto; */
-  /* margin-bottom: 10rem; */
-  /* padding-bottom: rem; */
+  height: auto;
+  padding-bottom: 300px;
+  overflow: visible; /* 确保子元素不被裁剪 */
+  position: relative; /* 确保定位正常 */
+  min-height: 600px; /* 确保有足够的高度 */
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .container {
+    margin-bottom: 150px;
+    padding-bottom: 80px;
+  }
+  
+  .card-container {
+    padding-bottom: 200px;
+  }
+  
+  .custom-cell:last-child {
+    margin-bottom: 80px; /* 增加最后一个卡片的底部间距 */
+  }
+}
+
+/* 大屏幕优化 */
+@media (min-width: 1024px) {
+  .container {
+    margin-bottom: 20px; /* 大屏幕更大的底部边距 */
+    padding-bottom: 10px;
+  }
+  
+  .card-container {
+    padding-bottom: 30px; /* 确保足够的底部空间 */
+  }
+  
+  .custom-cell:last-child {
+    margin-bottom: 100px; /* 增加大屏幕上最后一个卡片的底部间距 */
+  }
+}
+
+/* 小高度屏幕也保持足够空间 */
+@media (max-height: 700px) {
+  .container {
+    margin-bottom: 250px;
+    padding-bottom: 100px;
+  }
+  
+  .card-container {
+    padding-bottom: 250px;
+  }
 }
 
 @keyframes starFadeInOut {
@@ -1378,10 +1477,11 @@ onMounted(async () => {
     opacity: 0;
   }
   50% {
-    transform: scale(1); /* 中间状态最大 */
+    transform: scale(1);
     opacity: 1;
   }
 }
+
 .button-container {
   position: relative;
   margin-top: 0.3rem;
@@ -1397,22 +1497,18 @@ onMounted(async () => {
   height: auto;
 }
 
-/* 使用 :deep() 穿透 scoped 作用域，确保 Vant 组件内部样式生效 */
 .custom-dark-dialog :deep(.van-dialog__message) {
   color: red;
   font-weight: 700;
 }
+
 .custom-dark-dialog :deep(.van-dialog__header) {
   background-color: white;
 }
+
 .custom-dark-dialog :deep(.van-dialog__footer) {
   border-top-color: #444;
   background-color: gray;
-}
-
-.container {
-  width: 100%;
-  padding: 0;
 }
 
 /* 用户信息卡片样式 */
@@ -1465,7 +1561,7 @@ onMounted(async () => {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* 商品卡片保持原样 */
+/* 商品卡片 */
 .custom-cell {
   display: flex;
   justify-content: space-between;
@@ -1480,8 +1576,8 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.custom-cell ::v-deep .van-card__content {
-  padding-left: 3rem;   /* 调整为你想要的距离 */
+.custom-cell :deep(.van-card__content) {
+  padding-left: 3rem;
 }
 
 .custom-cell:hover {
@@ -1630,8 +1726,15 @@ onMounted(async () => {
   font-weight: bold;
 }
 
-::v-deep .my-dialog {
-  width: 560px;        /* 你想要的宽度，例如 360px */
-  max-width: 90%;      /* 防止超出屏幕，可选 */
+:deep(.my-dialog) {
+  width: 560px;
+  max-width: 90%;
 }
 </style>
+
+
+
+
+
+
+
