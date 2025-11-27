@@ -27,6 +27,333 @@ const axios = instance.appContext.config.globalProperties.$ajax;
 const originalData = ref([]);
 const filterXlsmData = ref([]);
 
+const props = defineProps({
+  popupWidth: {
+    type: String,
+    default: '100%'
+  },
+  popupHeight: {
+    type: String,
+    default: '100%'
+  },
+  popupPosition: {
+    type: String,
+    default: 'bottom'
+  },
+  filterGrade: {
+    type: String,
+    default: ''
+  },
+  filterLocation: {
+    type: String,
+    default: ''
+  },
+  filterStudent: {
+    type: String,
+    default: ''
+  },
+  showTabbar: {
+    type: Boolean,
+    default: true
+  }
+});
+// 筛选
+const formattedRate = (rate) => {
+  // 检查是否为整数
+  if (Number.isInteger(rate)) {
+    return rate - 3;
+  } else {
+    // 保留一位小数
+    return (rate - 3).toFixed(1);
+  }
+};
+const showFliterBox = ref(false);
+const valueSearchStudent = ref("");
+const valueSearchXlsm = ref("");
+const valueSearchGroup = ref("");
+const columnsGrade = [
+  //年级
+  { text: "七年级", value: "七年级" },
+  { text: "八年级", value: "八年级" },
+  { text: "九年级", value: "九年级" },
+  { text: "高一", value: "高一" },
+  { text: "高二", value: "高二" },
+  { text: "高三", value: "高三" },
+];
+const showGradePicker = ref(false);
+const valueGrade = ref("");
+const onConfirmGrade = ({ selectedValues }) => {
+  showGradePicker.value = false;
+  valueGrade.value = selectedValues[0];
+};
+
+const showLocationPicker = ref(false); // 地点
+const columnsLocation = ref([]);
+async function queryLocations() {
+  let params = new URLSearchParams();
+  params.append("method", "queryLocations");
+  return await axios.post("words/", params).then((ret) => {
+    return ret.data;
+  });
+}
+const valueLocation = ref("");
+const onConfirmLocation = ({ selectedValues }) => {
+  showLocationPicker.value = false;
+  valueLocation.value = selectedValues[0];
+};
+
+const showCalendar = ref(false); // 日期
+const dateCalendar = ref("");
+const formatDate = (date) =>
+  `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+const onConfirmCalendar = (values) => {
+  const [start, end] = values;
+  showCalendar.value = false;
+  dateCalendar.value = `${formatDate(start)} - ${formatDate(end)}`;
+};
+
+const clearFilterData = () => {
+  valueSearchStudent.value = "";
+  valueSearchXlsm.value = "";
+  valueSearchGroup.value = "";
+  valueLocation.value = "";
+  valueGrade.value = "";
+};
+const showFilter = () => {
+  showFliterBox.value = true;
+  queryLocations().then((ret) => {
+    columnsLocation.value = ret.map((item) => ({
+      text: item.location_name,
+      value: item.location_name,
+    }));
+    // console.log("columnsLocation", columnsLocation.value);
+  });
+};
+function processData(res) {
+  return res.map((item) => {
+    const {
+      title,
+      username,
+      answers,
+      synonyms,
+      create_time,
+      rate,
+      attempt,
+      nid,
+      alias,
+      view,
+      view_time,
+      swipe,
+      coins,
+      merge_option,
+      type,
+      reversd_number,
+      none_of_above,
+      is_spell_number,
+      lock_spell,
+      spell_words,
+      is_pinned,
+      is_review_required,
+      review_time,
+      apply_challenge,
+    } = item;
+    let dataAnswers = JSON.stringify(answers);
+    // console.log("dataAnswers: ", dataAnswers);
+    const parsedAnswers = eval("(" + dataAnswers + ")");
+    let dataSynonyms = JSON.stringify(synonyms);
+    const parsedSynonyms = eval("(" + dataSynonyms + ")");
+    // const parsedSynonyms = JSON.parse(dataSynonyms);
+
+    let lock_spell_format;
+    if (lock_spell === null) {
+      lock_spell_format = "未选词";
+    } else {
+      lock_spell_format = lock_spell;
+    }
+
+    const noneOfAboveValue = none_of_above ? 1 : 0;
+    return {
+      title,
+      username,
+      answers: parsedAnswers,
+      synonyms: parsedSynonyms,
+      create_time,
+      rate,
+      attempt,
+      nid,
+      alias,
+      view,
+      view_time,
+      swipe,
+      coins,
+      merge_option,
+      type,
+      reversd_number,
+      none_of_above: noneOfAboveValue,
+      is_spell_number,
+      lock_spell: lock_spell_format,
+      spell_words,
+      is_pinned,
+      is_review_required,
+      review_time,
+      apply_challenge,
+    };
+  });
+}
+const filterData = () => {
+  if (
+    valueSearchStudent.value == "" &&
+    valueSearchXlsm.value == "" &&
+    valueSearchGroup.value == "" &&
+    valueLocation.value == "" &&
+    valueGrade.value == "" &&
+    dateCalendar.value == ""
+  ) {
+    return;
+  }
+
+  async function filterData() {
+    let params = new URLSearchParams();
+    params.append("method", "filterTeacherComment");
+    params.append("filterStudent", valueSearchStudent.value);
+    params.append("filterXlsm", valueSearchXlsm.value);
+    params.append("filterGroup", valueSearchGroup.value);
+    params.append("filterLocation", valueLocation.value);
+    params.append("filterGrade", valueGrade.value);
+    params.append("filterDate", dateCalendar.value);
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  filterData()
+    .then((res) => {
+      const newFilteredFiles = [];
+      res.forEach((item) => {
+        newFilteredFiles.push({
+          nid: item.pk,
+          ...item.fields,
+          lock_spell: item.lock_spell,
+          spell_words: item.spell_words,
+        });
+      });
+      // console.log("res: ", newFilteredFiles);
+      let data = processData(newFilteredFiles);
+      data = processDatetime(data);
+      filterXlsmData.value = [...data];
+      // filterXlsmData2.value = [...data];
+    })
+    .then(() => {
+      sortByXlsm();
+    });
+};
+
+const sortByXlsm = () => {
+  filterXlsmData.value.sort((a, b) => {
+    if (a.username < b.username) return -1;
+    if (a.username > b.username) return 1;
+
+    const dateA = new Date(
+      a.create_time.replace(/[年月日时分]/g, "-").slice(0, -1)
+    );
+    const dateB = new Date(
+      b.create_time.replace(/[年月日时分]/g, "-").slice(0, -1)
+    );
+
+    return dateA - dateB;
+  });
+  console.log("filterXlsmData: ", filterXlsmData.value);
+};
+
+const filteredStudent = () => {
+  filterData();
+  // showFliterBox.value = false;
+};
+
+const updateReview = () => {
+  async function updateReview() {
+    let params = new URLSearchParams();
+    params.append("method", "updateReview");
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  showConfirmDialog({
+    title: "确认更新",
+    message: "是否确认更新review？",
+    theme: "round-button",
+  })
+    .then(() => {
+      updateReview().then((res) => {
+        console.log(res);
+        let message = "";
+        for (const [username, count] of Object.entries(res)) {
+          message += `${username}: ${count}个\n`;
+        }
+        showToast({
+          duration: 0,
+          closeOnClick: true,
+          closeOnClickOverlay: true,
+          message: message,
+        });
+      });
+    })
+    .catch(() => {
+      // on cancel
+    });
+};
+
+const updateDaily = () => {
+  async function updateDaily() {
+    let params = new URLSearchParams();
+    params.append("method", "updateDaily");
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+  showConfirmDialog({
+    title: "确认更新",
+    message: "是否确认更新Daily周长？",
+  })
+    .then(() => {
+      updateDaily().then((res) => {
+        console.log(res);
+        let message = "";
+        for (const [username, count] of Object.entries(res)) {
+          message += `${username}`;
+        }
+        showToast({
+          duration: 0,
+          closeOnClick: true,
+          closeOnClickOverlay: true,
+          message: message,
+        });
+      });
+    })
+    .catch(() => {
+      // on cancel
+    });
+};
+// 监听来自父组件的筛选参数变化
+watch(() => props.filterGrade, (newGrade) => {
+  if (newGrade !== undefined && newGrade !== null) {
+    valueGrade.value = newGrade;
+    filterData();
+  }
+}, { immediate: true });
+
+watch(() => props.filterLocation, (newLocation) => {
+  if (newLocation !== undefined && newLocation !== null) {
+    valueLocation.value = newLocation;
+    filterData();
+  }
+}, { immediate: true });
+
+watch(() => props.filterStudent, (newStudent) => {
+  if (newStudent !== undefined && newStudent !== null) {
+    valueSearchStudent.value = newStudent;
+    filterData();
+  }
+}, { immediate: true });
 // 跳转明细
 function formatDateString(dateString) {
   const date = new Date(dateString);
@@ -809,282 +1136,7 @@ const toggleDetail = async (item, index) => {
   });
 };
 
-// 筛选
-const formattedRate = (rate) => {
-  // 检查是否为整数
-  if (Number.isInteger(rate)) {
-    return rate - 3;
-  } else {
-    // 保留一位小数
-    return (rate - 3).toFixed(1);
-  }
-};
-const showFliterBox = ref(false);
-const valueSearchStudent = ref("");
-const valueSearchXlsm = ref("");
-const valueSearchGroup = ref("");
-const columnsGrade = [
-  //年级
-  { text: "七年级", value: "七年级" },
-  { text: "八年级", value: "八年级" },
-  { text: "九年级", value: "九年级" },
-  { text: "高一", value: "高一" },
-  { text: "高二", value: "高二" },
-  { text: "高三", value: "高三" },
-];
-const showGradePicker = ref(false);
-const valueGrade = ref("");
-const onConfirmGrade = ({ selectedValues }) => {
-  showGradePicker.value = false;
-  valueGrade.value = selectedValues[0];
-};
 
-const showLocationPicker = ref(false); // 地点
-const columnsLocation = ref([]);
-async function queryLocations() {
-  let params = new URLSearchParams();
-  params.append("method", "queryLocations");
-  return await axios.post("words/", params).then((ret) => {
-    return ret.data;
-  });
-}
-const valueLocation = ref("");
-const onConfirmLocation = ({ selectedValues }) => {
-  showLocationPicker.value = false;
-  valueLocation.value = selectedValues[0];
-};
-
-const showCalendar = ref(false); // 日期
-const dateCalendar = ref("");
-const formatDate = (date) =>
-  `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-const onConfirmCalendar = (values) => {
-  const [start, end] = values;
-  showCalendar.value = false;
-  dateCalendar.value = `${formatDate(start)} - ${formatDate(end)}`;
-};
-
-const clearFilterData = () => {
-  valueSearchStudent.value = "";
-  valueSearchXlsm.value = "";
-  valueSearchGroup.value = "";
-  valueLocation.value = "";
-  valueGrade.value = "";
-};
-const showFilter = () => {
-  showFliterBox.value = true;
-  queryLocations().then((ret) => {
-    columnsLocation.value = ret.map((item) => ({
-      text: item.location_name,
-      value: item.location_name,
-    }));
-    // console.log("columnsLocation", columnsLocation.value);
-  });
-};
-function processData(res) {
-  return res.map((item) => {
-    const {
-      title,
-      username,
-      answers,
-      synonyms,
-      create_time,
-      rate,
-      attempt,
-      nid,
-      alias,
-      view,
-      view_time,
-      swipe,
-      coins,
-      merge_option,
-      type,
-      reversd_number,
-      none_of_above,
-      is_spell_number,
-      lock_spell,
-      spell_words,
-      is_pinned,
-      is_review_required,
-      review_time,
-      apply_challenge,
-    } = item;
-    let dataAnswers = JSON.stringify(answers);
-    // console.log("dataAnswers: ", dataAnswers);
-    const parsedAnswers = eval("(" + dataAnswers + ")");
-    let dataSynonyms = JSON.stringify(synonyms);
-    const parsedSynonyms = eval("(" + dataSynonyms + ")");
-    // const parsedSynonyms = JSON.parse(dataSynonyms);
-
-    let lock_spell_format;
-    if (lock_spell === null) {
-      lock_spell_format = "未选词";
-    } else {
-      lock_spell_format = lock_spell;
-    }
-
-    const noneOfAboveValue = none_of_above ? 1 : 0;
-    return {
-      title,
-      username,
-      answers: parsedAnswers,
-      synonyms: parsedSynonyms,
-      create_time,
-      rate,
-      attempt,
-      nid,
-      alias,
-      view,
-      view_time,
-      swipe,
-      coins,
-      merge_option,
-      type,
-      reversd_number,
-      none_of_above: noneOfAboveValue,
-      is_spell_number,
-      lock_spell: lock_spell_format,
-      spell_words,
-      is_pinned,
-      is_review_required,
-      review_time,
-      apply_challenge,
-    };
-  });
-}
-const filterData = () => {
-  if (
-    valueSearchStudent.value == "" &&
-    valueSearchXlsm.value == "" &&
-    valueSearchGroup.value == "" &&
-    valueLocation.value == "" &&
-    valueGrade.value == "" &&
-    dateCalendar.value == ""
-  ) {
-    return;
-  }
-
-  async function filterData() {
-    let params = new URLSearchParams();
-    params.append("method", "filterTeacherComment");
-    params.append("filterStudent", valueSearchStudent.value);
-    params.append("filterXlsm", valueSearchXlsm.value);
-    params.append("filterGroup", valueSearchGroup.value);
-    params.append("filterLocation", valueLocation.value);
-    params.append("filterGrade", valueGrade.value);
-    params.append("filterDate", dateCalendar.value);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  filterData()
-    .then((res) => {
-      const newFilteredFiles = [];
-      res.forEach((item) => {
-        newFilteredFiles.push({
-          nid: item.pk,
-          ...item.fields,
-          lock_spell: item.lock_spell,
-          spell_words: item.spell_words,
-        });
-      });
-      // console.log("res: ", newFilteredFiles);
-      let data = processData(newFilteredFiles);
-      data = processDatetime(data);
-      filterXlsmData.value = [...data];
-      // filterXlsmData2.value = [...data];
-    })
-    .then(() => {
-      sortByXlsm();
-    });
-};
-
-const sortByXlsm = () => {
-  filterXlsmData.value.sort((a, b) => {
-    if (a.username < b.username) return -1;
-    if (a.username > b.username) return 1;
-
-    const dateA = new Date(
-      a.create_time.replace(/[年月日时分]/g, "-").slice(0, -1)
-    );
-    const dateB = new Date(
-      b.create_time.replace(/[年月日时分]/g, "-").slice(0, -1)
-    );
-
-    return dateA - dateB;
-  });
-  console.log("filterXlsmData: ", filterXlsmData.value);
-};
-
-const filteredStudent = () => {
-  filterData();
-  // showFliterBox.value = false;
-};
-
-const updateReview = () => {
-  async function updateReview() {
-    let params = new URLSearchParams();
-    params.append("method", "updateReview");
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  showConfirmDialog({
-    title: "确认更新",
-    message: "是否确认更新review？",
-    theme: "round-button",
-  })
-    .then(() => {
-      updateReview().then((res) => {
-        console.log(res);
-        let message = "";
-        for (const [username, count] of Object.entries(res)) {
-          message += `${username}: ${count}个\n`;
-        }
-        showToast({
-          duration: 0,
-          closeOnClick: true,
-          closeOnClickOverlay: true,
-          message: message,
-        });
-      });
-    })
-    .catch(() => {
-      // on cancel
-    });
-};
-
-const updateDaily = () => {
-  async function updateDaily() {
-    let params = new URLSearchParams();
-    params.append("method", "updateDaily");
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  showConfirmDialog({
-    title: "确认更新",
-    message: "是否确认更新Daily周长？",
-  })
-    .then(() => {
-      updateDaily().then((res) => {
-        console.log(res);
-        let message = "";
-        for (const [username, count] of Object.entries(res)) {
-          message += `${username}`;
-        }
-        showToast({
-          duration: 0,
-          closeOnClick: true,
-          closeOnClickOverlay: true,
-          message: message,
-        });
-      });
-    })
-    .catch(() => {
-      // on cancel
-    });
-};
 // 多选修改分组
 const cellValue = ref(true);
 const valueNewGroup = ref("");
@@ -1659,10 +1711,7 @@ const reloadPage = () => {
     </div>
 
     <router-view />
-    <van-tabbar route>
-      <!-- <van-tabbar-item icon="home-o" replace to="/teacher"
-        >首页</van-tabbar-item
-      > -->
+    <van-tabbar v-if="showTabbar" route>
       <van-tabbar-item icon="friends-o" replace to="/xlsmList"
         >用户xlsm</van-tabbar-item
       >
@@ -1686,8 +1735,8 @@ const reloadPage = () => {
     <!-- 答案日志 -->
     <van-popup
       v-model:show="showAnswerLog"
-      position="bottom"
-      :style="{ height: '80%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -1738,8 +1787,8 @@ const reloadPage = () => {
     <!-- log日志 -->
     <van-popup
       v-model:show="showAccountLog"
-      position="top"
-      :style="{ height: '100%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -1824,8 +1873,8 @@ const reloadPage = () => {
     <!-- 筛选数据 -->
     <van-popup
       v-model:show="showFliterBox"
-      position="bottom"
-      :style="{ height: '80%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -2368,10 +2417,11 @@ const reloadPage = () => {
     </van-dialog>
 
     <!-- 修改数据 -->
+     <!-- :style="{ height: '100%' }" -->
     <van-popup
       v-model:show="showReviseData"
-      position="bottom"
-      :style="{ height: '100%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
     >
       <van-cell-group inset style="">
@@ -2529,8 +2579,8 @@ const reloadPage = () => {
     <!-- 选择拼写的单词 -->
     <van-popup
       v-model:show="showSelectSpellVocabulary"
-      position="bottom"
-      :style="{ height: '90%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
     >
       <van-cell-group inset style="position: sticky; top: 0; z-index: 10">
@@ -2718,8 +2768,8 @@ const reloadPage = () => {
     <van-popup
       closeable
       v-model:show="showViewStudents"
-      position="bottom"
-      :style="{ height: '90%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
     >
       <div style="display: flex; align-items: center">
@@ -3089,7 +3139,6 @@ const reloadPage = () => {
                   is-link
                   center
                   clickable
-                  @click=""
                   class="custom-cell"
                 >
                   <template #icon>
@@ -3603,7 +3652,6 @@ const reloadPage = () => {
                     is-link
                     center
                     clickable
-                    @click=""
                     class="custom-cell"
                   >
                     <template #icon>

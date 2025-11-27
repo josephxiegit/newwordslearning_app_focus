@@ -26,6 +26,28 @@ const axios = instance.appContext.config.globalProperties.$ajax;
 const originalData = ref([]);
 const filteredFiles = ref([]);
 const showDiamondConsume = ref(false);
+const props = defineProps({
+  popupWidth: {
+    type: String,
+    default: '100%'
+  },
+  popupHeight: {
+    type: String,
+    default: '100%'
+  },
+  popupPosition: {
+    type: String,
+    default: 'bottom'
+  },
+  filterStudent: {
+    type: String,
+    default: ''
+  },
+  showTabbar: {
+    type: Boolean,
+    default: true
+  }
+});
 
 // 获得日志
 async function queryData() {
@@ -196,6 +218,17 @@ const valueAliasLog = ref("");
 const loading = ref(false);
 const finished = ref(false);
 const pageIndex = ref(0);
+
+// 监听filterStudent属性变化，自动更新筛选条件
+watch(() => props.filterStudent, (newValue) => {
+  if (newValue !== valueSearchStudent.value) {
+    valueSearchStudent.value = newValue;
+    // 触发筛选操作
+    if (newValue || valueSearchLog.value || valueAliasLog.value || valueVariety.value) {
+      getListData();
+    }
+  }
+});
 
 // 筛选类型
 const valueVariety = ref("");
@@ -597,10 +630,7 @@ const reloadPage = () => {
     </div>
 
     <router-view />
-    <van-tabbar route>
-      <!-- <van-tabbar-item icon="home-o" replace to="/teacher"
-        >首页</van-tabbar-item
-      > -->
+    <van-tabbar v-if="showTabbar" route>
       <van-tabbar-item icon="friends-o" replace to="/xlsmList"
         >用户xlsm</van-tabbar-item
       >
@@ -624,8 +654,8 @@ const reloadPage = () => {
     <!-- 筛选数据 -->
     <van-popup
       v-model:show="showFliterBox"
-      position="bottom"
-      :style="{ height: '50%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -776,8 +806,8 @@ const reloadPage = () => {
     <!-- 答案日志 -->
     <van-popup
       v-model:show="showAnswerLog"
-      position="bottom"
-      :style="{ height: '80%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -821,8 +851,8 @@ const reloadPage = () => {
     <!-- 日志详情 -->
     <van-popup
       v-model:show="showDetail"
-      position="bottom"
-      :style="{ height: '90%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -1017,8 +1047,8 @@ const reloadPage = () => {
     <!-- 延迟库 -->
     <van-popup
       v-model:show="showUncertain"
-      position="bottom"
-      :style="{ height: '70%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >

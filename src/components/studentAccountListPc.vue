@@ -3757,11 +3757,45 @@ const toggleChartMode = () => {
 };
 
 // 新增：计算最近四周的数据
+// 获取最近4周的数据
 const getLastFourWeeksData = computed(() => {
   const today = new Date();
   const weeks = [];
 
   for (let i = 3; i >= 0; i--) {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - i * 7 - today.getDay() + 1);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const weekData = {
+      label: `${weekStart.getMonth() + 1}.${weekStart.getDate()}-${
+        weekEnd.getMonth() + 1
+      }.${weekEnd.getDate()}`,
+      count: 0,
+    };
+
+    // 统计这一周的背诵次数
+    for (let j = 0; j < 7; j++) {
+      const currentDate = new Date(weekStart);
+      currentDate.setDate(weekStart.getDate() + j);
+      const dateString = formatDate(currentDate);
+      weekData.count += dailyCalendarData.value[dateString] || 0;
+    }
+
+    weeks.push(weekData);
+  }
+
+  return weeks;
+});
+
+// 获取最近8周的数据，用于计算八周平均值
+const getLastEightWeeksData = computed(() => {
+  const today = new Date();
+  const weeks = [];
+
+  for (let i = 7; i >= 0; i--) {
     const weekStart = new Date(today);
     weekStart.setDate(today.getDate() - i * 7 - today.getDay() + 1);
 
@@ -3985,7 +4019,6 @@ const selectDate = (day) => {
 };
 
 // 新增：绘制曲线图
-// 新增：绘制柱状图
 const chartCanvas = ref(null);
 const fourWeekAvg = ref(0);
 const eightWeekAvg = ref(0);
@@ -4019,7 +4052,7 @@ const drawChart = () => {
   }
 
   // 取最近8周数据计算八周平均
-  const recentEightWeeks = data.slice(-8);
+  const recentEightWeeks = getLastEightWeeksData.value;
   if (recentEightWeeks.length > 0) {
     eightWeekAvg.value =
       recentEightWeeks.reduce((acc, item) => acc + item.count, 0) /

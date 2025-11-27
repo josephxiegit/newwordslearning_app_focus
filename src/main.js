@@ -31,6 +31,7 @@ import UserInformation from './components/userInformation.vue';
 import UserInformationPc from './components/userInformationPc.vue';
 import PurchaseLog from './components/purchaseLog.vue';
 import Viewers from './components/viewers.vue';
+import ViewersPc from './components/viewersPc.vue';
 import ViewersHomepage from './components/viewersHomepage.vue';
 import Complete3star from './components/complete3star.vue';
 import Complete3starPc from './components/complete3starPc.vue';
@@ -296,6 +297,15 @@ const routes = [
         path: '/viewers',
         name: 'viewers',
         component: Viewers,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
+    {
+        path: '/viewersPc',
+        name: 'viewersPc',
+        component: ViewersPc,
         meta: {
             index: 2,
             preventBack: true
