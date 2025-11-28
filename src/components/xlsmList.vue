@@ -23,6 +23,14 @@ const router = useRouter();
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 
+// 定义props，控制是否显示router-view和tabbar
+const props = defineProps({
+  isEmbedded: {
+    type: Boolean,
+    default: false
+  }
+});
+
 const originalData = ref([]);
 const filteredFiles = ref([]);
 const studentData = ref([]);
@@ -1122,30 +1130,30 @@ const viewersConfirm = () => {
       />
     </div>
 
-    <router-view />
-    <van-tabbar route>
-      <!-- <van-tabbar-item icon="home-o" replace to="/teacher"
-        >首页</van-tabbar-item
-      > -->
-      <van-tabbar-item icon="friends-o" replace to="/xlsmList"
-        >用户xlsm</van-tabbar-item
-      >
-      <van-tabbar-item icon="todo-list-o" replace to="/teacherComment"
-        >试题</van-tabbar-item
-      >
-      <van-tabbar-item icon="list-switch" replace to="/logList"
-        >日志</van-tabbar-item
-      >
-      <van-tabbar-item icon="records-o" replace to="/viewersHomepage"
-        >监督</van-tabbar-item
-      >
-      <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
-        >单词本</van-tabbar-item
-      >
-      <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
-        >消费</van-tabbar-item
-      >
-    </van-tabbar>
+    <!-- 只在正常访问时显示router-view和tabbar -->
+    <template v-if="!isEmbedded">
+      <router-view />
+      <van-tabbar route>
+        <van-tabbar-item icon="friends-o" replace to="/xlsmList"
+          >用户xlsm</van-tabbar-item
+        >
+        <van-tabbar-item icon="todo-list-o" replace to="/teacherComment"
+          >试题</van-tabbar-item
+        >
+        <van-tabbar-item icon="list-switch" replace to="/logList"
+          >日志</van-tabbar-item
+        >
+        <van-tabbar-item icon="records-o" replace to="/viewersHomepage"
+          >监督</van-tabbar-item
+        >
+        <van-tabbar-item icon="vip-card-o" replace to="/textbookList"
+          >单词本</van-tabbar-item
+        >
+        <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
+          >消费</van-tabbar-item
+        >
+      </van-tabbar>
+    </template>
 
     <!-- 搜索试题 -->
     <form action="/">
@@ -1720,7 +1728,7 @@ const viewersConfirm = () => {
               <template #right-icon>
                 <van-checkbox
                   :name="item2.username"
-                  @click.native.stop="() => {}"
+                  @click.stop="() => {}"
                 />
               </template>
             </van-cell>

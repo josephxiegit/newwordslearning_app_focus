@@ -19,8 +19,9 @@ import {
 import moment from "moment";
 import loading from "./loading.vue";
 import WinningCalendar from "./WinningCalendar.vue";
-import TeacherComment from "./teacherComment.vue"; // 确保导入路径与文件系统中的实际文件名完全匹配，解决大小写冲突问题
+import TeacherComment from "./teacherComment.vue"; // 保持与实际文件名一致
 import logList from "./logList.vue";
+import xlsmList from "./xlsmList.vue";
 
 const router = useRouter();
 const instance = getCurrentInstance();
@@ -912,7 +913,7 @@ const getUserCalendarData = async (username) => {
     params.append("username", username);
 
     const response = await axios.post("words/", params);
-    console.log('response: ', response);
+    console.log("response: ", response);
 
     if (response.data.status === "success") {
       // 处理每日数据
@@ -937,7 +938,7 @@ const getUserCalendarData = async (username) => {
 
 // 处理用户名点击事件，显示/隐藏柱状图
 const handleUserClick = async (username) => {
-  console.log('username: ', username);
+  console.log("username: ", username);
   try {
     // 如果点击的是当前已显示的用户，则隐藏图表
     if (showChart.value && currentSelectedUser.value === username) {
@@ -1314,13 +1315,17 @@ const onFilterClick = () => {
         if (location && user.location_name !== location) return false;
 
         // 所有筛选条件都满足
-        
+
         return true;
       });
     });
   }
+};
 
-  
+// 分配词汇按钮
+const showAssignWordsTasks = ref(false);
+const assignWordsTasks = async () => {
+  showAssignWordsTasks.value = true;
 };
 
 // 复习
@@ -1474,10 +1479,13 @@ const reloadPage = () => {
             <span>{{
               filterGrade || filterLocation
                 ? filterGrade && filterLocation
-                  ? `${filterGrade}，${filterLocation}`
+                  ? `${filterLocation},${filterGrade}`
                   : filterGrade || filterLocation
                 : "全部"
             }}</span>
+          </button>
+          <button class="assign-button" @click="assignWordsTasks">
+            分配任务
           </button>
         </div>
 
@@ -1515,13 +1523,13 @@ const reloadPage = () => {
           <logList
             popupWidth="30%"
             popupHeight="100%"
-            popupPosition="right"
+            popupPosition="left"
             :filter-student="filterName"
             :show-tabbar="false"
           />
         </div>
         <!-- 柱状容器 -->
-        <!-- <div class="column">
+        <!-- <div lefts="column">
           <div
             v-show="showChart"
             class="chart-container"
@@ -2503,6 +2511,14 @@ const reloadPage = () => {
       >
     </van-popup>
 
+    <!-- 分配词汇任务 -->
+    <van-popup
+      v-model:show="showAssignWordsTasks"
+      position="left"
+      :style="{ width: '30%', height: '100%' }"
+    >
+      <xlsmList v-if="showAssignWordsTasks" :is-embedded="true" />
+    </van-popup>
     <!-- 连胜日历 -->
     <WinningCalendar
       v-model:visible="showWinningCalendar"
@@ -2718,6 +2734,42 @@ const reloadPage = () => {
   color: #1989fa;
   border: 2px solid #1989fa;
   border-radius: 8px;
+  font-size: clamp(
+    12px,
+    2vw,
+    16px
+  ); /* 自适应字体大小，最小值12px，最大值16px */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap; /* 防止文字换行 */
+  min-width: 0; /* 允许按钮宽度自适应内容 */
+  word-break: keep-all; /* 保持单词不被截断 */
+}
+
+.filter-button:hover {
+  background: linear-gradient(135deg, #1677ff 0%, #1989fa 100%);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(25, 137, 250, 0.3);
+}
+
+.filter-button:active {
+  background: linear-gradient(135deg, #1677ff 0%, #1989fa 100%);
+  color: white;
+  transform: translateY(0);
+}
+
+.assign-button {
+  width: 100%;
+  padding: 12px 24px;
+  background: white;
+  color: #faba19;
+  border: 2px solid #faba19;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
@@ -2727,13 +2779,16 @@ const reloadPage = () => {
   justify-content: center;
 }
 
-.filter-button:hover {
-  background: linear-gradient(135deg, #1677ff 0%, #1989fa 100%);
+.assign-button:hover {
+  background: linear-gradient(135deg, #faba19 0%, #faba19 100%);
+  color: white;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(25, 137, 250, 0.3);
 }
 
-.filter-button:active {
+.assign-button:active {
+  background: linear-gradient(135deg, #faba19 0%, #faba19 100%);
+  color: white;
   transform: translateY(0);
 }
 
