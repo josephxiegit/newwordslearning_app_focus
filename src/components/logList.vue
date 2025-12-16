@@ -29,24 +29,24 @@ const showDiamondConsume = ref(false);
 const props = defineProps({
   popupWidth: {
     type: String,
-    default: '100%'
+    default: "100%",
   },
   popupHeight: {
     type: String,
-    default: '100%'
+    default: "100%",
   },
   popupPosition: {
     type: String,
-    default: 'bottom'
+    default: "bottom",
   },
   filterStudent: {
     type: String,
-    default: ''
+    default: "",
   },
   showTabbar: {
     type: Boolean,
-    default: true
-  }
+    default: true,
+  },
 });
 
 // 获得日志
@@ -196,7 +196,7 @@ function processData(res) {
         alias,
         complement,
         diamondConsume,
-        teacher_mark
+        teacher_mark,
       };
     })
     .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
@@ -220,15 +220,23 @@ const finished = ref(false);
 const pageIndex = ref(0);
 
 // 监听filterStudent属性变化，自动更新筛选条件
-watch(() => props.filterStudent, (newValue) => {
-  if (newValue !== valueSearchStudent.value) {
-    valueSearchStudent.value = newValue;
-    // 触发筛选操作
-    if (newValue || valueSearchLog.value || valueAliasLog.value || valueVariety.value) {
-      getListData();
+watch(
+  () => props.filterStudent,
+  (newValue) => {
+    if (newValue !== valueSearchStudent.value) {
+      valueSearchStudent.value = newValue;
+      // 触发筛选操作
+      if (
+        newValue ||
+        valueSearchLog.value ||
+        valueAliasLog.value ||
+        valueVariety.value
+      ) {
+        getListData();
+      }
     }
   }
-});
+);
 
 // 筛选类型
 const valueVariety = ref("");
@@ -331,6 +339,7 @@ const numberprev = ref(0);
 const numbershowanswer = ref(0);
 const numbertransparent = ref(0);
 const diamondConsume = ref("");
+const detailPopup = ref("");
 
 // 延迟库
 async function getUncertain(nid) {
@@ -374,6 +383,7 @@ const getUncertainVocabulary = () => {
 
 const toggleDetail = async (index) => {
   const detail = filteredFiles.value[index];
+  detailPopup.value = detail;
   detailMode.value = detail["swipe"];
   detailName.value = detail["username"];
   detailAlias.value = detail["alias"];
@@ -400,7 +410,6 @@ const toggleDetail = async (index) => {
     console.log("response.data", response.data);
     detailChallenge.value = response.data.apply_challenge;
     checkedChallenge.value = !detailChallenge.value;
-
 
     // 创建一个映射，用于快速查找哪些英文单词的 teacher_mark 为 true
     const teacherMarkedWords = new Set();
@@ -469,6 +478,7 @@ const isCorrectAnswer = (
 const deleteItem = (item, index) => {
   // console.log("index: ", index);
   // console.log("item: ", item);
+  showDetail.value = false;
   async function deleteLog() {
     // 查询学生
     let params = new URLSearchParams();
@@ -549,14 +559,14 @@ const checkboxRefs3 = ref({});
 const checkboxStates = ref({});
 const checkedChallenge = ref(true);
 const changeSwitchChallenge = () => {
-  if(checkedChallenge.value) {
+  if (checkedChallenge.value) {
     // 打开点击自动上传
     showToast("点击就上传");
   } else {
     // 只能使用刷新按钮上传
     showToast("按钮才会上传");
   }
-}
+};
 const toggleCheckChallenge = (index) => {
   if (detailChallenge.value) return;
   // 切换选中状态
@@ -569,7 +579,7 @@ const toggleCheckChallenge = (index) => {
     }
   }
   console.log("checkedChallenge", checkedChallenge.value);
-  if(checkedChallenge.value) {
+  if (detailMode.value === '挑战' && checkedChallenge.value) {
     refreshDataChallenge();
   }
 };
@@ -747,10 +757,10 @@ const reloadPage = () => {
           is-link
           @click="toggleDetail(index)"
         >
-        <template #label>
-          <div class="label-line">{{ item.create_time }}</div>
-          <div v-if="item.teacher_mark != ''">{{ item.teacher_mark }}</div>
-        </template>
+          <template #label>
+            <div class="label-line">{{ item.create_time.slice(2) }}</div>
+            <div v-if="item.teacher_mark != ''">{{ item.teacher_mark }}</div>
+          </template>
           <template #title>
             <div v-if="item.title == '多组复习'">
               <div
@@ -789,7 +799,9 @@ const reloadPage = () => {
                   {{ item.log.length }}
                   <div
                     v-if="
-                      item.diamondConsume != null && item.diamondConsume != '' && item.swipe != '滑动'
+                      item.diamondConsume != null &&
+                      item.diamondConsume != '' &&
+                      item.swipe != '滑动'
                     "
                   >
                     &nbsp;💎
@@ -888,20 +900,24 @@ const reloadPage = () => {
                 display: flex;
               "
             >
-              <div style="margin-top: 0.1rem;">{{ detailRate }}</div>
+              <div style="margin-top: 0.1rem">{{ detailRate }}</div>
 
               <div
                 v-if="detailMode !== '挑战'"
                 style="display: flex; margin-top: -0.1rem"
               >
                 <span
-                  style="margin-left: 1rem; color: blueviolet; margin-top: 0.1rem;"
+                  style="
+                    margin-left: 1rem;
+                    color: blueviolet;
+                    margin-top: 0.1rem;
+                  "
                   @click="showUncertainResult"
                   >迟疑库 {{ uncertainResult.length }}</span
                 >
                 <div style="display: flex; margin-top: 0.1rem">
                   <van-icon
-                  style="margin-top: 0.1rem;"
+                    style="margin-top: 0.1rem"
                     name="replay"
                     v-show="!loadingUncertain"
                     @click="getUncertainVocabulary()"
@@ -917,7 +933,9 @@ const reloadPage = () => {
                 <div
                   style="display: flex; margin-top: 0.1rem; margin-left: 2rem"
                 >
-                  <div @click="refreshDataChallenge" style="font-size: 12px;">上传标记</div>
+                  <div @click="refreshDataChallenge" style="font-size: 12px">
+                    上传标记
+                  </div>
                   <van-icon
                     style="margin-top: 0.1rem"
                     name="replay"
@@ -943,6 +961,15 @@ const reloadPage = () => {
             <div style="margin-top: 0.1rem; color: gray">
               {{ detailXlsmName.slice(0, -5) }}
             </div>
+          </div>
+          <div style="margin-top: 0.2rem; margin-left: 1rem;">
+            <van-button
+              square
+              type="primary"
+              text="删除"
+              size="small"
+              @click="deleteItem(detailPopup, index)"
+            />
           </div>
           <div
             v-if="detailMode === '游戏'"

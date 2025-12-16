@@ -5108,17 +5108,6 @@ onMounted(async () => {
                           >
                             {{ processedTitle(item.title) }}
                           </div>
-                          <van-badge
-                            :content="item.swipe == 0 ? 'Game' : 'Game'"
-                            :color="
-                              item.is_review_required == 1
-                                ? '#999'
-                                : item.swipe == 0
-                                ? 'lightgray'
-                                : '#999'
-                            "
-                            style="font-size: 12px"
-                          />
                         </div>
                       </template>
 
@@ -5779,11 +5768,11 @@ onMounted(async () => {
       @cancel="handleSwipeMode"
       :confirmButtonDisabled="!isRegularModeEnabled"
       style="
-        --van-dialog-width: 30%;
+        --van-dialog-width: 45%;
         --van-dialog-confirm-button-font-size: 20px;
         --van-dialog-button-height: 65px;
       "
-      :style="{ maxWidth: '400px' }"
+      :style="{ maxWidth: '550px' }"
     >
       <template #title>
         <div>
@@ -5961,7 +5950,7 @@ onMounted(async () => {
       confirmButtonText="复习模式"
       @confirm="handleReviewMode"
       style="
-        --van-dialog-width: 30%;
+        --van-dialog-width: 45%;
         --van-dialog-confirm-button-font-size: 20px;
         --van-dialog-button-height: 65px;
       "
@@ -6790,6 +6779,12 @@ onMounted(async () => {
   }
 }
 
+/* @media screen and (min-height: 1360px) {
+  .right-panel {
+    padding-top: 100% !important;
+  }
+} */
+
 @media screen and (max-width: 900px) {
   .month-calendar {
     padding: 0.8rem;
@@ -7032,7 +7027,7 @@ onMounted(async () => {
 }
 
 .cell-value {
-  font-size: 14px;
+  font-size: 12px;
   text-align: right;
 }
 
@@ -7095,6 +7090,7 @@ onMounted(async () => {
   font-size: 14px;
   color: #666;
   margin-top: 1rem;
+  width: 120%;
 }
 
 .create-time.reviewed-text {
@@ -7676,7 +7672,7 @@ onMounted(async () => {
 @media screen and (max-width: 1199px) {
   /* 中等屏幕：2列，较小单元格 */
   .van-list {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(1fr);
     gap: 0.8rem;
   }
 }

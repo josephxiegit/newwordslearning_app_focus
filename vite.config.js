@@ -1,29 +1,14 @@
+// newWordsLearning_app/vite.config.js
+
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
+  // 保持相对路径，解决 Cordova ERR_CONNECTION_REFUSED
+  base: './', 
   plugins: [vue()],
+  build: {
+    // *** 关键修改：将输出目录指向 Cordova 的 www 目录 ***
+    outDir: 'cordova-app/www' 
+  }
 })
-
-// import { defineConfig } from 'vite'
-// import vue from '@vitejs/plugin-vue'
-// import fs from 'fs'
-
-// export default defineConfig({
-//   plugins: [vue()],
-//   server: {
-//     https: {
-//       key: fs.readFileSync('./localhost+2-key.pem'),
-//       cert: fs.readFileSync('./localhost+2.pem'),
-//     },
-//     port: 5173,
-//     host: true,
-//     proxy: {
-//       '/newwordslearning': {
-//         target: 'http://127.0.0.1:8000',
-//         changeOrigin: true,
-//         secure: false,
-//       }
-//     }
-//   }
-// })

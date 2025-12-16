@@ -20,7 +20,6 @@ import {
 } from "vant";
 import { Base64 } from "js-base64";
 import { useRouter } from "vue-router";
-import backgroundVideo from "../assets/homepagebackground.mp4";
 
 const flagTheme = inject("flagTheme");
 const router = useRouter();
@@ -183,13 +182,6 @@ const forcePlayVideo = async () => {
   }
 };
 
-// 用户交互后播放视频
-const handleUserInteraction = () => {
-  if (videoRef.value && videoRef.value.paused) {
-    forcePlayVideo();
-  }
-};
-
 onMounted(async () => {
   const expirationDate = localStorage.getItem("expirationDate");
   if (expirationDate) {
@@ -247,41 +239,21 @@ onMounted(async () => {
   };
   typed.value = new Typed(pRef.value, options);
 
-  // 尝试播放视频
-  await forcePlayVideo();
 
-  // 监听用户交互事件以触发视频播放
-  document.addEventListener("click", handleUserInteraction, { once: true });
-  document.addEventListener("touchstart", handleUserInteraction, { once: true });
 });
 
 onUnmounted(() => {
   if (typed.value) {
     typed.value.destroy();
   }
-  // 清理事件监听
-  document.removeEventListener("click", handleUserInteraction);
-  document.removeEventListener("touchstart", handleUserInteraction);
 });
 </script>
 
 <template>
   <div class="page-container">
     <!-- 视频背景 -->
-    <video 
-      ref="videoRef"
-      class="background-video" 
-      autoplay 
-      loop 
-      muted 
-      playsinline
-      preload="auto"
-      @loadeddata="forcePlayVideo"
-      @canplay="forcePlayVideo"
-    >
-      <source :src="backgroundVideo" type="video/mp4" />
-      您的浏览器不支持视频标签。
-    </video>
+  <div class="background-image-container">
+    </div>
     
     <div class="content-wrapper">
       <!-- 主要内容区域：左右布局 -->
@@ -305,9 +277,6 @@ onUnmounted(() => {
             <van-cell-group inset>
               <div class="header-section">
                 <div class="login-title">请输入账户名和密码</div>
-                <div class="parent-link-button" @click="gotoParent()">
-                  前往家长版
-                </div>
               </div>
               <van-field
                 v-model="userAccount"
@@ -370,17 +339,20 @@ body {
 }
 
 /* 视频背景 */
-.background-video {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  min-width: 100%;
-  min-height: 100%;
-  width: auto;
-  height: auto;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-  object-fit: cover;
+.background-image-container {
+  /* 确保覆盖整个视口 */
+  position: fixed; 
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0; /* 保持在最底层 */
+
+  /* 使用 CSS 属性设置图片 */
+  background-image: url("../assets/homepagebackground.jpg"); /* 这里的路径需要根据您的实际文件结构来确定 */
+  background-size: cover; /* 关键：确保图片覆盖整个容器 */
+  background-position: center; /* 确保图片居中显示 */
+  background-repeat: no-repeat; /* 防止图片重复平铺 */
 }
 
 .page-container::before {
@@ -427,7 +399,7 @@ body {
 }
 
 .right-section {
-  flex: 1;
+  flex: 1.4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -435,17 +407,21 @@ body {
 
 /* 打字动画 */
 .typing-container {
-  height: 80px;
+  height: 100px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .content {
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 600;
-  color: #333;
+  color: #E7C8C8;
   text-align: center;
+  
+  line-height: 1.2; 
+  margin: 0; 
+  padding: 0;
 }
 
 /* 登录表单 */
@@ -474,21 +450,6 @@ body {
   font-weight: 700;
   font-size: 18px;
   color: #333;
-}
-
-.parent-link-button {
-  font-size: 13px;
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: white;
-  background-color: rgb(47, 255, 134);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.parent-link-button:hover {
-  background-color: rgb(37, 235, 114);
-  transform: translateY(-1px);
 }
 
 .large-field :deep(.van-field__label),
@@ -571,10 +532,6 @@ body {
 @media (min-width: 768px) {
   .content {
     font-size: 48px;
-  }
-
-  .typing-container {
-    height: 100px;
   }
 
   .login-box {

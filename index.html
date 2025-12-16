@@ -2,17 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
 
     
-    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0" /> -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
+    <meta http-equiv="Content-Security-Policy" 
+    content="
+        default-src * 'self' data: gap: 'unsafe-inline' 'unsafe-eval'; 
+        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+        font-src 'self' data: https://fonts.gstatic.com https://at.alicdn.com http://at.alicdn.com;
+        connect-src *;
+        media-src *
+    ">
+    
     <title>扫码背单词</title>
+    <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <div id="app"></div>
-    <!-- <script src="https://code.responsivevoice.org/responsivevoice.js?key=SIbs8PoG"></script> -->
-    <script type="module" src="/src/main.js"></script>
-  </body>
+    </body>
 </html>

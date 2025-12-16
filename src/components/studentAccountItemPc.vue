@@ -1562,6 +1562,7 @@ onMounted(async () => {
                     :ref="(el) => (checkboxRefs[`${index}-${index2}`] = el)"
                     class="mini-checkbox"
                     @click.stop
+                    @click="!isDisabled(index, index2) && toggleCheckChinese(index, index2)"
                   />
                 </div>
               </div>

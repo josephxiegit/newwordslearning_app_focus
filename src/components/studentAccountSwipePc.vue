@@ -2499,7 +2499,7 @@ onMounted(async () => {
 
     <!-- 遮罩层（场外支援）- 移到右侧面板内 -->
     <van-overlay :show="showOverlay" @click="continueSwipe">
-      <van-icon name="cross" class="close-icon" @click.stop="continueSwipe" />
+      <!-- <van-icon name="cross" class="close-icon" @click.stop="continueSwipe" /> -->
       <div class="swipe-help-container">
         <swipeHelp ref="swipeHelpRef"/>
       </div>
@@ -2698,7 +2698,8 @@ html {
 }
 
 .button-group {
-  width: 100%;
+  width: 95%;
+  margin-left: 7px;
 }
 
 .timer-section {
@@ -2719,16 +2720,18 @@ html {
 /* 右侧面板 */
 .right-panel {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 7%;
+  padding-bottom: 0%;
 }
 
 .my-swipe {
   width: 100%;
   max-width: 800px;
+  max-height: 100%;
+  transform: translateY(-30%);
 }
 
 /* 卡片样式 */
@@ -2910,10 +2913,11 @@ html {
 }
 
 /* 响应式设计 */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .main-content {
     flex-direction: column;
     padding: 10px;
+    overflow: hidden;
   }
   
   .left-panel {
@@ -2930,6 +2934,7 @@ html {
     width: 100%;
     flex-direction: row;
     flex-wrap: wrap;
+    justify-content: space-around;
   }
   
   .button-group {

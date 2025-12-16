@@ -1450,11 +1450,11 @@ onMounted(async () => {
   }
   
   .card-container {
-    padding-bottom: 30px; /* 确保足够的底部空间 */
+    padding-bottom: 5px; /* 确保足够的底部空间 */
   }
   
   .custom-cell:last-child {
-    margin-bottom: 100px; /* 增加大屏幕上最后一个卡片的底部间距 */
+    margin-bottom: 10px; /* 增加大屏幕上最后一个卡片的底部间距 */
   }
 }
 
@@ -1468,6 +1468,72 @@ onMounted(async () => {
   .card-container {
     padding-bottom: 250px;
   }
+}
+
+/* 小平板竖屏及更小屏幕优化 */
+@media (max-width: 1024px) {
+  
+  .container {
+    min-height: 120vh;
+  }
+  /* 1. 容器改为单列 */
+  .card-container {
+    grid-template-columns: 1fr !important;
+    padding-left: 5px;
+  }
+
+  /* 2. 卡片样式重置 */
+  .custom-cell {
+    /* 限制最大宽度，防止卡片在iPad上显得傻大 */
+    max-width: 480px !important; 
+    /* 居中显示 */
+    margin: 0 auto !important; 
+    /* 增加底部间距 */
+    margin-bottom: 20px !important;
+    
+    /* 解决高度太矮的问题：改为自动高度 */
+    height: auto !important;
+    min-height: 140px !important; /* 给一个最小高度 */
+    
+    /* 重新整理内部布局 */
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+
+  /* 3. 修复价格区域被遮挡或位置不对 */
+  .price-container {
+    /* 取消原来的 margin-top: -20px，改为正常间距 */
+    margin-top: 10px !important; 
+    height: auto !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* 4. 修复按钮看不见的问题 */
+  .button-purchase {
+    /* 取消原来的 margin-top: 70px，那个值太大了导致溢出 */
+    margin-top: 0 !important; 
+    padding-bottom: 10px !important;
+    
+    /* 让按钮居右显示（可选，如果想居中改为 center） */
+    display: flex;
+    justify-content: flex-end; 
+  }
+
+  /* 调整图片大小，避免在宽卡片中比例失调 */
+  .custom-thumb-image {
+    width: 120px !important; /* 稍微放大一点图片 */
+    height: auto !important;
+    margin-right: 15px !important;
+  }
+}
+
+/* 小平板横屏及更小屏幕优化 */
+@media (max-width: 1024px) and (max-height: 768px) {
+  .container {
+    min-height: 185vh;
+  }
+  
 }
 
 @keyframes starFadeInOut {

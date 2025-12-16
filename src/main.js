@@ -1,7 +1,7 @@
 import { createApp, reactive, provide, ref } from 'vue'
 // import './style.css'
 import App from './App.vue'
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router';
 import axiosPlugin from './plugins/axios';
 import HomePage from './components/homepage.vue';
 import HomePagePc from './components/homepagePc.vue';
@@ -341,7 +341,7 @@ const routes = [
 ];
 // 创建router实例
 const router = createRouter({
-    history: createWebHistory(),
+    history: createWebHashHistory(),
     routes, // 使用路由配置
 });
 
@@ -352,6 +352,13 @@ function _isMobile() {
     return flag;
 }
 function _isPc() {
+    // 首先检查屏幕宽度，如果屏幕宽度小于阈值，直接判定为移动设备
+    const SMALL_SCREEN_THRESHOLD = 768;
+    if (window.innerWidth < SMALL_SCREEN_THRESHOLD) {
+        return false;
+    }
+
+    // 原有逻辑：基于User-Agent判断
     let userAgentInfo = navigator.userAgent;
     let agents = ["Android", "iPhone", "SymbianOS", "Windows Phone", "iPad", "iPod"];
     let flag = true;
@@ -364,12 +371,22 @@ function _isPc() {
     return flag;  // true = PC, false = Mobile + Pad
 }
 function _isPad() {
+    const SMALL_SCREEN_THRESHOLD = 768;
+    if (window.innerWidth < SMALL_SCREEN_THRESHOLD) {
+        return false;
+    }
     return /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
 }
 
+
+
 // 设置全局前置守卫
 router.beforeEach((to, from, next) => {
+    // console.log('_isPad(): ', _isPad());
+    // console.log('_isPc(): ', _isPc());
+    // console.log('_isMobile(): ', _isMobile());
     if (to.path === '/' || to.path === '/homepage') {
+
         if (_isPc() || _isPad()) {
             if (to.path !== '/homepagePc') {
                 return next('/homepagePc');
@@ -552,4 +569,14 @@ app.use(router);
 app.use(axiosPlugin);
 
 // 挂载Vue应用实例
-app.mount('#app');
+function mountApp() {
+    app.mount('#app');
+}
+
+if (window.cordova) {
+    // 只有在 Cordova ready 后才挂载
+    document.addEventListener('deviceready', mountApp, false);
+} else {
+    // 在浏览器开发环境，立即挂载
+    mountApp();
+}

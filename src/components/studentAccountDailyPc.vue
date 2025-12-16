@@ -1087,19 +1087,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- 新增顶级包裹 div -->
   <div class="app-root">
-    <!-- 新增顶部导航栏 -->
     <div class="top-nav-header">
       <div class="nav-left-content">{{ username }}</div>
       <div class="nav-center-content">{{ navTitle }}</div>
       <div class="nav-right-placeholder"></div>
-      <!-- 占位，确保flex布局下标题居中（如果不用绝对定位） -->
-    </div>
+      </div>
 
-    <!-- 原有的主布局容器，现在包裹在app-root内 -->
     <div class="parent-container layout-container">
-      <!-- 布局：左侧面板 (控制区/进度/按钮) -->
       <div class="control-panel">
         <div class="custom-info-bar">
           <div class="info-left-text">
@@ -1108,7 +1103,6 @@ onMounted(async () => {
           <div class="info-right-title">一起来复习</div>
         </div>
 
-        <!-- 做题进度 -->
         <div class="progress-wrapper">
           <van-progress
             :pivot-text="pivotText"
@@ -1118,7 +1112,6 @@ onMounted(async () => {
             :pivot-style="pivotFontStyle"
           />
 
-          <!-- 鼓励动画 (Fixed定位，不受容器限制) -->
           <img
             v-if="showEncouragement"
             :src="srcswipeEncouragement"
@@ -1133,7 +1126,6 @@ onMounted(async () => {
           />
         </div>
 
-        <!-- 底部按钮区 (在横屏时移入左侧面板) -->
         <div class="button-container">
           <van-button
             :type="buttonTextType"
@@ -1147,7 +1139,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 布局：右侧面板 (卡片/购物车) -->
       <div class="card-panel">
         <div class="swipe-wrapper">
           <van-swipe
@@ -1319,7 +1310,6 @@ onMounted(async () => {
           </van-swipe>
         </div>
 
-        <!-- 购物车 (移动到右侧卡片面板内) -->
         <div class="cart-wrapper">
           <van-badge :content="cartCount">
             <van-icon
@@ -1332,14 +1322,12 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 动画元素 (独立层级) -->
       <div
         v-if="showAnimation"
         class="animated-item"
         :style="animationStyle"
       ></div>
 
-      <!-- vocabulary meaning -->
       <van-popup
         position="right"
         :style="{ width: '40%', height: '100%' }"
@@ -1347,7 +1335,6 @@ onMounted(async () => {
         style="padding: 1rem"
         :close-on-click-overlay="false"
       >
-        <!-- Popup 内容保持不变 -->
         <div
           v-if="typeXiti != '试题'"
           style="
@@ -1424,15 +1411,7 @@ onMounted(async () => {
       />
     </div>
   </div>
-</template>
-
-<script>
-// 用于在setup外补充一些计算属性或逻辑，如果需要的话
-// 但此处因为已经用了 script setup，这部分主要为了解决 cartWrapperStyle 在 script setup 中未定义的问题
-// 由于 script setup 中不好直接写 data/methods 混合，我将在下面的 computed 中补充 cartWrapperStyle 逻辑
-</script>
-
-<style scope>
+</template><style scope>
 html {
   touch-action: manipulation; /* 禁用双击缩放 */
   height: 100%;
@@ -1493,7 +1472,7 @@ body {
   flex: 1;
   min-height: 0; /* 防止 flex item 内容溢出导致撑大容器 */
   background-color: #f7f8fa;
-  overflow: hidden; /* 内部管理滚动条 */
+  overflow: hidden; /* **关键：防止 layout-container 自身出现滚动条** */
 }
 
 .nav-bar-container {
@@ -1565,9 +1544,13 @@ body {
     margin-bottom: 40px; /* 核心修改：大幅增加底部间距，把按钮推开 */
   }
 
+  /* **关键：确保卡片面板不会产生水平滚动条** */
   .card-panel {
     display: block;
     padding-bottom: 50px;
+    /* 核心修改：移除默认的宽度限制或确保内容不会溢出 */
+    overflow-x: hidden; /* 强制隐藏横向滚动条 */
+    width: 100%;
   }
 
   .my-swipe {
@@ -1590,10 +1573,11 @@ body {
     justify-content: center;
   }
 
+  /* 购物车位置调整 (竖屏) */
   .cart-wrapper {
     position: fixed;
-    right: 20px;
-    bottom: 100px;
+    right: 100px; /* 从 20px 减少到 10px (稍微向左) */
+    bottom: 200px; /* 从 100px 减少到 70px (向上移动) */
     z-index: 99;
   }
 }
@@ -1604,7 +1588,8 @@ body {
     display: flex;
     flex-direction: row;
     height: 100%; /* 占满 flex: 1 的高度 */
-    overflow: hidden;
+    overflow: hidden; /* **关键：防止 layout-container 出现滚动条** */
+
   }
 
   /* --- 左侧面板 --- */
@@ -1663,9 +1648,10 @@ body {
     width: 70%;
     height: 100%; /* 占满父容器 */
     overflow-y: auto;
+    overflow-x: hidden; /* 强制隐藏横向滚动条 */
     position: relative;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background-color: #f7f8fa;
   }
@@ -1673,6 +1659,14 @@ body {
   .swipe-wrapper {
     width: 100%;
     max-width: 600px;
+    transform: translateY(10%);
+  }
+  @media screen and (min-width: 1023px) {
+    .swipe-wrapper {
+      width: 100%;
+      max-width: 600px;
+      transform: translateY(40%);
+    }
   }
 
   .my-swipe {
@@ -1680,11 +1674,19 @@ body {
     padding: 20px 0;
   }
 
+  /* 购物车位置调整 (横屏) */
   .cart-wrapper {
     position: absolute;
-    right: 30px;
-    bottom: 30px;
+    right: 100px; /* 从 30px 减少到 20px (稍微向左) */
+    bottom: 200px; /* 从 30px 减少到 20px (向上移动) */
     z-index: 99;
+  }
+  @media screen and (max-width: 1025px) {
+    .swipe-wrapper {
+      width: 100%;
+      max-width: 600px;
+      transform: translateY(10%);
+    }
   }
 }
 

@@ -30,32 +30,36 @@ const filterXlsmData = ref([]);
 const props = defineProps({
   popupWidth: {
     type: String,
-    default: '100%'
+    default: "100%",
   },
   popupHeight: {
     type: String,
-    default: '100%'
+    default: "100%",
   },
   popupPosition: {
     type: String,
-    default: 'bottom'
+    default: "bottom",
   },
   filterGrade: {
     type: String,
-    default: ''
+    default: "",
   },
   filterLocation: {
     type: String,
-    default: ''
+    default: "",
   },
   filterStudent: {
     type: String,
-    default: ''
+    default: "",
   },
   showTabbar: {
     type: Boolean,
-    default: true
-  }
+    default: true,
+  },
+  rateSize: {
+    type: String,
+    default: "18",
+  },
 });
 // 筛选
 const formattedRate = (rate) => {
@@ -334,26 +338,38 @@ const updateDaily = () => {
     });
 };
 // 监听来自父组件的筛选参数变化
-watch(() => props.filterGrade, (newGrade) => {
-  if (newGrade !== undefined && newGrade !== null) {
-    valueGrade.value = newGrade;
-    filterData();
-  }
-}, { immediate: true });
+watch(
+  () => props.filterGrade,
+  (newGrade) => {
+    if (newGrade !== undefined && newGrade !== null) {
+      valueGrade.value = newGrade;
+      filterData();
+    }
+  },
+  { immediate: true }
+);
 
-watch(() => props.filterLocation, (newLocation) => {
-  if (newLocation !== undefined && newLocation !== null) {
-    valueLocation.value = newLocation;
-    filterData();
-  }
-}, { immediate: true });
+watch(
+  () => props.filterLocation,
+  (newLocation) => {
+    if (newLocation !== undefined && newLocation !== null) {
+      valueLocation.value = newLocation;
+      filterData();
+    }
+  },
+  { immediate: true }
+);
 
-watch(() => props.filterStudent, (newStudent) => {
-  if (newStudent !== undefined && newStudent !== null) {
-    valueSearchStudent.value = newStudent;
-    filterData();
-  }
-}, { immediate: true });
+watch(
+  () => props.filterStudent,
+  (newStudent) => {
+    if (newStudent !== undefined && newStudent !== null) {
+      valueSearchStudent.value = newStudent;
+      filterData();
+    }
+  },
+  { immediate: true }
+);
 // 跳转明细
 function formatDateString(dateString) {
   const date = new Date(dateString);
@@ -485,6 +501,43 @@ function getListData() {
 }
 
 // 左右滑按钮
+const showPreviewDelete = ref(false);
+const actionsPreviewDelete = [{ name: "预览" }, { name: "删除" }];
+const detailPreviewDelete = ref({});
+const onCancelPreviewDelete = () => {
+  showPreviewDelete.value = false;
+};
+const clickPreviewDelete = (item, index) => {
+  // console.log(item, index);
+  detailPreviewDelete.value = item;
+  showPreviewDelete.value = true;
+};
+const onSelectPreviewDelete = (item) => {
+  if (item.name == "删除") {
+    deleteItem(detailPreviewDelete.value, 0);
+  }
+  if (item.name == "预览") {
+    viewStudentsList(detailPreviewDelete.value, 0);
+  }
+};
+
+// 处理弹窗关闭事件
+const handleDialogClose = (action) => {
+  if (action === "confirm") {
+    // 点击确认按钮时执行预览操作
+    viewStudentsList(detailPreviewDelete.value, 0);
+    return true;
+  }
+  // 点击取消或关闭按钮时，直接关闭弹窗
+  showPreviewDelete.value = false;
+  return true;
+};
+
+// 处理删除按钮点击
+const handleDeleteAction = () => {
+  deleteItem(detailPreviewDelete.value, 0);
+  showPreviewDelete.value = false;
+};
 // 删除项的函数
 const deleteItem = (item, index) => {
   // console.log("编辑项目：", item, "索引：", index);
@@ -1136,7 +1189,6 @@ const toggleDetail = async (item, index) => {
   });
 };
 
-
 // 多选修改分组
 const cellValue = ref(true);
 const valueNewGroup = ref("");
@@ -1292,7 +1344,7 @@ const valueChallenge = ref(0);
 const valueReviewTime = ref("");
 const editData = (index) => {
   itemEdit.value = filterXlsmData.value[index];
-  console.log("itemEdit: ", itemEdit.value);
+  // console.log("itemEdit: ", itemEdit.value);
 
   showReviseData.value = true;
   valueIsPinned.value = itemEdit.value.is_pinned ? 1 : 0;
@@ -1691,6 +1743,8 @@ const reloadPage = () => {
     resolve("ok");
   });
   res.then(() => {
+    isMultiSelectMode.value = false;
+    showFliterBox.value = false;
     showSuccessToast("刷新成功");
   });
 };
@@ -1708,6 +1762,7 @@ const reloadPage = () => {
         @click-right="isMultiSelectMode ? selectAll() : toggleMultiSelectMode()"
         @click-left="isMultiSelectMode ? popReviseGroup() : showFilter()"
       />
+
     </div>
 
     <router-view />
@@ -1965,6 +2020,14 @@ const reloadPage = () => {
         >
 
         <van-button
+          @click="reloadPage()"
+          type="warning"
+          block
+          style="margin-top: 0.2rem"
+          >刷新</van-button
+        >
+
+        <van-button
           @click="updateReview()"
           type="danger"
           block
@@ -1972,21 +2035,14 @@ const reloadPage = () => {
           >更新复习</van-button
         >
 
-        <!-- <van-button
-          @click="updateDaily()"
-          type="warning"
-          block
-          style="margin-top: 0.2rem"
-          >更新周长</van-button
-        > -->
       </van-cell-group>
     </van-popup>
 
     <!-- 日志详情 -->
     <van-popup
       v-model:show="showDetail"
-      position="bottom"
-      :style="{ height: '90%' }"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
       closeable
       :lock-scroll="false"
     >
@@ -2195,7 +2251,7 @@ const reloadPage = () => {
             <div style="display: flex; flex-direction: column">
               <div v-if="item.is_review_required == 1">
                 <van-tag color="white" text-color="lightgray" plain
-                  >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon
+                  >{{ item.username }}<van-icon
                     color="blue"
                     style="font-weight: 700"
                     v-if="item.is_pinned && item.rate < 3"
@@ -2205,7 +2261,7 @@ const reloadPage = () => {
               </div>
               <div v-else>
                 <van-tag color="#ffe1e1" text-color="#ad0000" plain
-                  >{{ item.username }} ｜ 游戏{{ item.swipe }}次<van-icon
+                  >{{ item.username }}<van-icon
                     color="blue"
                     style="font-weight: 700"
                     v-if="item.is_pinned && item.rate < 3"
@@ -2258,32 +2314,33 @@ const reloadPage = () => {
             <div style="margin-top: 0.2rem">
               {{ item.alias }} {{ item.answers_len }}词
             </div>
-            <div style="margin-top: 0.3rem">{{ item.create_time }}</div>
+
+          <div style="margin-top: 0.3rem">{{ item.create_time.slice(2) }}</div>
           </template>
+          <!-- 原代码中的 #value 部分替换为以下内容 -->
           <template #value>
             <div
               v-if="cellValue"
-              style="display: flex; justify-content: space-between"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                min-height: 60px;
+              "
             >
               <div v-if="item.type == 0 || item.type == 1 || item.type == null">
-                <div style="display: flex">
+                <div style="display: flex; align-items: center">
                   <van-rate
                     v-model="item.rate"
-                    :size="18"
+                    :size="rateSize"
+                    gutter="1"
                     icon="like"
                     void-icon="like-o"
                     :count="3"
                     readonly
                     allow-half
                   />
-                  <div
-                    style="
-                      margin-top: 4%;
-                      font-size: 12px;
-                      margin-left: 0rem;
-                      width: 32px;
-                    "
-                  >
+                  <div style="margin-left: 0rem; width: 32px; font-size: 12px">
                     <span v-if="showRatePlus[index]">
                       +{{ formattedRate(item.rate) }}
                     </span>
@@ -2292,18 +2349,20 @@ const reloadPage = () => {
                 </div>
               </div>
               <div v-if="item.type == 2 || item.type == 3">
-                <van-rate
-                  v-model="item.rate"
-                  :size="60"
-                  color="#ffd21e"
-                  void-icon="chart-trending-o"
-                  icon="chart-trending-o"
-                  void-color="#eee"
-                  :count="1"
-                  readonly
-                  allow-half
-                />
-                {{ (item.rate * 100).toFixed(1) }}%
+                <div style="display: flex; align-items: center; gap: 0.5rem">
+                  <van-rate
+                    v-model="item.rate"
+                    :size="60"
+                    color="#ffd21e"
+                    void-icon="chart-trending-o"
+                    icon="chart-trending-o"
+                    void-color="#eee"
+                    :count="1"
+                    readonly
+                    allow-half
+                  />
+                  <span>{{ (item.rate * 100).toFixed(1) }}%</span>
+                </div>
               </div>
 
               <div
@@ -2312,19 +2371,42 @@ const reloadPage = () => {
                   color: black;
                   font-weight: 700;
                   margin-right: 20px;
+                  display: flex;
+                  flex-direction: column;
+                  justify-content: space-between;
+                  height: 60px;
                 "
               >
-                {{ item.attempt }}次
-              </div>
-
-              <div v-if="item.view == null">
-                <div style="margin-left: -2rem">0次</div>
-              </div>
-              <div v-else>
-                <div style="margin-left: -2rem">{{ item.view }}次</div>
+                <div
+                  style="
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                  "
+                >
+                  <div>{{ item.attempt }}次</div>
+                  <div
+                    v-if="item.view == null"
+                    style="font-size: 12px; color: lightgray"
+                  >
+                    0次
+                  </div>
+                  <div v-else style="font-size: 12px; color: lightgray">
+                    {{ item.view }}次
+                  </div>
+                </div>
+                <div
+                  @click.stop="clickPreviewDelete(item, index)"
+                  style="display: flex; justify-content: center"
+                >
+                  <van-icon name="ellipsis" size="1.1rem" />
+                </div>
               </div>
             </div>
-            <div v-else style="margin-right: 2rem; display: flex">
+            <div
+              v-else
+              style="margin-right: 2rem; display: flex; align-items: center"
+            >
               <div style="font-weight: 700; color: red">{{ item.rate }}</div>
               &nbsp;&nbsp;/&nbsp;&nbsp;{{ item.attempt }}
             </div>
@@ -2338,6 +2420,7 @@ const reloadPage = () => {
             />
           </template>
         </van-cell>
+
         <template #right>
           <van-button
             square
@@ -2379,6 +2462,29 @@ const reloadPage = () => {
       </van-swipe-cell>
     </van-cell-group>
 
+    <!-- 删除和预览 - 居中弹窗 -->
+    <van-dialog
+      v-model:show="showPreviewDelete"
+      :title="detailPreviewDelete?.title || '未知标题'"
+      show-cancel-button
+      confirmButtonText="预览"
+      :before-close="handleDialogClose"
+      closeOnClickOverlay
+    >
+      <div class="dialog-content">
+        <p class="dialog-description">
+          {{ detailPreviewDelete?.username || "未知用户" }}
+        </p>
+        <van-button
+          type="danger"
+          block
+          @click="handleDeleteAction"
+          style="margin-top: 20px"
+          >删除</van-button
+        >
+      </div>
+    </van-dialog>
+
     <!-- 改分组 -->
     <van-dialog
       v-model:show="showReviseGroup"
@@ -2413,11 +2519,18 @@ const reloadPage = () => {
         >
           删除选中的 {{ selectedItems.length }} 个项目
         </van-button>
+        <van-button
+          type="primary"
+          block
+          @click="reloadPage"
+        >
+          刷新
+        </van-button>
       </div>
     </van-dialog>
 
     <!-- 修改数据 -->
-     <!-- :style="{ height: '100%' }" -->
+    <!-- :style="{ height: '100%' }" -->
     <van-popup
       v-model:show="showReviseData"
       :position="popupPosition"
@@ -3070,7 +3183,7 @@ const reloadPage = () => {
                         color: lightgray;
                       "
                     >
-                      {{ item.create_time }}
+                      {{ item.create_time.slice(2) }}
                     </div>
                     <div
                       v-else
@@ -3081,7 +3194,7 @@ const reloadPage = () => {
                         font-size: 12px;
                       "
                     >
-                      {{ item.create_time }}
+                      {{ item.create_time.slice(2) }}
                     </div>
                     <div style="margin-top: 1rem">
                       <div v-if="item.is_review_required == 1">
@@ -3135,12 +3248,7 @@ const reloadPage = () => {
                 </van-cell>
               </div>
               <div v-if="item.type == 2 || item.type == 3">
-                <van-cell
-                  is-link
-                  center
-                  clickable
-                  class="custom-cell"
-                >
+                <van-cell is-link center clickable class="custom-cell">
                   <template #icon>
                     <img
                       v-if="item.rate < 3 && (item.type == 0 || item.type == 1)"
@@ -3226,7 +3334,7 @@ const reloadPage = () => {
                         font-size: 12px;
                       "
                     >
-                      <div>{{ item.create_time }}</div>
+                      <div>{{ item.create_time.slice(2) }}</div>
                     </div>
                   </template>
                 </van-cell>
@@ -3591,7 +3699,7 @@ const reloadPage = () => {
                           color: lightgray;
                         "
                       >
-                        <div>{{ item.create_time }}</div>
+                        <div>{{ item.create_time.slice(2) }}</div>
                       </div>
                       <div
                         v-else
@@ -3602,7 +3710,7 @@ const reloadPage = () => {
                           font-size: 12px;
                         "
                       >
-                        <div>{{ item.create_time }}</div>
+                        <div>{{ item.create_time.slice(2) }}</div>
                       </div>
                       <div style="margin-top: 1rem">
                         <div v-if="item.is_review_required == 1">
@@ -3648,12 +3756,7 @@ const reloadPage = () => {
                 </div>
 
                 <div v-if="item.type == 2 || item.type == 3">
-                  <van-cell
-                    is-link
-                    center
-                    clickable
-                    class="custom-cell"
-                  >
+                  <van-cell is-link center clickable class="custom-cell">
                     <template #icon>
                       <img
                         v-if="
@@ -3741,7 +3844,7 @@ const reloadPage = () => {
                           font-size: 12px;
                         "
                       >
-                        <div>{{ item.create_time }}</div>
+                        <div>{{ item.create_time.slice(2) }}</div>
                       </div>
                     </template>
                   </van-cell>
@@ -3849,7 +3952,8 @@ const reloadPage = () => {
 
 
 <style>
-html, body {
+html,
+body {
   overflow-y: auto !important;
   height: auto !important;
 }
@@ -4142,5 +4246,15 @@ body::-webkit-scrollbar {
 .calendar-fade-leave-from {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.dialog-content {
+  padding: 10px 0;
+}
+.dialog-description {
+  text-align: center;
+  line-height: 1.6;
+  color: #606266;
+  margin-bottom: 10px;
 }
 </style>

@@ -15,6 +15,8 @@ import {
   showLoadingToast,
   showConfirmDialog,
   showToast,
+  showDialog,
+  Dialog,
 } from "vant";
 import moment from "moment";
 import loading from "./loading.vue";
@@ -22,6 +24,7 @@ import WinningCalendar from "./WinningCalendar.vue";
 import TeacherComment from "./teacherComment.vue"; // 保持与实际文件名一致
 import logList from "./logList.vue";
 import xlsmList from "./xlsmList.vue";
+import WeeklyMultiUserChart from "./WeeklyMultiUserChart.vue";
 
 const router = useRouter();
 const instance = getCurrentInstance();
@@ -152,130 +155,6 @@ function formatDate_log(isoString) {
 
   return `${year}年${month}月${day}日${hours}时${minutes}分`;
 }
-const searchLog = (item, index) => {
-  return new Promise((resolve) => {
-    // console.log(item);
-    totalHelp.value = 0;
-    isLateNight.value = false;
-    answerUsername.value = item.username;
-    answerAttempt.value = item.attempt;
-    answerSwipe.value = item.swipe;
-    answerLens.value = item.answers_len;
-    answerRate.value = item.rate;
-    answerTitle.value = item.title;
-    async function getAccountLog() {
-      let params = new URLSearchParams();
-      params.append("method", "getAccountLog");
-      params.append("account_data_id", item.nid);
-      return await axios.post("words/", params).then((ret) => {
-        return ret.data.answer_log;
-      });
-    }
-    getAccountLog().then((res) => {
-      if (res.length == 0) {
-        showToast("没有查询到数据");
-        answerLogList.value = [];
-      } else {
-        // showAccountLog.value = true;
-
-        res.forEach((item) => {
-          // const correctedLog = item.log.replace(/'/g, '"');
-          let dataString = item.log.replace(/(\W)'|'(\W)/g, '$1"$2');
-          dataString = dataString
-            .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
-            .replace(/'/g, '"')
-            .replace(/s" /g, "s' ")
-            .replace(/"s /g, "'s ")
-            .replace(/"t /g, "'t ")
-            .replace(/"m /g, "'m ")
-            .replace(/can"t/g, "can't")
-            .replace(/mustn"t/g, "mustn't")
-            .replace(/must"t/g, "mustn't")
-            .replace(/nustn"t/g, "nustn't")
-            .replace(/o"clock/g, "o'clock")
-            .replace(/needn"t/g, "needn't")
-            .replace(/o"clock/g, "o'clock")
-            .replace(/won"t/g, "won't")
-            .replace(/it"s/g, "it's")
-            .replace(/we"re/gi, "we're'")
-            .replace(/You"re/gi, "you're'")
-            .replace(/they"re/gi, "they're'")
-            .replace(/doesn"t/gi, "doesn't")
-            .replace(/don"t/gi, "don't")
-            .replace(/I"ll/gi, "I'll")
-            .replace(/you"ll/gi, "you'll")
-            .replace(/one"s/gi, "one's")
-            .replace(/let"s/gi, "let's")
-            .replace(/it" hard/gi, "it' hard")
-            .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
-
-          dataString = dataString
-            .replace(/\bFalse\b/g, "false")
-            .replace(/\bTrue\b/g, "true")
-            .replace(/\bNone\b/g, "null");
-
-          item.log = JSON.parse(dataString);
-          // console.log("item: ", item);
-
-          let trueCount;
-          if (item.swipe == "复习") {
-            trueCount = 0;
-            for (let i = 0; i < item.log.length; i++) {
-              const correctAnswer = item.log[i]["正确答案"];
-              const correctArray = correctAnswer
-                .split(/；|,/)
-                .map((item) => item.trim())
-                .sort();
-
-              const userSelection = item.log[i]["用户选择"];
-              const areEqual =
-                correctArray.length === userSelection.length &&
-                correctArray.every((item) => userSelection.includes(item));
-              if (areEqual) {
-                trueCount += 1;
-              }
-            }
-          } else {
-            trueCount = item.log.filter(
-              (entry) => entry.flag === "true"
-            ).length;
-          }
-
-          item.true_length = trueCount;
-        });
-        console.log("log:", res);
-        // 计算场外支援总次数
-        totalHelp.value = res.reduce((acc, log) => {
-          return (
-            acc +
-            (log.numberprev || 0) +
-            (log.numbershowanswer || 0) +
-            (log.numbertransparent || 0)
-          );
-        }, 0);
-
-        // console.log("totalHelp:", totalHelp.value);
-
-        // 计算熬夜问题
-        isLateNight.value = res.some((log) => {
-          const date = new Date(log.create_time);
-          const hours = date.getHours();
-          const minutes = date.getMinutes();
-
-          // 检查时间是否在晚上 11:30 到早上 6:00 之间
-          return (hours === 23 && minutes >= 30) || hours === 0 || hours < 6;
-        });
-        // console.log("isLateNight:", isLateNight.value);
-
-        answerLogList.value = res.filter(
-          (item) => item.swipe !== "复习" && item.swipe !== "滑动"
-        );
-        reviewLogList.value = res.filter((item) => item.swipe == "复习");
-      }
-      resolve();
-    });
-  });
-};
 
 // 日志详情
 const showDetail = ref(false);
@@ -539,15 +418,7 @@ const loadingOriginalData = ref(false);
 const finishedOriginalData = ref(false);
 const pageIndexOriginalData = ref(0);
 const isLoading = ref(false);
-const formattedRate = (rate) => {
-  // 检查是否为整数
-  if (Number.isInteger(rate)) {
-    return rate - 3;
-  } else {
-    // 保留一位小数
-    return (rate - 3).toFixed(1);
-  }
-};
+
 // 分页加载
 const onLoadOriginalData = async (title = "全部") => {
   // console.log("filtergrade: ", title);
@@ -561,7 +432,7 @@ const onLoadOriginalData = async (title = "全部") => {
   params.append("method", "getViewerAccountDataPage");
   params.append("grade", title);
   params.append("location", filterLocation.value);
-  params.append("viewer_name", viewername.value);
+  params.append("viewer_name", viewUsername.value);
   params.append("username", "josephxie");
   params.append("page", pageIndexOriginalData.value + 1); // 请求下一页的数据
   params.append("page_size", 20); // 每页数据大小
@@ -619,18 +490,499 @@ const onClickTab = ({ index }) => {
 
 // 点击具体项
 const data_specific = ref("");
-const gotoItem = async (index) => {
-  data_specific.value = originalData.value[index];
-  // console.log("data_specific:", data_specific.value);
 
-  isLoading.value = true;
-  await searchLog(data_specific.value, index);
-  await searchAnswer(data_specific.value, index);
-  await searchpurchase(data_specific.value, index);
-  await nextTick(() => {
-    showAccountLog.value = true;
-    isLoading.value = false;
+// 多选学生按钮
+const multiSelectSidebar = ref(false);
+const showChartMultitMode = ref(true);
+const selectedSidebarItems = ref([]);
+const multiUserChartDataList = ref([]);
+const monthColumnWidth = ref("250px");
+const chartCanvases = ref([]);
+
+const selectAllItems = () => {
+  if (sidesName.value && sidesName.value.length > 0) {
+    selectedSidebarItems.value = sidesName.value.map((_, index) => index);
+  }
+};
+
+watch(
+  showChartMultitMode,
+  (newVal) => {
+    // 只有在切换到曲线图模式 (newVal 为 true) 且有数据时才需要绘制
+    if (newVal && multiUserChartDataList.value.length > 0) {
+      // 使用 nextTick 确保 Vue 已经完成了 DOM 的更新（即 canvas 元素已挂载）
+      nextTick(() => {
+        // 确保 chartCanvases 数组已经填充完毕
+        if (chartCanvases.value.length > 0) {
+          chartCanvases.value.forEach((canvas, index) => {
+            // 确保 canvas 元素是 HTMLCanvasElement 实例
+            if (canvas && canvas.getContext) {
+              drawMultiUserChart(canvas, index);
+            } else {
+              console.warn(
+                `Canvas element at index ${index} is not ready or null.`
+              );
+            }
+          });
+
+          chartCanvases.value = [];
+        } else {
+          console.log(
+            "Chart canvases array is empty after nextTick. Retrying drawing logic."
+          );
+        }
+      });
+    }
+  },
+  { immediate: true }
+);
+
+const toggleAllChartMode = () => {
+  showMomentScatter.value = false;
+  showChartMultitMode.value = !showChartMultitMode.value;
+  // 强制重新渲染，刷新日历布局
+  nextTick(() => {
+    // 触发窗口 resize 事件，让布局重新计算
+    window.dispatchEvent(new Event("resize"));
+
+    // 如果需要重新绘制图表
+    if (showChartMultitMode.value) {
+      nextTick(() => {
+        drawMultiUserCharts();
+      });
+    }
   });
+};
+
+const generateMultiUserMonthDays = (userData, year, month) => {
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDate = new Date(firstDay);
+  // 将周一设为一周的第一天（与单用户模式保持一致）
+  let firstDayOfWeek = firstDay.getDay();
+  firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+  startDate.setDate(startDate.getDate() - firstDayOfWeek);
+
+  const days = [];
+  const today = new Date();
+  const weekTotals = {};
+
+  // 第一遍：收集所有天数的数据
+  for (let i = 0; i < 42; i++) {
+    // 直接基于年月日创建日期对象，避免时区问题
+    const currentDate = new Date(
+      startDate.getFullYear(),
+      startDate.getMonth(),
+      startDate.getDate() + i
+    );
+
+    const dateString = formatDate(currentDate);
+    const isCurrentMonth =
+      currentDate.getMonth() === month && currentDate.getFullYear() === year;
+    const isEmpty = !isCurrentMonth;
+    const recordCount = userData.dailyData[dateString] || 0;
+    const hasFlower = recordCount > 0;
+    const isToday = currentDate.toDateString() === today.toDateString();
+    const weekNumber = Math.floor(i / 7); // 计算周数（0-5）
+
+    days.push({
+      day: currentDate.getDate(),
+      dateString: dateString, // 添加dateString属性
+      username: userData.username, // 添加username属性，用于显示当前用户
+      isEmpty,
+      isToday,
+      hasFlower,
+      recordCount,
+      weekCompleteState: 0,
+      weekNumber, // 记录周数，用于后续计算
+    });
+
+    // 计算每周的合计值
+    if (!isEmpty) {
+      if (!weekTotals[weekNumber]) {
+        weekTotals[weekNumber] = 0;
+      }
+      weekTotals[weekNumber] += recordCount;
+    }
+  }
+
+  // 第二遍：根据每周合计值设置weekCompleteState
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i];
+    if (!day.isEmpty) {
+      const weekTotal = weekTotals[day.weekNumber] || 0;
+      if (weekTotal > 0) {
+        if (weekTotal >= 6) {
+          day.weekCompleteState = 2; // 深黄色
+        } else {
+          day.weekCompleteState = 1; // 浅黄色
+        }
+      } else {
+        day.weekCompleteState = 0; // 没有数据，不设置颜色
+      }
+    }
+  }
+
+  return days;
+};
+
+// 计算多用户四周八周平均
+const calculateFourWeekAvg = (userData) => {
+  const today = new Date("2025-12-03"); // 使用您给定的今天日期进行精确计算
+  let totalCount = 0; // 累计 28 天的总次数
+  const numWeeks = 4; // 总周数
+
+  for (let i = 3; i >= 0; i--) {
+    const weekStart = new Date(today);
+    let dayOfWeek = today.getDay(); // 2 (Tue)
+
+    // 距离周一要减去的天数：(dayOfWeek + 6) % 7
+    let daysToSubtractForCurrentMonday = (dayOfWeek + 6) % 7; // (2 + 6) % 7 = 1
+
+    // 2. 找到当前周的星期一
+    const currentMonday = new Date(today);
+    currentMonday.setDate(today.getDate() - daysToSubtractForCurrentMonday);
+
+    // 3. 找到四個周期前那个周的星期一 (i=3 时最远)
+    const startOfWeek = new Date(currentMonday);
+    startOfWeek.setDate(currentMonday.getDate() - i * 7);
+
+    // 循环一周 (7天)
+    for (let j = 0; j < 7; j++) {
+      const currentDate = new Date(startOfWeek);
+      currentDate.setDate(startOfWeek.getDate() + j);
+
+      const dateString = formatDate(currentDate);
+      // 累加所有 28 天的总和
+      totalCount += userData.dailyData[dateString] || 0;
+    }
+  }
+
+  return totalCount / numWeeks;
+};
+
+const calculateEightWeekAvg = (userData) => {
+  const today = new Date();
+  let totalCount = 0;
+  const numWeeks = 8;
+  let dayOfWeek = today.getDay();
+
+  const daysToSubtractForCurrentMonday = (dayOfWeek + 6) % 7;
+  const currentMonday = new Date(today);
+  currentMonday.setDate(today.getDate() - daysToSubtractForCurrentMonday);
+
+  // 2. 循环 8 次，计算从今天所在周开始，向前 7 个完整周的数据
+  // i 从 7 (最远的周) 循环到 0 (当前的周)
+  for (let i = numWeeks - 1; i >= 0; i--) {
+    // 找到当前循环周的星期一
+    const startOfWeek = new Date(currentMonday);
+    startOfWeek.setDate(currentMonday.getDate() - i * 7);
+
+    // 3. 循环一周 (7天)，累加数据
+    for (let j = 0; j < 7; j++) {
+      const currentDate = new Date(startOfWeek);
+      currentDate.setDate(startOfWeek.getDate() + j);
+
+      const dateString = formatDate(currentDate);
+
+      // 累加所有 56 天的总和
+      totalCount += userData.dailyData[dateString] || 0;
+    }
+  }
+
+  // 4. 返回周平均值 (总次数 / 8 周)
+  return totalCount / numWeeks;
+};
+
+// 退出多用户模式
+const exitMultiUserMode = () => {
+  multiUserChartDataList.value = [];
+  selectedSidebarItems.value = [];
+};
+
+// 绘制多用户图表
+const drawMultiUserChart = (canvas, index) => {
+  if (!canvas) {
+    console.warn(`Canvas ${index} not found`);
+    return;
+  }
+
+  const userData = multiUserChartDataList.value[index];
+  if (!userData) return;
+
+  const container = canvas.parentElement;
+
+  if (!container) {
+    console.warn(`Container for canvas ${index} not found`);
+    return;
+  }
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = container.getBoundingClientRect();
+
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + "px";
+  canvas.style.height = rect.height + "px";
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, rect.width, rect.height);
+
+  // 计算最近4周数据
+  const today = new Date();
+  const weeks = [];
+
+  for (let i = 3; i >= 0; i--) {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - i * 7 - today.getDay() + 1);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const weekData = {
+      label: `${weekStart.getMonth() + 1}.${weekStart.getDate()}-${
+        weekEnd.getMonth() + 1
+      }.${weekEnd.getDate()}`,
+      count: 0,
+    };
+
+    for (let j = 0; j < 7; j++) {
+      const currentDate = new Date(weekStart);
+      currentDate.setDate(weekStart.getDate() + j);
+      const dateString = formatDate(currentDate);
+      weekData.count += userData.dailyData[dateString] || 0;
+    }
+
+    weeks.push(weekData);
+  }
+
+  // 设置样式
+  const padding = { top: 30, right: 20, bottom: 65, left: 50 };
+  const chartWidth = rect.width - padding.left - padding.right;
+  const chartHeight = rect.height - padding.top - padding.bottom;
+  const maxCount = Math.max(...weeks.map((d) => d.count), 10);
+
+  // 绘制渐变背景
+  const bgGradient = ctx.createLinearGradient(
+    0,
+    padding.top,
+    0,
+    rect.height - padding.bottom
+  );
+  bgGradient.addColorStop(0, "rgba(25, 137, 250, 0.05)");
+  bgGradient.addColorStop(1, "rgba(25, 137, 250, 0.01)");
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(padding.left, padding.top, chartWidth, chartHeight);
+
+  // 绘制Y轴网格线和刻度
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.08)";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#999";
+  ctx.font =
+    '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+
+  for (let i = 0; i <= 5; i++) {
+    const y = padding.top + (chartHeight / 5) * i;
+    const value = Math.round(maxCount - (maxCount / 5) * i);
+
+    // 网格线
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(rect.width - padding.right, y);
+    ctx.stroke();
+
+    // Y轴刻度
+    ctx.fillText(value.toString(), padding.left - 10, y);
+  }
+
+  // 绘制X轴
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padding.left, rect.height - padding.bottom);
+  ctx.lineTo(rect.width - padding.right, rect.height - padding.bottom);
+  ctx.stroke();
+
+  // 取最近4周数据
+  const recentData = weeks.slice(-4);
+  const barWidth = (chartWidth / recentData.length) * 0.7;
+  const barSpacing = chartWidth / recentData.length;
+
+  // 绘制柱状图
+  recentData.forEach((d, i) => {
+    const barHeight = (d.count / maxCount) * chartHeight;
+    const x = padding.left + barSpacing * i + (barSpacing - barWidth) / 2;
+    const y = rect.height - padding.bottom - barHeight;
+
+    // 绘制柱子渐变
+    const barGradient = ctx.createLinearGradient(
+      x,
+      y,
+      x,
+      rect.height - padding.bottom
+    );
+    barGradient.addColorStop(0, "rgba(59, 130, 246, 0.9)");
+    barGradient.addColorStop(1, "rgba(59, 130, 246, 0.7)");
+
+    ctx.fillStyle = barGradient;
+    ctx.strokeStyle = "rgb(59, 130, 246)";
+    ctx.lineWidth = 2;
+
+    // 绘制圆角矩形柱子
+    ctx.beginPath();
+    const radius = 6;
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + barWidth - radius, y);
+    ctx.quadraticCurveTo(x + barWidth, y, x + barWidth, y + radius);
+    ctx.lineTo(x + barWidth, rect.height - padding.bottom);
+    ctx.lineTo(x, rect.height - padding.bottom);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 绘制柱子内的数据标签
+    ctx.font =
+      'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(d.count.toString(), x + barWidth / 2, y + 10);
+
+    // X轴日期标签（45度倾斜）
+    ctx.save();
+    ctx.translate(x + barWidth / 2, rect.height - padding.bottom + 20);
+    ctx.rotate(-Math.PI / 6);
+    ctx.font =
+      '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+    ctx.fillStyle = "#666";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(d.label, 0, 0);
+    ctx.restore();
+  });
+
+  // 计算四周平均值
+  const fourWeekAvgValue =
+    recentData.reduce((acc, item) => acc + item.count, 0) / recentData.length;
+
+  // 绘制四周平均线
+  if (fourWeekAvgValue > 0) {
+    const avgY =
+      rect.height -
+      padding.bottom -
+      (fourWeekAvgValue / maxCount) * chartHeight;
+
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, avgY);
+    ctx.lineTo(rect.width - padding.right, avgY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 绘制Y轴标题"背诵次数"（垂直显示）
+  ctx.save();
+  ctx.translate(15, rect.height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font =
+    'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
+  ctx.fillStyle = "#666";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("背诵次数", 0, 0);
+  ctx.restore();
+};
+
+const toggleSidebarMultiSelectMode = async () => {
+  multiSelectSidebar.value = !multiSelectSidebar.value;
+
+  if (!multiSelectSidebar.value) {
+    if (selectedSidebarItems.value.length > 0) {
+      multiUserChartDataList.value = [];
+
+      for (const index of selectedSidebarItems.value) {
+        const username = sidesName.value[index].username;
+
+        try {
+          // 请求该用户的数据
+          let params = new URLSearchParams();
+          params.append("method", "getUserWinningStreak");
+          params.append("username", username);
+
+          const response = await axios.post("words/", params);
+
+          if (response.data.status === "success") {
+            // 处理每日数据
+            const dailyData = {};
+            response.data.daily_data.forEach((record) => {
+              const date = record.date.split(" ")[0];
+              dailyData[date] = record.record_count || 0;
+            });
+
+            // 将用户数据存入数组
+            multiUserChartDataList.value.push({
+              username: username,
+              winningStreak: response.data.winning_streak * 7,
+              dailyData: dailyData,
+              completeWeeks: response.data.data.map((record) => ({
+                monday: record.week_monday.split(" ")[0],
+                state: record.complete_state,
+              })),
+              hasEnoughToday: response.data.has_enough_today,
+            });
+          }
+        } catch (error) {
+          console.error(`获取 ${username} 数据失败:`, error);
+          showToast(`获取 ${username} 数据失败`);
+        }
+      }
+
+      console.log("多用户图表数据:", multiUserChartDataList.value);
+
+      // ❗ 重点新增：数据加载完成后，如果当前是曲线图模式，手动触发绘制
+      if (showChartMultitMode.value) {
+        // 必须使用 nextTick 来等待 DOM 渲染完成
+        nextTick(() => {
+          chartCanvases.value.forEach((canvas, index) => {
+            if (canvas && canvas.getContext) {
+              drawMultiUserChart(canvas, index);
+            }
+          });
+          // 清空 Refs 数组
+          chartCanvases.value = [];
+        });
+      }
+    }
+    selectedSidebarItems.value = [];
+  }
+};
+
+const toggleSidebarSelect = (index) => {
+  if (selectedSidebarItems.value.includes(index)) {
+    selectedSidebarItems.value = selectedSidebarItems.value.filter(
+      (i) => i !== index
+    );
+  } else {
+    selectedSidebarItems.value.push(index);
+  }
+};
+
+const unSelectedSidebarItems = () => {
+  selectedSidebarItems.value = [];
+  multiSelectSidebar.value = false;
+};
+
+// 切换时刻散点图
+const showMomentScatter = ref(false);
+const popUpMomentScatter = () => {
+  showMomentScatter.value = true;
 };
 
 // 周长细节
@@ -638,24 +990,83 @@ const showDailyDetail = ref(false);
 const showDailyRange = ref(false);
 const dateDaily = ref("");
 const minDateDaily = ref(new Date(2025, 0, 1));
-const formatDate = (date) =>
-  `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+// const formatDate = (date) =>
+//   `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
 
 // 图表相关响应式数据
-const chartCanvas = ref(null);
-const fourWeekAvg = ref(0);
-const eightWeekAvg = ref(0);
-const showChart = ref(false);
 const dailyCalendarData = ref({});
 const currentSelectedUser = ref("");
 
-// 格式化日期为YYYY/MM/DD
-function formatDateForChart(date) {
-  return `${date.getFullYear()}/${(date.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}`;
-}
+// 全屏模式
+const isChartFullscreen = ref(false);
+const toggleFullscreen = () => {
+  isChartFullscreen.value = !isChartFullscreen.value;
+  if (isChartFullscreen.value && multiSelectSidebar.value) {
+    unSelectedSidebarItems();
+  }
+  if(showMomentScatter.value) {
+    nextTick(() => {
+      setTimeout(() => {
+        window.dispatchEvent(new Event("resize"));
+      }, 500);
+    });
+  }
+};
 
+// 图表数据
+// 本月日历，连胜
+const monthDays = ref([]);
+const weekdayNames = ["一", "二", "三", "四", "五", "六", "日"];
+const currentMonth = ref("");
+const currentYear = ref(new Date().getFullYear());
+const currentMonthIndex = ref(new Date().getMonth()); // 0-11
+const completeWeekStates = ref({});
+const has_enough_today = ref(false);
+const showChartMode = ref(true);
+
+const realCurrentYear = new Date().getFullYear();
+const realCurrentMonth = new Date().getMonth(); // 0-11
+const showWinningCalendar = ref(false);
+const daysWinningStreak = ref(0);
+const completeWeeks = ref([]);
+const viewUsername = ref("");
+const showMonthColumn = ref(true);
+
+const activeSidebarIndex = ref(null);
+
+const toggleMonthColumn = () => {
+  showMonthColumn.value = !showMonthColumn.value;
+  // 如果显示第三列且有选中用户，刷新曲线图数据
+  if (showMonthColumn.value && viewUsername.value) {
+    nextTick(() => {
+      setTimeout(async () => {
+        await generateMonthDays(
+          currentYear.value,
+          currentMonthIndex.value && activeSidebarIndex.value !== null
+        );
+        if (showChartMode.value) {
+          drawChart();
+        }
+      }, 350);
+    });
+  }
+};
+
+const toggleChartMode = () => {
+  showChartMode.value = !showChartMode.value;
+  monthColumnWidth.value = showChartMode.value ? "250px" : "330px";
+
+  // 需要延迟更长时间等待CSS过渡完成
+  nextTick(() => {
+    setTimeout(() => {
+      if (showChartMode.value && chartCanvas.value) {
+        drawChart();
+      }
+    }, 350); // 与CSS过渡时间(0.3s)保持一致，多留50ms
+  });
+};
+
+// 新增：计算最近四周的数据
 // 获取最近4周的数据
 const getLastFourWeeksData = computed(() => {
   const today = new Date();
@@ -679,7 +1090,7 @@ const getLastFourWeeksData = computed(() => {
     for (let j = 0; j < 7; j++) {
       const currentDate = new Date(weekStart);
       currentDate.setDate(weekStart.getDate() + j);
-      const dateString = formatDateForChart(currentDate);
+      const dateString = formatDate(currentDate);
       weekData.count += dailyCalendarData.value[dateString] || 0;
     }
 
@@ -712,7 +1123,7 @@ const getLastEightWeeksData = computed(() => {
     for (let j = 0; j < 7; j++) {
       const currentDate = new Date(weekStart);
       currentDate.setDate(weekStart.getDate() + j);
-      const dateString = formatDateForChart(currentDate);
+      const dateString = formatDate(currentDate);
       weekData.count += dailyCalendarData.value[dateString] || 0;
     }
 
@@ -722,16 +1133,246 @@ const getLastEightWeeksData = computed(() => {
   return weeks;
 });
 
-// 绘制图表
+// 生成本月日历数据
+const generateMonthDays = async (year, month) => {
+  // 设置月份标题
+  currentMonth.value = `${year}年${month + 1}月`;
+
+  // 获取该月第一天和最后一天
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+
+  // 获取第一天是星期几（0=周日，需要转换成周一为第一天）
+  let firstDayOfWeek = firstDay.getDay();
+  firstDayOfWeek = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // 转换为周一=0
+
+  // 获取本月天数
+  const daysInMonth = lastDay.getDate();
+
+  // 获取数据 - 传入年月参数
+  let params = new URLSearchParams();
+  params.append("method", "getUserWinningStreak");
+  params.append("username", viewUsername.value);
+  params.append("year", year.toString());
+  params.append("month", (month + 1).toString());
+
+  const response = await axios.post("words/", params);
+
+  if (response.data.status === "success") {
+    // 处理返回的数据
+    completeWeeks.value = response.data.data.map((record) => ({
+      monday: record.week_monday.split(" ")[0],
+      state: record.complete_state,
+    }));
+
+    daysWinningStreak.value = response.data.winning_streak * 7;
+
+    // 构建周完成状态映射
+    completeWeekStates.value = {};
+    response.data.data.forEach((record) => {
+      const monday = record.week_monday.split(" ")[0];
+      completeWeekStates.value[monday] = record.complete_state || 0;
+    });
+
+    has_enough_today.value = response.data.has_enough_today;
+
+    // 构建每日数据映射
+    dailyCalendarData.value = {};
+    response.data.daily_data.forEach((record) => {
+      const date = record.date.split(" ")[0];
+      dailyCalendarData.value[date] = record.record_count || 0;
+    });
+
+    console.log("dailyCalendarData", dailyCalendarData.value);
+
+    // 生成日历数组
+    monthDays.value = [];
+
+    // 添加空白格子（月初前的空白）
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      monthDays.value.push({
+        isEmpty: true,
+      });
+    }
+
+    // 获取今天的日期（用于判断是否是今天）
+    const today = new Date();
+    const todayString = formatDate(today);
+
+    // 添加本月的所有日期
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day);
+      const dateString = formatDate(currentDate);
+      const mondayString = getMondayOfWeek(currentDate);
+
+      // 获取该日期所在周的完成状态
+      const weekCompleteState = completeWeekStates.value[mondayString] || 0;
+
+      // 获取该日期的背诵次数
+      const recordCount = dailyCalendarData.value[dateString] || 0;
+
+      // 判断是否是今天（只有在查询当前月份时才标记今天）
+      const isCurrentMonth =
+        year === today.getFullYear() && month === today.getMonth();
+      const isToday = isCurrentMonth && todayString === dateString;
+
+      monthDays.value.push({
+        date: currentDate.toISOString(),
+        day: day,
+        dateString: dateString,
+        isToday: isToday,
+        hasFlower: recordCount > 0,
+        recordCount: recordCount,
+        weekCompleteState: weekCompleteState,
+        isEmpty: false,
+      });
+    }
+  }
+};
+
+// 检查是否可以切换到目标月份
+const canChangeMonth = (targetYear, targetMonth) => {
+  // 计算目标月份与当前真实月份的差距（以月为单位）
+  const targetDate = new Date(targetYear, targetMonth, 1);
+  const currentDate = new Date(realCurrentYear, realCurrentMonth, 1);
+
+  // 计算月份差
+  const monthDiff =
+    (targetYear - realCurrentYear) * 12 + (targetMonth - realCurrentMonth);
+
+  // console.log(
+  //   `目标: ${targetYear}年${targetMonth + 1}月, 当前: ${realCurrentYear}年${
+  //     realCurrentMonth + 1
+  //   }月, 差距: ${monthDiff}个月`
+  // );
+
+  // 不能查看未来月份
+  if (monthDiff > 0) {
+    showToast({
+      message: "不能查看未来月份",
+      duration: 2000,
+      icon: "warning-o",
+    });
+    return false;
+  }
+
+  // 最多只能查看前3个月
+  if (monthDiff < -3) {
+    showToast({
+      message: "最多只能查看前3个月的数据",
+      duration: 2000,
+      icon: "warning-o",
+    });
+    return false;
+  }
+
+  return true;
+};
+
+const changeMonth = (offset) => {
+  // 计算目标年月
+  let targetYear = currentYear.value;
+  let targetMonth = currentMonthIndex.value + offset;
+
+  // 处理跨年
+  if (targetMonth > 11) {
+    targetMonth = 0;
+    targetYear += 1;
+  } else if (targetMonth < 0) {
+    targetMonth = 11;
+    targetYear -= 1;
+  }
+
+  // 检查是否可以切换
+  if (!canChangeMonth(targetYear, targetMonth)) {
+    return; // 不允许切换，直接返回
+  }
+
+  // 更新当前显示的年月
+  currentYear.value = targetYear;
+  currentMonthIndex.value = targetMonth;
+
+  // 重新生成日历
+  generateMonthDays(currentYear.value, currentMonthIndex.value);
+};
+
+const changeMonthMulti = (offset) => {
+  // 计算目标年月
+  let targetYear = currentYear.value;
+  let targetMonth = currentMonthIndex.value + offset;
+
+  // 处理跨年
+  if (targetMonth > 11) {
+    targetMonth = 0;
+    targetYear += 1;
+  } else if (targetMonth < 0) {
+    targetMonth = 11;
+    targetYear -= 1;
+  }
+
+  // 检查是否可以切换
+  if (!canChangeMonth(targetYear, targetMonth)) {
+    return; // 不允许切换，直接返回
+  }
+
+  // 更新当前显示的年月
+  currentYear.value = targetYear;
+  currentMonthIndex.value = targetMonth;
+  // 更新月份显示
+  currentMonth.value = `${targetYear}年${targetMonth + 1}月`;
+  console.log("multiUserChartDataList", multiUserChartDataList.value);
+};
+
+// 计算是否可以点击上/下月按钮（用于按钮禁用状态）
+
+const formatDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getMondayOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return formatDate(monday);
+};
+
+// 点击日期
+const selectDate = (day) => {
+  // 如果有username属性（多用户模式），则显示用户名
+  const username = day.username || viewUsername.value;
+  if (day.recordCount > 0) {
+    showToast({
+      message: `${username} ${day.dateString} 背诵 ${day.recordCount} 次`,
+      duration: 2000,
+    });
+  } else {
+    showToast({
+      message: `${username} ${day.dateString} 暂无背诵数据`,
+      duration: 2000,
+    });
+  }
+};
+
+// 新增：绘制曲线图
+const chartCanvas = ref(null);
+const fourWeekAvg = ref(0);
+const eightWeekAvg = ref(0);
+
 const drawChart = () => {
   if (!chartCanvas.value) return;
 
   const canvas = chartCanvas.value;
   const container = canvas.parentElement;
 
-  // 设置画布尺寸为容器尺寸，支持高DPI屏幕
+  // 强制重新计算容器尺寸
   const dpr = window.devicePixelRatio || 1;
   const rect = container.getBoundingClientRect();
+
+  // 重新设置canvas尺寸（这会清空之前的内容）
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
   canvas.style.width = rect.width + "px";
@@ -896,111 +1537,48 @@ const drawChart = () => {
   ctx.save();
   ctx.translate(15, rect.height / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.font =
-    'bold 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial';
-  ctx.fillStyle = "#666";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("背诵次数", 0, 0);
   ctx.restore();
 };
 
-// 获取用户日历数据
-const getUserCalendarData = async (username) => {
-  try {
-    let params = new URLSearchParams();
-    params.append("method", "getUserWinningStreak");
-    params.append("username", username);
-
-    const response = await axios.post("words/", params);
-    console.log("response: ", response);
-
-    if (response.data.status === "success") {
-      // 处理每日数据
-      const calendarData = {};
-      response.data.daily_data.forEach((record) => {
-        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
-        // 转换为 YYYY/MM/DD 格式
-        const [year, month, day] = date.split("-");
-        const formattedDate = `${year}/${month}/${day}`;
-        calendarData[formattedDate] = record.count || 0;
-      });
-      dailyCalendarData.value = calendarData;
-
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error("获取日历数据失败:", error);
-    return false;
-  }
-};
-
-// 处理用户名点击事件，显示/隐藏柱状图
-const handleUserClick = async (username) => {
-  console.log("username: ", username);
-  try {
-    // 如果点击的是当前已显示的用户，则隐藏图表
-    if (showChart.value && currentSelectedUser.value === username) {
-      showChart.value = false;
-      return;
-    }
-
-    // 显示加载状态
-    // const toast = showLoadingToast({
-    //   message: "加载数据中...",
-    //   duration: 0,
-    // });
-
-    // 设置当前选中用户
-    currentSelectedUser.value = username;
-
-    // 获取用户数据
-    const success = await getUserCalendarData(username);
-
-    // 隐藏加载状态
-    // toast.clear();
-
-    if (success) {
-      // 显示图表并重新绘制
-      showChart.value = true;
-
-      // 使用nextTick确保DOM已更新
-      await nextTick();
-
-      // 绘制图表
+watch(showChartMode, (newVal) => {
+  if (newVal) {
+    nextTick(() => {
       drawChart();
+    });
+  }
+});
 
-      // 监听窗口大小变化，重新绘制图表
-      window.addEventListener("resize", handleResize);
-    } else {
-      showToast({
-        message: "加载数据失败，请重试",
-        type: "error",
-        duration: 2000,
+// 新增：监听数据变化重绘
+watch(
+  dailyCalendarData,
+  () => {
+    if (showChartMode.value) {
+      nextTick(() => {
+        drawChart();
       });
     }
-  } catch (error) {
-    console.error("处理用户点击事件失败:", error);
+  },
+  { deep: true }
+);
+
+const handleDateClick = (dayData) => {
+  // 点击日期回调
+  const count = dayData.recordCount;
+  if (count > 0) {
     showToast({
-      message: "操作失败，请重试",
-      type: "error",
-      duration: 2000,
+      message: `${dayData.dateString} 背诵 ${count} 次`,
+      zIndex: 9999,
+    });
+  } else {
+    showToast({
+      message: `${dayData.dateString} 暂无背诵数据`,
+      zIndex: 9999,
     });
   }
 };
 
-// 处理窗口大小变化
-const handleResize = () => {
-  if (showChart.value) {
-    drawChart();
-  }
-};
-
 // 组件卸载时清理事件监听
-onBeforeUnmount(() => {
-  window.removeEventListener("resize", handleResize);
-});
+onBeforeUnmount(() => {});
 
 const onConfirmDailyRange = async (values) => {
   let toast1 = showLoadingToast({
@@ -1155,8 +1733,10 @@ async function refreshtLastDaysDailyTask() {
 }
 
 const onChangeSidebar = async (index) => {
+  activeSidebarIndex.value = index;
   showLastDaysDailyTask.value = sidesName.value[index].username !== "全部";
   const username = sidesName.value[index]["username"];
+  viewUsername.value = username;
   getLastDaysDailyTask(username);
 
   // 设置当前选中用户
@@ -1192,6 +1772,10 @@ const onChangeSidebar = async (index) => {
   // handleUserClick(selectedStudent);
   // 重新加载数据
   onLoadOriginalData(title);
+  if (showMonthColumn.value) {
+    viewUsername.value = username;
+    await generateMonthDays(currentYear.value, currentMonthIndex.value);
+  }
 };
 watch(sidesName, () => {
   showLastDaysDailyTask.value = false;
@@ -1205,67 +1789,10 @@ const locationitems = ref([
   { icon: "wap-home-o", text: "上门" },
   { icon: "wap-home-o", text: "南楼" },
 ]);
-function getNewSidesNames() {
-  const filterTitle = tabsName.value[activeTabs.value - 1] || "全部";
-  // console.log("filtergrade: ", filterTitle);
-  // console.log("filterLocation: ", filterLocation.value);
-  let filteredSidesName = [];
-  if (filterTitle === "全部") {
-    filteredSidesName = backupSides.value.filter((nameObj) => {
-      return usersData.value.some((user) => {
-        if (filterTitle && filterLocation.value !== "") {
-          // 点击年级时，同时检查 grade_name 和 location_name
-          return (
-            user.username === nameObj.username &&
-            user.location_name === filterLocation.value
-          );
-        } else if (filterTitle && filterLocation.value === "") {
-          // 点击年级时，但是没有地点筛选
-          return user.username === nameObj.username;
-        } else {
-          // 点击地点时，只检查 location_name
-          return (
-            user.username === nameObj.username &&
-            user.location_name === filterLocation.value
-          );
-        }
-      });
-    });
-  } else {
-    filteredSidesName = backupSides.value.filter((nameObj) => {
-      return usersData.value.some((user) => {
-        if (filterTitle && filterLocation.value !== "") {
-          // 点击年级时，同时检查 grade_name 和 location_name
-          return (
-            user.username === nameObj.username &&
-            user.location_name === filterLocation.value &&
-            user.grade_name === filterTitle
-          );
-        } else if (filterTitle && filterLocation.value === "") {
-          // 点击年级时，但是没有地点筛选
-          return (
-            user.username === nameObj.username &&
-            user.grade_name === filterTitle
-          );
-        } else {
-          // 点击地点时，只检查 location_name
-          return (
-            user.username === nameObj.username &&
-            user.location_name === filterLocation.value
-          );
-        }
-      });
-    });
-  }
-
-  filteredSidesName.unshift({ username: "全部", total_reviews: 0 });
-  console.log("filteredSidesName: ", filteredSidesName);
-
-  return filteredSidesName;
-}
 
 const selectedIndexLocation = ref(null);
 const filterLocation = ref("");
+const showPasswordPopup = ref(false);
 const toggleLocationSelection = (index) => {
   // 只处理选中状态的切换，不进行立即筛选
   if (selectedIndexLocation.value === index) {
@@ -1328,6 +1855,24 @@ const assignWordsTasks = async () => {
   showAssignWordsTasks.value = true;
 };
 
+// 反选按钮
+const unselectWordsTasks = async () => {
+  filterGrade.value = "";
+  filterLocation.value = "";
+  selectedIndexLocation.value = null; // 取消地点选择
+  activeTabs.value = null; // 取消年级选择
+  activeSidebar.value = null; // 取消sidebar选择
+  activeSidebarIndex.value = null; // 取消sidebar选择
+  sidesName.value = backupSides.value; // 恢复所有用户数据
+  filterName.value = ""; // 清空筛选名称
+  filterStudentForComment.value = ""; // 清空评论筛选学生
+
+  // 重置数据
+  originalData.value = [];
+  finishedOriginalData.value = false;
+  pageIndexOriginalData.value = 0;
+};
+
 // 复习
 const getSidesNameReviews = async (sidesName) => {
   const params = new URLSearchParams();
@@ -1337,114 +1882,84 @@ const getSidesNameReviews = async (sidesName) => {
   return response.data.data;
 };
 
-// 连胜日历
-const showWinningCalendar = ref(false);
-const daysWinningStreak = ref(0);
-const completeWeeks = ref([]);
-// const dailyCalendarData = ref({});
-const viewUsername = ref("");
-
-const getWinningCalendar = async () => {
-  viewUsername.value = dailyUser.value;
-  // 获取日历数据
-  try {
-    let params = new URLSearchParams();
-    params.append("method", "getUserWinningStreak");
-    params.append("username", viewUsername.value);
-
-    const response = await axios.post("words/", params);
-
-    if (response.data.status === "success") {
-      // 处理周完成数据
-      completeWeeks.value = response.data.data.map((record) => ({
-        monday: record.week_monday.split(" ")[0],
-        state: record.complete_state, // 0, 1, 2
-      }));
-
-      // 设置连胜天数
-      daysWinningStreak.value = response.data.winning_streak * 7;
-
-      // 处理每日数据
-      dailyCalendarData.value = {};
-      response.data.daily_data.forEach((record) => {
-        const date = record.date.split(" ")[0]; // "YYYY-MM-DD"
-        dailyCalendarData.value[date] = record.record_count || 0;
-      });
-
-      // 显示日历
-      showWinningCalendar.value = true;
-    }
-  } catch (error) {
-    console.error("获取日历数据失败:", error);
-    showToast("获取数据失败");
-  }
-};
-
-const handleDateClick = (dayData) => {
-  // 点击日期回调
-  const count = dayData.recordCount;
-  if (count > 0) {
-    showToast({
-      message: `${dayData.dateString} 背诵 ${count} 次`,
-      zIndex: 9999,
-    });
-  } else {
-    showToast({
-      message: `${dayData.dateString} 暂无背诵数据`,
-      zIndex: 9999,
-    });
-  }
-};
-
 const onCalendarClose = () => {
   // 关闭日历回调
 };
 
-const viewername = ref("");
 const usersData = ref("");
+const teacherPassword = ref("");
+const TARGET_PASSWORD = "ss654321";
+const PASSWORD_KEY = "teacherPassword";
 
+const verifyPassword = async () => {
+  const passwordInput = teacherPassword.value;
+  if (passwordInput == TARGET_PASSWORD) {
+    localStorage.setItem(PASSWORD_KEY, TARGET_PASSWORD);
+    showPasswordPopup.value = false;
+    return;
+  } else {
+    showFailToast({ message: "密码错误" });
+  }
+};
 onMounted(async () => {
+  const storedPassword = localStorage.getItem(PASSWORD_KEY);
+  console.log("storedPassword: ", storedPassword);
+  if (storedPassword !== TARGET_PASSWORD) {
+    showPasswordPopup.value = true;
+    return;
+  }
+
+  // 初始化月份显示
+  currentMonth.value = `${currentYear.value}年${currentMonthIndex.value + 1}月`;
+
   async function submitAccountData() {
     let params = new URLSearchParams();
+
     params.append("method", "getViewerData");
+
     params.append("viewer", "josephxie");
+
     params.append("password", 123456);
+
     return await axios.post("words/", params).then((ret) => {
       console.log(ret.data);
+
       return ret.data;
     });
   }
 
   // 先获取基础数据
+
   const data = await submitAccountData();
+
   console.log("data: ", data);
 
-  viewername.value = data.viewer_data[0].viewer_name;
-  console.log("viewername.value: ", viewername.value);
-  if (viewername.value === "josephxie") showGridLocation.value = true;
+  viewUsername.value = data.viewer_data[0].viewer_name;
+
+  // console.log("viewUsername.value: ", viewUsername.value);
+
+  if (viewUsername.value === "josephxie") showGridLocation.value = true;
 
   tabsName.value = data.grade_names;
-  usersData.value = data.users;
-  console.log("usersData.value: ", usersData.value);
 
+  usersData.value = data.users;
+
+  console.log("usersData.value: ", usersData.value);
   let users = data.users.map((item) => item.username);
   sidesName.value = await getSidesNameReviews(users);
-
   backupSides.value = [...sidesName.value];
 });
-
-// 刷新页面
-const reloadPage = () => {
-  location.reload();
-};
 </script>
 
 <template>
-  <div>
+  <div style="height: 100vh; overflow: hidden">
     <van-nav-bar title="背诵看板" class="nav-bar-container"> </van-nav-bar>
 
     <!-- 横屏布局 -->
-    <div class="horizontal-layout-container">
+    <div
+      class="horizontal-layout-container"
+      :class="{ 'fullscreen-active': isChartFullscreen }"
+    >
       <!-- 左侧面板 -->
       <div class="left-panel">
         <!-- 左侧上方tabs按钮 -->
@@ -1484,21 +1999,86 @@ const reloadPage = () => {
                 : "全部"
             }}</span>
           </button>
-          <button class="assign-button" @click="assignWordsTasks">
-            分配任务
+          <button class="assign-button" @click="assignWordsTasks">分配</button>
+          <button class="unselect-button" @click="unselectWordsTasks">
+            反选
           </button>
         </div>
 
-        <!-- 左侧下方sidebar -->
+        <!-- 左侧下方sidebar姓名多选 -->
         <div class="sidebar-container">
+          <!-- 多选按钮 -->
+          <div
+            style="
+              padding-bottom: 10px;
+              border-bottom: 1px solid #e9ecef;
+              display: flex;
+              gap: 10px;
+              align-items: center;
+            "
+          >
+            <van-button
+              size="small"
+              type="primary"
+              plain
+              @click="unSelectedSidebarItems"
+            >
+              取消
+            </van-button>
+
+            <div style="display: flex; gap: 10px; margin-left: auto">
+              <van-button
+                v-if="multiSelectSidebar"
+                size="small"
+                type="success"
+                plain
+                @click="selectAllItems"
+              >
+                全选
+              </van-button>
+
+              <van-button
+                size="small"
+                :type="multiSelectSidebar ? 'danger' : 'primary'"
+                plain
+                @click="toggleSidebarMultiSelectMode"
+              >
+                {{ multiSelectSidebar ? "完成" : "多选" }}
+              </van-button>
+            </div>
+          </div>
+
           <div
             v-for="(sidename, index_side) in sidesName"
             :key="index_side"
             class="sidebar-item"
-            :class="{ active: activeSidebar === index_side }"
-            @click="onChangeSidebar(index_side)"
+            :class="{
+              active: activeSidebarIndex === index_side && !multiSelectSidebar,
+              'sidebar-item-selected':
+                selectedSidebarItems.includes(index_side) && multiSelectSidebar,
+            }"
+            @click="
+              multiSelectSidebar
+                ? toggleSidebarSelect(index_side)
+                : onChangeSidebar(index_side)
+            "
           >
-            <span class="sidebar-text">{{ sidename.username }}</span>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: 1;
+                min-width: 0;
+              "
+            >
+              <van-checkbox
+                v-if="multiSelectSidebar"
+                :checked="selectedSidebarItems.includes(index_side)"
+                @click.stop
+              />
+              <span class="sidebar-text">{{ sidename.username }}</span>
+            </div>
             <span v-if="sidename.total_reviews > 0" class="sidebar-badge">{{
               sidename.total_reviews
             }}</span>
@@ -1508,340 +2088,552 @@ const reloadPage = () => {
 
       <!-- 右侧内容区域 -->
       <div class="content-container">
-        <div class="column">
-          <TeacherComment
-            popupWidth="30%"
-            popupHeight="100%"
-            popupPosition="right"
-            :filter-grade="filterGradeForComment"
-            :filter-location="filterLocationForComment"
-            :filter-student="filterStudentForComment"
-            :show-tabbar="false"
-          />
-        </div>
-        <div class="column">
-          <logList
-            popupWidth="30%"
-            popupHeight="100%"
-            popupPosition="left"
-            :filter-student="filterName"
-            :show-tabbar="false"
-          />
-        </div>
-        <!-- 柱状容器 -->
-        <!-- <div lefts="column">
+        <!-- 单用户模式 -->
+        <template v-if="multiUserChartDataList.length === 0">
+          <div class="column">
+            <TeacherComment
+              rateSize="13"
+              popupWidth="30%"
+              popupHeight="100%"
+              popupPosition="right"
+              :filter-grade="filterGradeForComment"
+              :filter-location="filterLocationForComment"
+              :filter-student="filterStudentForComment"
+              :show-tabbar="false"
+            />
+          </div>
+          <div class="column">
+            <logList
+              popupWidth="30%"
+              popupHeight="100%"
+              popupPosition="left"
+              :filter-student="filterName"
+              :show-tabbar="false"
+            />
+          </div>
+          <!-- 柱状容器 -->
           <div
-            v-show="showChart"
-            class="chart-container"
+            class="month-column"
+            :class="{ 'month-column-hidden': !showMonthColumn }"
+            v-show="showMonthColumn"
+          >
+            <div class="month-calendar">
+              <!-- 月份标题 + 切换按钮 -->
+              <div class="month-header">
+                <!-- 隐藏按钮 -->
+                <van-button
+                  size="mini"
+                  type="primary"
+                  plain
+                  @click="toggleMonthColumn"
+                  style="margin-left: 0"
+                >
+                  <div style="font-size: 12px">隐藏</div>
+                </van-button>
+                <span class="month-title" v-if="!showChartMode">{{
+                  currentMonth
+                }}</span>
+                <van-button
+                  v-if="!showChartMode"
+                  icon="arrow-left"
+                  size="small"
+                  plain
+                  @click="changeMonth(-1)"
+                />
+                <!-- <span class="month-title" v-if="!showChartMode">{{
+                  currentMonth
+                }}</span> -->
+                <span class="month-title" v-else style="margin-left: 1rem"
+                  >趋势图</span
+                >
+                <van-button
+                  v-if="!showChartMode"
+                  icon="arrow"
+                  size="small"
+                  plain
+                  @click="changeMonth(1)"
+                />
+                <van-button
+                  size="small"
+                  type="primary"
+                  plain
+                  @click="toggleChartMode"
+                  style="margin-left: auto"
+                >
+                  {{ showChartMode ? "变日历" : "变曲线" }}
+                </van-button>
+              </div>
+              <div style="text-align: center">
+                <span>{{ viewUsername }}</span>
+              </div>
+              <!-- 日历视图 -->
+              <div v-if="!showChartMode">
+                <!-- 星期标题 -->
+                <div class="weekday-header">
+                  <div
+                    class="weekday-cell"
+                    v-for="day in weekdayNames"
+                    :key="day"
+                  >
+                    {{ day }}
+                  </div>
+                </div>
+
+                <!-- 日期网格 -->
+                <div class="days-grid">
+                  <div
+                    v-for="(day, index) in monthDays"
+                    :key="index"
+                    class="calendar-day"
+                    :class="{
+                      empty: day.isEmpty,
+                      today: day.isToday,
+                      'has-flower': day.hasFlower,
+                      'week-complete-1': day.weekCompleteState === 1,
+                      'week-complete-2': day.weekCompleteState === 2,
+                    }"
+                    @click="!day.isEmpty && selectDate(day)"
+                  >
+                    <template v-if="!day.isEmpty">
+                      <div class="date-text">{{ day.day }}</div>
+                      <div v-if="day.isToday" class="today-dot"></div>
+                      <div v-if="day.hasFlower" class="week-flower-indicator">
+                        {{ day.recordCount === 1 ? "🔺" : "🌸" }}
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 曲线图视图 -->
+              <div v-else>
+                <div class="chart-container">
+                  <canvas ref="chartCanvas" width="350" height="180"></canvas>
+                </div>
+
+                <!-- 平均数标注 - 横线形式（放在图表下方） -->
+                <div
+                  style="
+                    padding: 12px;
+                    background-color: #f3f4f6;
+                    border-radius: 8px;
+                    margin-top: 1rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                  "
+                >
+                  <!-- 根据数值大小动态排序 -->
+                  <template v-if="fourWeekAvg >= eightWeekAvg">
+                    <!-- 近四周平均（数值较大，排在上面） -->
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 13px;
+                          color: #6b7280;
+                          white-space: nowrap;
+                        "
+                      >
+                        近四周平均
+                      </span>
+                      <div
+                        style="
+                          flex: 1;
+                          height: 3px;
+                          background: linear-gradient(
+                            to right,
+                            #ef4444,
+                            #ef4444 70%,
+                            transparent
+                          );
+                          border-radius: 2px;
+                        "
+                      ></div>
+                      <span
+                        style="
+                          font-size: 15px;
+                          font-weight: 600;
+                          color: #ef4444;
+                        "
+                      >
+                        {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+                      </span>
+                    </div>
+
+                    <!-- 近八周平均 -->
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 13px;
+                          color: #6b7280;
+                          white-space: nowrap;
+                        "
+                      >
+                        近八周平均
+                      </span>
+                      <div
+                        style="
+                          flex: 1;
+                          height: 3px;
+                          background: linear-gradient(
+                            to right,
+                            #10b981,
+                            #10b981 70%,
+                            transparent
+                          );
+                          border-radius: 2px;
+                        "
+                      ></div>
+                      <span
+                        style="
+                          font-size: 15px;
+                          font-weight: 600;
+                          color: #10b981;
+                        "
+                      >
+                        {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+                      </span>
+                    </div>
+                  </template>
+
+                  <template v-else>
+                    <!-- 近八周平均（数值较大，排在上面） -->
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 13px;
+                          color: #6b7280;
+                          white-space: nowrap;
+                        "
+                      >
+                        近八周平均
+                      </span>
+                      <div
+                        style="
+                          flex: 1;
+                          height: 3px;
+                          background: linear-gradient(
+                            to right,
+                            #10b981,
+                            #10b981 70%,
+                            transparent
+                          );
+                          border-radius: 2px;
+                        "
+                      ></div>
+                      <span
+                        style="
+                          font-size: 15px;
+                          font-weight: 600;
+                          color: #10b981;
+                        "
+                      >
+                        {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+                      </span>
+                    </div>
+
+                    <!-- 近四周平均 -->
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <span
+                        style="
+                          font-size: 13px;
+                          color: #6b7280;
+                          white-space: nowrap;
+                        "
+                      >
+                        近四周平均
+                      </span>
+                      <div
+                        style="
+                          flex: 1;
+                          height: 3px;
+                          background: linear-gradient(
+                            to right,
+                            #ef4444,
+                            #ef4444 70%,
+                            transparent
+                          );
+                          border-radius: 2px;
+                        "
+                      ></div>
+                      <span
+                        style="
+                          font-size: 15px;
+                          font-weight: 600;
+                          color: #ef4444;
+                        "
+                      >
+                        {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+                      </span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- 多用户模式 -->
+        <template v-else>
+          <!-- 多用户按钮组 -->
+          <div
             style="
-              position: absolute;
-              top: 10px;
-              right: 10px;
-              width: 300px;
-              height: 200px;
-              background: white;
-              border-radius: 8px;
-              box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-              z-index: 1000;
-              padding: 10px;
+              padding: 15px 0;
+              display: flex;
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 10px;
             "
           >
-            <div style="font-size: 14px; margin-bottom: 10px; color: #333">
-              {{ filterName }} 的背诵统计
-            </div>
-            <div ref="chartRef" style="width: 100%; height: 160px"></div>
+            <van-button
+              type="success"
+              @click="exitMultiUserMode"
+              style="padding: 15px 10px; height: auto"
+              plain
+            >
+              返回
+            </van-button>
+
+            <van-button
+              type="primary"
+              @click="toggleFullscreen"
+              style="padding: 15px 10px; height: auto"
+              plain
+            >
+              {{ isChartFullscreen ? "恢复" : "全屏" }}
+            </van-button>
+            <van-button
+              v-if="multiUserChartDataList.length > 0"
+              type="warning"
+              @click="toggleAllChartMode"
+              style="padding: 15px 10px; height: auto"
+              plain
+            >
+              {{ showChartMultitMode ? "日历" : "曲线" }}
+            </van-button>
+            <van-button
+              type="danger"
+              @click="popUpMomentScatter"
+              style="padding: 15px 10px; height: auto"
+              plain
+            >
+              对比
+            </van-button>
           </div>
-        </div> -->
+          <!-- 柱状图和日期网络 -->
+          <div
+            v-if="!showMomentScatter"
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              align-items: flex-start;
+              width: 100%;
+            "
+          >
+            <div
+              style="
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                width: 100%;
+              "
+            >
+              <div
+                class="month-button-navigation"
+                v-show="!showChartMultitMode"
+              >
+                <button class="nav-button" @click="changeMonthMulti(-1)">
+                  ← 上一个月
+                </button>
+
+                <div class="current-month-title">
+                  {{ currentMonth }}
+                </div>
+
+                <button class="nav-button" @click="changeMonthMulti(1)">
+                  下一个月 →
+                </button>
+              </div>
+
+              <div
+                class="multi-user-charts-container"
+                style="max-height: 80vh; overflow-y: auto; width: 100%"
+                :class="{ 'calendar-mode-layout': !showChartMultitMode }"
+              >
+                <div
+                  v-for="(userData, index) in multiUserChartDataList"
+                  :key="index"
+                  class="month-calendar-multi-2"
+                >
+                  <div class="month-header">
+                    <span class="month-title">{{ userData.username }}</span>
+                  </div>
+
+                  <div v-if="!showChartMultitMode">
+                    <div class="weekday-header">
+                      <div
+                        class="weekday-cell"
+                        v-for="day in weekdayNames"
+                        :key="day"
+                      >
+                        {{ day }}
+                      </div>
+                    </div>
+
+                    <!-- 多用户日期网格 -->
+                    <div class="days-grid">
+                      <div
+                        v-for="(day, dayIndex) in generateMultiUserMonthDays(
+                          userData,
+                          currentYear,
+                          currentMonthIndex
+                        )"
+                        :key="dayIndex"
+                        class="calendar-day"
+                        :class="{
+                          empty: day.isEmpty,
+                          today: day.isToday,
+                          'has-flower': day.hasFlower,
+                          'week-complete-1': day.weekCompleteState === 1,
+                          'week-complete-2': day.weekCompleteState === 2,
+                        }"
+                        @click="!day.isEmpty && selectDate(day)"
+                      >
+                        <template v-if="!day.isEmpty">
+                          <div class="date-text">{{ day.day }}</div>
+                          <div v-if="day.isToday" class="today-dot"></div>
+                          <div
+                            v-if="day.hasFlower"
+                            class="week-flower-indicator"
+                          >
+                            {{ day.recordCount === 1 ? "🔺" : "🌸" }}
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 多用户曲线图视图 -->
+                  <div v-else class="month-calendar-multi">
+                    <canvas
+                      :key="`chart-${index}`"
+                      width="350"
+                      height="150"
+                      :ref="
+                        (el) => {
+                          if (el) chartCanvases[index] = el;
+                        }
+                      "
+                      style="width: 100%; height: 200px"
+                      class="multi-user-canvas"
+                      :data-index="index"
+                    ></canvas>
+
+                    <!-- 多用户平均数标注 -->
+                    <div
+                      style="
+                        padding: 12px;
+                        background-color: #f3f4f6;
+                        border-radius: 8px;
+                        margin-top: 1rem;
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                      "
+                    >
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <span
+                          style="
+                            font-size: 13px;
+                            color: #6b7280;
+                            white-space: nowrap;
+                          "
+                        >
+                          近四周平均
+                        </span>
+                        <div
+                          style="
+                            flex: 1;
+                            height: 3px;
+                            background: linear-gradient(
+                              to right,
+                              #ef4444,
+                              #ef4444 70%,
+                              transparent
+                            );
+                            border-radius: 2px;
+                          "
+                        ></div>
+                        <span
+                          style="
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #ef4444;
+                          "
+                        >
+                          {{ calculateFourWeekAvg(userData).toFixed(1) }}
+                        </span>
+                        <span
+                          style="
+                            font-size: 13px;
+                            color: #6b7280;
+                            white-space: nowrap;
+                          "
+                        >
+                          近八周平均
+                        </span>
+                        <div
+                          style="
+                            flex: 1;
+                            height: 3px;
+                            background: linear-gradient(
+                              to right,
+                              #10b981,
+                              #10b981 70%,
+                              transparent
+                            );
+                            border-radius: 2px;
+                          "
+                        ></div>
+                        <span
+                          style="
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #10b981;
+                          "
+                        >
+                          {{ calculateEightWeekAvg(userData).toFixed(1) }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 多用户时刻散点图 -->
+          <WeeklyMultiUserChart
+            v-else
+            :multiUserChartDataList="multiUserChartDataList"
+            @close="showMomentScatter = false"
+            ref="weeklyChartRef"
+          />
+        </template>
       </div>
     </div>
-    <!-- 周长细节 -->
-    <!-- <van-cell
-      v-show="showLastDaysDailyTask"
-      is-link
-      center
-      clickable
-      class="custom-cell"
-      @click="showDailyDetail = true"
-      style="padding-top: 0.5rem; padding-bottom: 0.5rem"
-    >
-      <template #title>
-        <div style="display: flex; align-items: center; gap: 0.5rem">
-          <span style="font-weight: 400; margin-bottom: 0rem">
-            十五天：复习
-            {{ LastDaysReview.filter((r) => r.swipe === "复习").length }} 次 ·
-            滑动
-            {{ LastDaysReview.filter((r) => r.swipe === "滑动").length }} 次
-          </span>
-          <van-button
-            round
-            type="success"
-            size="small"
-            style="margin-bottom: 0rem"
-            @click.stop="getWinningCalendar"
-            >日历</van-button
-          >
-        </div>
-      </template>
-    </van-cell>
-    <van-list
-      v-model="loadingOriginalData"
-      :finished="finishedOriginalData"
-      finished-text="没有更多了"
-      @load="onLoadOriginalData(item)"
-    >
-      <div v-for="(item, index) in originalData" :key="index">
-        <div v-if="item.type !== 2 && item.type != 3">
-          <van-cell
-            is-link
-            center
-            clickable
-            @click="gotoItem(index)"
-            class="custom-cell"
-          >
-            <template #title>
-              <div v-if="item.attempt == '0'">
-                <div
-                  style="display: flex; align-items: flex-start; width: 160%"
-                >
-                  <div
-                    style="
-                      margin-bottom: 7px;
-                      font-weight: 700;
-                      display: flex;
-                      width: 120%;
-                    "
-                  >
-                    <div>还没有背诵</div>
-                    <div
-                      style="
-                        margin: 0.25rem 0 0 0.2rem;
-                        font-size: 9px;
-                        color: lightgray;
-                      "
-                    >
-                      {{
-                        item.create_time.replace(
-                          /(\d{4}年\d{1,2}月\d{1,2}日).*/,
-                          "$1"
-                        )
-                      }}布置
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else>
-                <div
-                  style="display: flex; align-items: flex-start; width: 160%"
-                >
-                  <div style="margin-bottom: 7px; font-weight: 700">
-                    <div style="font-size: smaller; color: lightgray">
-                      最后一次背诵时间：
-                    </div>
-                    <div
-                      v-if="item.is_review_required == 1"
-                      style="margin-top: 0.3rem; color: lightgray"
-                    >
-                      {{ item.create_time }}
-                    </div>
-                    <div v-else style="margin-top: 0.3rem">
-                      {{ item.create_time }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
 
-            <template #value>
-              <div style="font-size: 12px">
-                <div style="margin-bottom: 0.5rem">
-                  {{ item.username }}
-                </div>
-                <div style="display: flex; justify-content: flex-end">
-                  共背诵
-                  <div style="font-weight: 700; color: red">
-                    {{ item.attempt }}
-                  </div>
-                  次
-                </div>
-
-                <div style="margin-top: 0.5rem">
-                  {{ item.answers.length }}词
-                </div>
-              </div>
-            </template>
-
-            <template #label>
-              <div style="display: flex">
-                <van-rate
-                  v-model="item.rate"
-                  :size="20"
-                  color="#ffd21e"
-                  void-icon="like"
-                  icon="like"
-                  void-color="#eee"
-                  :count="3"
-                  readonly
-                  allow-half
-                />
-                <div
-                  style="margin-top: 3%; margin-left: 0.2rem"
-                  v-if="showRatePlus[index]"
-                >
-                  + {{ formattedRate(item.rate) }}
-                </div>
-              </div>
-              <div
-                style="
-                  margin-left: 4px;
-                  margin-top: 7px;
-                  margin-bottom: 3px;
-                  width: 140%;
-                  font-size: 10px;
-                "
-              >
-                <div>{{ processedTitle(item.title) }}</div>
-              </div>
-            </template>
-
-            <template #right-icon>
-              <div
-                v-if="item.is_pinned && item.rate < 3"
-                style="display: flex; flex-direction: column"
-              >
-                <van-icon
-                  name="link-o"
-                  size="0.6rem"
-                  style="
-                    margin-bottom: 4.3rem;
-                    margin-left: -0.8rem;
-                    color: blue;
-                  "
-                />
-              </div>
-            </template>
-          </van-cell>
-        </div>
-
-        <div v-if="item.type == 2 || item.type == 3">
-          <van-cell
-            is-link
-            center
-            clickable
-            @click="gotoItem(index)"
-            class="custom-cell"
-          >
-            <template #icon>
-              <img
-                v-if="item.rate < 3 && (item.type == 0 || item.type == 1)"
-                src="../assets/item_list.png"
-                style="width: 27px; height: auto; margin-right: 0.5rem"
-                alt="Item List"
-              />
-              <img
-                v-if="item.rate >= 3 && (item.type == 0 || item.type == 1)"
-                src="../assets/item_list_complete.png"
-                style="width: 27px; height: auto; margin-right: 0.5rem"
-                alt="Item List Complete"
-              />
-              <img
-                v-if="item.type == 3"
-                src="../assets/item_list_complete.png"
-                style="width: 27px; height: auto; margin-right: 0.5rem"
-                alt="Item List Complete"
-              />
-              <img
-                v-if="item.type == 2"
-                src="../assets/item_list.png"
-                style="width: 27px; height: auto; margin-right: 0.5rem"
-                alt="Item List"
-              />
-            </template>
-
-            <template #title>
-              <div v-if="item.attempt == '0'">
-                <div
-                  style="display: flex; align-items: flex-start; width: 160%"
-                >
-                  <div
-                    style="
-                      margin-bottom: 7px;
-                      font-weight: 700;
-                      display: flex;
-                      width: 120%;
-                    "
-                  >
-                    <div>还没有背诵</div>
-                    <div
-                      style="
-                        margin: 0.25rem 0 0 0.2rem;
-                        font-size: 9px;
-                        color: lightgray;
-                      "
-                    >
-                      {{
-                        item.create_time.replace(
-                          /(\d{4}年\d{1,2}月\d{1,2}日).*/,
-                          "$1"
-                        )
-                      }}布置
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else>
-                <div
-                  style="display: flex; align-items: flex-start; width: 160%"
-                >
-                  <div style="margin-bottom: 7px; font-weight: 700">
-                    <div style="font-size: smaller; color: lightgray">
-                      最后一次背诵时间：
-                    </div>
-                    <div style="margin-top: 0.3rem">
-                      {{ item.create_time }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <template #value>
-              <div style="font-size: 12px">
-                <div style="margin-bottom: 0.5rem">
-                  {{ item.username }}
-                </div>
-                <div style="margin-top: 0rem">{{ item.answers.length }}词</div>
-              </div>
-            </template>
-
-            <template #label>
-              <van-rate
-                v-model="item.rate"
-                :size="50"
-                color="#ffd21e"
-                void-icon="chart-trending-o"
-                icon="chart-trending-o"
-                void-color="#eee"
-                :count="1"
-                readonly
-                allow-half
-              />
-              <div
-                style="
-                  margin-left: 4px;
-                  margin-top: 7px;
-                  margin-bottom: 3px;
-                  width: 140%;
-                  font-size: 10px;
-                "
-              >
-                <div>{{ processedTitle(item.title) }}</div>
-              </div>
-            </template>
-          </van-cell>
-        </div>
-      </div>
-    </van-list>
-    <van-back-top /> -->
+    <!-- 隐藏时的小按钮 - 固定在右侧 -->
+    <van-button
+      v-if="!showMonthColumn"
+      size="small"
+      type="primary"
+      icon="bar-chart-o"
+      @click="toggleMonthColumn"
+      class="expand-button"
+    />
 
     <!-- 周长日志 -->
     <van-popup
@@ -2519,6 +3311,7 @@ const reloadPage = () => {
     >
       <xlsmList v-if="showAssignWordsTasks" :is-embedded="true" />
     </van-popup>
+
     <!-- 连胜日历 -->
     <WinningCalendar
       v-model:visible="showWinningCalendar"
@@ -2531,11 +3324,50 @@ const reloadPage = () => {
       @date-click="handleDateClick"
       @close="onCalendarClose"
     />
+
+    <!-- 输入密码 -->
+    <van-popup
+      v-model:show="showPasswordPopup"
+      position="center"
+      round
+      :overlay-style="{ background: 'rgba(0, 0, 0, 1)' }"
+      :close-on-click-overlay="false"
+      :style="{ height: '30%', width: '30%' }"
+    >
+      <div
+        style="
+          display: flex;
+          justify-content: center;
+          padding-top: 1rem;
+          padding-bottom: 2rem;
+        "
+      >
+        <span style="font-size: 24px; font-weight: 700"> 身份验证 </span>
+      </div>
+      <van-field
+        style="margin-bottom: 1rem; width: 80%"
+        v-model="teacherPassword"
+        name="password"
+        label="密码"
+        placeholder="请输入密码"
+        type="password"
+      />
+      <div style="display: flex; justify-content: center; width: 100%">
+        <van-button
+          type="success"
+          block
+          style="margin-top: 1rem; width: 80%"
+          @click="verifyPassword"
+          >确认</van-button
+        >
+      </div>
+    </van-popup>
+
     <loading v-if="isLoading" />
   </div>
 </template>
 
-<style>
+<style scoped>
 .nav-bar-container {
   position: sticky;
   top: 0;
@@ -2619,12 +3451,13 @@ const reloadPage = () => {
   height: 100vh; /* 关键：限制整个布局高度为视口高度 */
   display: flex; /* 左右布局 */
   overflow: hidden; /* 防止整个页面出现滚动条 */
+  flex-wrap: nowrap;
 }
 
 /* 左侧面板 */
 .left-panel {
   width: 320px;
-  height: 100%;
+  height: 92%;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -2633,7 +3466,8 @@ const reloadPage = () => {
   background-color: #ffffff;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 0 8px 8px 0;
-  transition: all 0.3s ease;
+  transition: width 0.3s, opacity 0.3s;
+  flex-shrink: 0;
 }
 
 /* 左侧上方tabs按钮容器 */
@@ -2737,7 +3571,7 @@ const reloadPage = () => {
   font-size: clamp(
     12px,
     2vw,
-    16px
+    10px
   ); /* 自适应字体大小，最小值12px，最大值16px */
   font-weight: 500;
   cursor: pointer;
@@ -2792,6 +3626,35 @@ const reloadPage = () => {
   transform: translateY(0);
 }
 
+.unselect-button {
+  width: 100%;
+  padding: 12px 24px;
+  background: white;
+  color: #28a745;
+  border: 2px solid #28a745;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.unselect-button:hover {
+  background: linear-gradient(135deg, #28a745 0%, #28a745 100%);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.unselect-button:active {
+  background: linear-gradient(135deg, #28a745 0%, #28a745 100%);
+  color: white;
+  transform: translateY(0);
+}
+
 .tab-badge {
   position: absolute;
   top: -8px;
@@ -2815,7 +3678,7 @@ const reloadPage = () => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  max-height: calc(100vh - 250px);
+  /* max-height: calc(100vh - 300px); */
 }
 
 .sidebar-title {
@@ -2872,6 +3735,7 @@ const reloadPage = () => {
   border-color: #1989fa;
   box-shadow: 0 4px 16px rgba(25, 137, 250, 0.3);
   transform: translateX(3px);
+  pointer-events: auto;
 }
 
 .sidebar-item.active::before {
@@ -2885,7 +3749,7 @@ const reloadPage = () => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  flex-shrink: 1;
 }
 
 .sidebar-badge {
@@ -2901,6 +3765,7 @@ const reloadPage = () => {
   justify-content: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 /* 右侧内容区域 */
@@ -2908,17 +3773,35 @@ const reloadPage = () => {
   flex: 1;
   height: 100%;
   overflow-y: auto;
-  padding: 20px;
+  padding: 10px;
   background-color: #ffffff;
   border-radius: 8px;
   margin: 10px 10px 10px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   display: flex;
-  gap: 20px;
+  gap: 5px;
+  min-width: 0;
+  flex-grow: 1;
+  width: auto;
+}
+
+/* 全屏模式 */
+.horizontal-layout-container.fullscreen-active .left-panel {
+  /* 将宽度设为 0，并隐藏 */
+  width: 0;
+  opacity: 0;
+  /* 确保内容不可点击或溢出 */
+  overflow: hidden;
+}
+
+/* 5. 确保右侧容器在左侧隐藏后占据所有空间 (通过 flex-grow 已经实现) */
+.horizontal-layout-container.fullscreen-active .content-container {
+  flex-grow: 1;
+  width: 100%;
 }
 
 .column {
-  flex: 1;
+  flex: 1 1 0;
   height: 100%;
   overflow: auto;
   padding: 10px;
@@ -2926,6 +3809,72 @@ const reloadPage = () => {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   background-color: #fafafa;
+  min-width: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.column:first-of-type {
+  flex: 1 1 0;
+  min-width: 340px;
+  /* 其他样式... */
+}
+
+.column:last-of-type {
+  flex: 1 1 0;
+  min-width: 0;
+  /* 其他样式... */
+}
+.month-column {
+  flex: 0 0 v-bind(monthColumnWidth);
+  min-width: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.month-column-hidden {
+  flex: 0 0 0;
+  opacity: 0;
+  transform: translateX(20px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 左边两列在月份列隐藏时平分屏幕 */
+.content-container:has(.month-column-hidden) .column {
+  flex: 1 1 0;
+}
+
+/* 展开按钮 - 固定在右侧 */
+.expand-button {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 50;
+  animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-50%) translateX(20px);
+  }
 }
 
 /* 滚动条样式优化 */
@@ -3001,5 +3950,270 @@ const reloadPage = () => {
     margin: 0;
     border-radius: 0;
   }
+}
+
+/* 本月日历容器 */
+.month-calendar {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+  padding: 0.1rem;
+}
+
+/* 月份标题 */
+.month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  gap: 0.5rem;
+}
+
+.month-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  text-align: center;
+}
+
+/* 切换按钮样式 */
+.month-header .van-button {
+  min-width: 32px;
+  height: 28px;
+  padding: 0 8px;
+}
+
+.month-header .van-button--mini {
+  font-size: 16px;
+}
+
+.month-header .van-button:hover {
+  opacity: 0.8;
+}
+
+.month-header .van-button:active {
+  transform: scale(0.95);
+}
+
+/* 星期标题行 */
+.weekday-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  margin-bottom: 8px;
+}
+
+.weekday-cell {
+  text-align: center;
+  font-size: 16px;
+  color: #969799;
+  padding: 2px 0;
+  padding-right: 18px;
+}
+
+/* 日期网格 */
+.days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+/* 日期单元格 */
+.calendar-day {
+  /* aspect-ratio: 1; */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  min-height: 45px; /* 从 36px 增加到 45px，并确保 padding/margin 足够 */
+  padding: 5px 0; /* 增加垂直 padding，撑开高度 */
+}
+
+.calendar-day.empty {
+  cursor: default;
+  pointer-events: none;
+}
+
+.calendar-day:not(.empty):hover {
+  background: #f7f8fa;
+  transform: scale(1.05);
+}
+
+.date-text {
+  font-size: 16px;
+  color: #323233;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+/* 今天的标记 */
+.calendar-day.today {
+  border: 2px solid #1989fa;
+}
+
+.today-dot {
+  width: 4px;
+  height: 4px;
+  background-color: #1989fa;
+  border-radius: 50%;
+  position: absolute;
+  bottom: 4px;
+}
+
+/* 花朵指示器 */
+.week-flower-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* .calendar-day.has-flower {
+  background-color: rgba(255, 192, 203, 0.15);
+} */
+
+/* 周完成状态背景 - 浅黄色 */
+.calendar-day.week-complete-1::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(135deg, #fff9cc 0%, #ffe680 100%);
+  border-radius: 4px;
+  z-index: 0;
+}
+
+.calendar-day.week-complete-1 .date-text {
+  color: #a67c00;
+}
+
+/* 周完成状态背景 - 金色 */
+.calendar-day.week-complete-2::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%);
+  border-radius: 4px;
+  z-index: 0;
+}
+
+.calendar-day.week-complete-2 .date-text {
+  color: #8b4513;
+  font-weight: 600;
+}
+
+.calendar-day.week-complete-1 .today-dot,
+.calendar-day.week-complete-2 .today-dot {
+  background: #8b4513;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 1200px) {
+  .calendar-day {
+    min-height: 32px;
+  }
+
+  .date-text {
+    font-size: 12px;
+  }
+
+  .week-flower-indicator {
+    font-size: 7px;
+  }
+}
+
+/* 曲线图容器 */
+.chart-container {
+  width: 100%;
+  height: 280px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-left: -1rem;
+  padding-right: -1rem;
+  position: relative;
+}
+
+.chart-container canvas {
+  width: 100%;
+  height: 80%;
+  display: block;
+}
+
+/* 学生多选按钮 */
+.sidebar-item-selected {
+  background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
+  color: white;
+  border-color: #ffa500;
+  box-shadow: 0 4px 16px rgba(255, 165, 0, 0.3);
+}
+
+.sidebar-item-selected .sidebar-badge {
+  background: rgba(255, 255, 255, 0.3);
+}
+.multi-user-charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
+  row-gap: 20px;
+  column-gap: 10px;
+  padding: 10px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: grid-template-columns 0.3s ease;
+}
+.multi-user-charts-container.calendar-mode-layout {
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-auto-rows: min-content;
+}
+
+.month-calendar-multi .days-grid {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.multi-user-charts-container .month-calendar {
+  margin: 0;
+}
+
+.month-calendar-multi {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+  padding: 0.1rem;
+  height: 360px;
+}
+.month-calendar-multi-2 {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 1rem;
+  padding: 0.1rem;
+  height: 470px;
+}
+
+/* 多人模式按钮 */
+.month-button-navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.current-month-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #323233;
+  margin-left: 10px;
 }
 </style>

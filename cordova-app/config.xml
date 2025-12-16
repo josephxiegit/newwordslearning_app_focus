@@ -1,0 +1,112 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.example.newwordslearning" 
+        version="1.0.0" 
+        xmlns="http://www.w3.org/ns/widgets" 
+        xmlns:cdv="http://cordova.apache.org/ns/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
+    <allow-navigation href="http://39.105.1.189:8000/*" />
+    <allow-navigation href="*" />
+    <access origin="*" />
+    <name>扫码背单词</name>
+    <description>
+        A sample Apache Cordova application that responds to the deviceready event.
+    </description>
+    <author email="dev@cordova.apache.org" href="https://cordova.apache.org">
+        Apache Cordova Team
+    </author>
+    <content src="index.html" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <preference name="scheme" value="http" />
+    <preference name="hostname" value="localhost" />
+    <allow-navigation href="http://*" />
+    <allow-navigation href="https://*" />
+    <allow-intent href="http://*" />
+    <allow-intent href="https://*" />
+
+    <!-- 图标 -->
+    <icon src="res/icon/android/icon-512x512.png" />
+
+    <platform name="android">
+
+        <!-- <preference name="StatusBarOverlaysWebView" value="false" />
+
+        <edit-config file="AndroidManifest.xml" target="/manifest/application" mode="merge">
+        <application android:networkSecurityConfig="@xml/network_security_config" />
+        </edit-config>
+        <preference name="webview-safe-domain-override" value="true" />
+        <preference name="android-usesCleartextTraffic" value="true" />
+        <edit-config file="AndroidManifest.xml" target="/manifest/application" mode="merge">
+            <application android:usesCleartextTraffic="true" />
+        </edit-config>
+        <uses-permission android:name="android.permission.INTERNET" /> 
+        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+        <edit-config file="AndroidManifest.xml" target="/manifest" mode="merge">
+            <queries>
+                <intent>
+                    <action android:name="android.intent.action.MAIN" />
+                    <category android:name="android.intent.category.LAUNCHER" />
+                </intent>
+            </queries>
+        </edit-config>
+
+        <preference name="AndroidPersistentFileLocation" value="Internal" /> -->
+
+
+
+                    <!-- ==================== 状态栏和UI配置 ==================== -->
+            <!-- 头部安全区域：状态栏不覆盖WebView内容 -->
+            <preference name="StatusBarOverlaysWebView" value="false" />
+
+            <!-- ==================== 网络安全配置 ==================== -->
+            <!-- 应用网络安全配置文件，允许特定域名使用明文HTTP -->
+            <edit-config file="AndroidManifest.xml" target="/manifest/application" mode="merge">
+                <application android:networkSecurityConfig="@xml/network_security_config" />
+            </edit-config>
+
+            <!-- WebView安全域名覆盖 -->
+            <preference name="webview-safe-domain-override" value="true" />
+
+            <!-- 允许应用发起HTTP（非HTTPS）请求 -->
+            <preference name="android-usesCleartextTraffic" value="true" />
+            <edit-config file="AndroidManifest.xml" target="/manifest/application" mode="merge">
+                <application android:usesCleartextTraffic="true" />
+            </edit-config>
+
+            <!-- ==================== 应用权限配置 ==================== -->
+            <!-- 互联网权限：必须有，否则无法访问网络 -->
+            <uses-permission android:name="android.permission.INTERNET" /> 
+
+            <!-- 网络状态权限：检查设备是否连接到网络 -->
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+            <!-- 精确位置权限（如果应用不需要位置，可删除） -->
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+            <!-- 粗略位置权限（如果应用不需要位置，可删除） -->
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+            <!-- Android 11+ 应用可见性：声明应用可以查询其他应用 -->
+            <edit-config file="AndroidManifest.xml" target="/manifest" mode="merge">
+                <queries>
+                    <intent>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent>
+                </queries>
+            </edit-config>
+
+            <!-- ==================== 文件存储配置 ==================== -->
+            <!-- 应用文件存储位置：Internal表示使用内部存储 -->
+            <preference name="AndroidPersistentFileLocation" value="Internal" />
+
+            <!-- ==================== 专用机模式配置（禁用系统交互） ==================== -->
+            <!-- 禁用全屏手势和下拉菜单：通过强制全屏显示 -->
+            <preference name="Fullscreen" value="true" />
+
+            <!-- 禁用返回导航：防止用户通过系统手势返回 -->
+            <preference name="DisallowOverscroll" value="true" />
+    </platform>
+    </widget>
