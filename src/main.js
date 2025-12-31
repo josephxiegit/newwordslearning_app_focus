@@ -1,7 +1,7 @@
 import { createApp, reactive, provide, ref } from 'vue'
 // import './style.css'
 import App from './App.vue'
-import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import axiosPlugin from './plugins/axios';
 import HomePage from './components/homepage.vue';
 import HomePagePc from './components/homepagePc.vue';
@@ -11,6 +11,8 @@ import StudentAnswer from './components/studentAnswer.vue';
 import StudentAccountAnswerChallenge from './components/studentAccountAnswerChallenge.vue';
 
 import StudentAccountList from './components/studentAccountList.vue';
+import StudentVoteMode from './components/studentVoteMode.vue';
+import StudentVoteModePc from './components/studentVoteModePc.vue';
 import StudentAccountListPc from './components/studentAccountListPc.vue';
 import StudentAccountItem from './components/studentAccountItem.vue';
 import StudentAccountItemPc from './components/studentAccountItemPc.vue';
@@ -28,6 +30,7 @@ import TeacherComment from './components/teacherComment.vue';
 import LogList from './components/logList.vue';
 import TextbookList from './components/textbookList.vue';
 import UserInformation from './components/userInformation.vue';
+import Tutorial from './components/tutorial.vue';
 import UserInformationPc from './components/userInformationPc.vue';
 import PurchaseLog from './components/purchaseLog.vue';
 import Viewers from './components/viewers.vue';
@@ -216,6 +219,15 @@ const routes = [
         }
     },
     {
+        path: '/tutorial',
+        name: 'tutorial',
+        component: Tutorial,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
         path: '/studentAccountItem',
         name: 'studentAccountItem',
         component: StudentAccountItem,
@@ -338,6 +350,24 @@ const routes = [
             preventBack: true
         }
     },
+    {
+        path: '/StudentVoteMode',
+        name: 'StudentVoteMode',
+        component: StudentVoteMode,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
+    {
+        path: '/StudentVoteModePc',
+        name: 'StudentVoteModePc',
+        component: StudentVoteModePc,
+        meta: {
+            index: 2,
+            preventBack: true
+        }
+    },
 ];
 // 创建router实例
 const router = createRouter({
@@ -378,8 +408,6 @@ function _isPad() {
     return /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
 }
 
-
-
 // 设置全局前置守卫
 router.beforeEach((to, from, next) => {
     // console.log('_isPad(): ', _isPad());
@@ -412,6 +440,7 @@ router.beforeEach((to, from, next) => {
     let localTeacherPassword = window.localStorage.getItem('teacherPassword');
     // localTeacherPassword = atob(localTeacherPassword);
     // console.log('localTeacherPassword: ', localTeacherPassword)
+    // localTeacherPassword == "ss654321"
     if (localTeacherPassword == "ss654321") {
         // next();
         if (to.path === '/viewers' && !from.name) {
@@ -447,6 +476,9 @@ router.beforeEach((to, from, next) => {
             (from.path === '/complete3star' && to.path === '/studentAccountAnswer') ||
             (from.path === '/complete3starPc' && to.path === '/studentAccountAnswerPc') ||
             (from.path === '/studentAccountAnswer' && to.path === '/studentAccountTest') ||
+            (from.path === '/studentVoteMode' && to.path === '/studentAccountList') ||
+            (from.path === '/studentVoteModePc' && to.path === '/studentAccountListPc') ||
+
 
             (from.path === '/studentAccountAnswerChallenge' && to.path === '/studentAccountChallenge') ||
             (from.path === '/studentAccountList' && to.path === '/studentAccountAnswerChallenge') ||
@@ -487,7 +519,7 @@ import {
     Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps, Divider, ActionSheet,
     Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row, ConfigProvider, BackTop, DropdownMenu, DropdownItem,
     Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem, NoticeBar, Barrage,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover, ImagePreview
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -563,20 +595,11 @@ app.use(Button)
     .use(Badge)
     .use(RollingText)
     .use(CollapseItem)
-    .use(Calendar);
+    .use(Calendar)
+    .use(ImagePreview);
 // 使用vue-router
 app.use(router);
 app.use(axiosPlugin);
 
 // 挂载Vue应用实例
-function mountApp() {
-    app.mount('#app');
-}
-
-if (window.cordova) {
-    // 只有在 Cordova ready 后才挂载
-    document.addEventListener('deviceready', mountApp, false);
-} else {
-    // 在浏览器开发环境，立即挂载
-    mountApp();
-}
+app.mount('#app');

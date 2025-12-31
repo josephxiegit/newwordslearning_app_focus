@@ -1206,7 +1206,7 @@ onMounted(async () => {
     </div>
 
     <!-- 做题进度 -->
-    <div style="margin-top: 3vh">
+    <div style="margin-top: 3vh; margin-bottom: 1vh">
       <van-progress
         :pivot-text="pivotText"
         :color="progressColor"

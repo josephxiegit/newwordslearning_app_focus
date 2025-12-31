@@ -943,6 +943,7 @@ const goToNextPage = (
       } else if (correctChineseAnswers.length === 3) {
         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
         if (Math.random() < 0.4) {
+          // if (Math.random() < 2) {
           const [first, second] = shuffle([
             shuffledCorrectAnswers[0],
             shuffledCorrectAnswers[1],
@@ -1253,10 +1254,6 @@ const goToNextPage = (
         if (correctAnswerObj) {
           correctAnswer = correctAnswerObj.中文;
         }
-        // else {
-        //   correctAnswer = '未找到匹配项';
-        // }
-        // console.log('correctAnswerObj: ', correctAnswerObj);
 
         // 解析正确答案为数组
         const correctAnswers = correctAnswer.includes("；")
@@ -1271,16 +1268,49 @@ const goToNextPage = (
         }
 
         let flattext = 0;
-        if (correctAnswerObj.英文 === "make use of") {
-          // if (Math.random() < 0) {
-          replaceCorrectAnswer = true;
-          flattext = 1;
+        // if (correctAnswerObj.英文 === "plant") {
+        //   replaceCorrectAnswer = true;
+        //   flattext = 1;
+        // }
+        function splitParts(text) {
+          if (text === null || text === undefined) return [];
+          return String(text)
+            .split(/[；,，]/g)
+            .map((s) => s.trim())
+            .filter(Boolean);
+        }
+
+        // correctPartsFlat: 例如 ["种植","工厂","植物"]
+        function isEquivalentToCorrect(option, correctPartsFlat) {
+          if (!option) return false;
+          const opt = String(option).trim();
+
+          // 单项直接命中
+          if (correctPartsFlat.includes(opt)) return true;
+
+          // 拼接项：拆分后与 correctPartsFlat 集合相等（忽略顺序）
+          const optParts = splitParts(opt);
+          if (optParts.length <= 1) return false;
+
+          const correctSet = new Set(correctPartsFlat);
+          const optSet = new Set(optParts);
+
+          if (optSet.size !== correctSet.size) return false;
+          for (const p of correctSet) {
+            if (!optSet.has(p)) return false;
+          }
+          return true;
         }
 
         if (replaceCorrectAnswer) {
           // 替换所有正确答案
+          // synonym.中文 = synonym.中文.map((option) =>
+          //   correctAnswers.includes(option) ? noneOfTheAbove : option
+          // );
           synonym.中文 = synonym.中文.map((option) =>
-            correctAnswers.includes(option) ? noneOfTheAbove : option
+            isEquivalentToCorrect(option, correctAnswers)
+              ? noneOfTheAbove
+              : option
           );
           correctAnswerObj.中文 = noneOfTheAbove;
         } else {
@@ -1566,8 +1596,8 @@ const goToNextPage = (
           // 根据 parts 的数量随机确定 numToRemove（删除0个概率0.3，1个的概率0.3，2个的概率0.4）
           let probabilities = {
             2: [0.3, 0.7],
-            // 3: [0.3, 0.3, 0.4],
-            3: [0, 1, 0],
+            // 3: [0.1, 0.5, 0.4],
+            3: [0, 0.8, 0.2],
             4: [0.2, 0.2, 0.2, 0.4],
             5: [0.15, 0.15, 0.15, 0.15, 0.4],
           };
@@ -2092,6 +2122,76 @@ const goToNextPage = (
     }
     console.log("data_wupinxie: ", data);
     redirect();
+    function printPlantDebug(data) {
+      if (
+        !data ||
+        !Array.isArray(data.answers) ||
+        !Array.isArray(data.synonyms)
+      ) {
+        console.warn("[plant-debug] data 结构不完整");
+        return;
+      }
+
+      // 1️⃣ 打印 answers 中的 plant
+      const plantAnswer = data.answers.find((a) => a.英文 === "plant");
+
+      console.log("========== 🌱 PLANT DEBUG ==========");
+
+      if (!plantAnswer) {
+        console.warn("❌ answers 中未找到英文为 plant 的项");
+      } else {
+        console.log("🧩 answers 中的 plant：");
+        console.log("  英文:", plantAnswer.英文);
+        console.log("  中文:", plantAnswer.中文);
+        console.log("  正确答案:", plantAnswer.正确答案);
+        console.log("  序号:", plantAnswer.序号);
+      }
+
+      // 2️⃣ 打印 synonyms 中对应的 plant 选项
+      const plantSynonym = data.synonyms.find((s) => s.英文 === "plant");
+
+      if (!plantSynonym) {
+        console.warn("❌ synonyms 中未找到英文为 plant 的项");
+      } else {
+        console.log("🧩 synonyms 中的 plant：");
+        console.log("  英文:", plantSynonym.英文);
+        console.log("  序号:", plantSynonym.序号);
+
+        if (Array.isArray(plantSynonym.中文)) {
+          console.log("  选项列表：");
+          plantSynonym.中文.forEach((opt, idx) => {
+            console.log(`    [${idx}]`, opt);
+          });
+        } else {
+          console.log("  中文字段（非数组）:", plantSynonym.中文);
+        }
+
+        if ("选项" in plantSynonym) {
+          console.log("  选项字段(选项):", plantSynonym.选项);
+        }
+        if ("排除" in plantSynonym) {
+          console.log("  排除:", plantSynonym.排除);
+        }
+      }
+
+      // 3️⃣ 对齐性检查（是否一致）
+      if (plantAnswer && plantSynonym && Array.isArray(plantSynonym.中文)) {
+        const matchInOptions = plantSynonym.中文.includes(plantAnswer.中文);
+        console.log(
+          "🔍 answers.中文 是否在 synonym.中文 选项中:",
+          matchInOptions
+        );
+
+        if (!matchInOptions) {
+          console.warn(
+            "⚠️ 不一致：answers.中文 不存在于选项中（这是你现在的核心 bug）"
+          );
+        }
+      }
+
+      console.log("====================================");
+    }
+    printPlantDebug(data);
   }
 };
 const lastSpeakTime = ref(0);
@@ -2665,6 +2765,74 @@ function showAnimation() {
 const gotoItem = (index) => {
   indexAnswer.value = index;
   flagReviewList.value = true;
+  // 投票模式
+  if (originalData.value[index]["type"] == 4) {
+    const loadingToast = showLoadingToast({
+      duration: 0,
+      forbidClick: true,
+      message: "请求中...",
+      loadingType: "spinner",
+    });
+    console.log("index: ", index);
+    async function isRecordExisted() {
+      let params = new URLSearchParams();
+      params.append("method", "isRecordExisted");
+      params.append("username", username.value);
+      params.append("nid", originalData.value[index].nid);
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
+    }
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 8000)
+    );
+
+    let loadingClosed = false;
+    Promise.race([isRecordExisted(), timeoutPromise])
+      .then((res) => {
+        console.log("res: ", res);
+        if (!loadingClosed) {
+          loadingToast.close();
+          loadingClosed = true;
+        }
+        if (res === "record_exists") {
+          showToast({
+            message: "已参与记录，无法重复参与",
+            duration: 4000,
+            closeOnClick: true,
+          });
+        } else {
+          router.push({
+            path: "/studentVoteMode",
+            state: {
+              data: JSON.stringify(originalData.value[index]),
+              nid: originalData.value[index].nid,
+              usercoins: usercoins.value,
+              basicPreExam: basicPreExam.value,
+            },
+          });
+        }
+      })
+      .catch((err) => {
+        if (!loadingClosed) {
+          loadingToast.close();
+          loadingClosed = true;
+        }
+
+        showToast({
+          message: "网络超时，请刷新页面后重试",
+          duration: 4000,
+          closeOnClick: true,
+        });
+      })
+      .finally(() => {
+        if (!loadingClosed) {
+          loadingToast.close();
+          loadingClosed = true;
+        }
+      });
+    return;
+  }
   // 预热熊出没
   if (originalData.value[index]["alias"].includes("庆典")) {
     showbearWarmup();
@@ -2701,17 +2869,6 @@ const gotoItem = (index) => {
   if (data.merge_option === false) {
     difficultyCoefficient.value -= 20;
   }
-  // 是否锁定钻石购买
-  // if (data.none_of_above== 0) {
-  //   disabledNoneOfAbove.value = true;
-  // } else {
-  //   disabledNoneOfAbove.value = false;
-  // }
-  // if (!data.is_spell_number) {
-  //   disabledSpell.value = true;
-  // } else {
-  //   disabledSpell.value = false;
-  // }
 
   if (data.reversd_number >= 1 && data.reversd_number < 5) {
     difficultyCoefficient.value += 10;
@@ -3688,11 +3845,11 @@ function getStartOfWeek(dateStr) {
   const day = date.getUTCDay();
   // 计算到周一的偏移量（周日是 0，需要特殊处理）
   const diff = day === 0 ? -6 : 1 - day;
-  
+
   const startOfWeek = new Date(date);
   startOfWeek.setUTCDate(date.getUTCDate() + diff);
   startOfWeek.setUTCHours(0, 0, 0, 0);
-  
+
   return startOfWeek.toISOString().split("T")[0];
 }
 
@@ -3704,60 +3861,62 @@ function formatDate2(dateStr) {
 function processDataForChart(data) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   // 获取最近 8 周的周一日期（用于计算 8 周平均）
   const allWeeks = [];
   for (let i = 7; i >= 0; i--) {
     const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() - (i * 7));
-    
-    const startOfWeek = getStartOfWeek(targetDate.toISOString().split('T')[0]);
-    
-    const endDate = new Date(startOfWeek + 'T00:00:00Z');
+    targetDate.setDate(today.getDate() - i * 7);
+
+    const startOfWeek = getStartOfWeek(targetDate.toISOString().split("T")[0]);
+
+    const endDate = new Date(startOfWeek + "T00:00:00Z");
     endDate.setUTCDate(endDate.getUTCDate() + 6);
-    const endDateStr = endDate.toISOString().split('T')[0];
-    
+    const endDateStr = endDate.toISOString().split("T")[0];
+
     allWeeks.push({
       startDate: startOfWeek,
       endDate: endDateStr,
     });
   }
-  
+
   // 为每一周聚合数据
-  const weeklyData = allWeeks.map(week => {
+  const weeklyData = allWeeks.map((week) => {
     let sum = 0;
-    
-    const startDate = new Date(week.startDate + 'T00:00:00Z');
+
+    const startDate = new Date(week.startDate + "T00:00:00Z");
     for (let day = 0; day < 7; day++) {
       const currentDate = new Date(startDate);
       currentDate.setUTCDate(startDate.getUTCDate() + day);
-      const dateStr = currentDate.toISOString().split('T')[0];
-      
+      const dateStr = currentDate.toISOString().split("T")[0];
+
       sum += data[dateStr] || 0;
     }
-    
+
     return {
       startDate: week.startDate,
       endDate: week.endDate,
       count: sum,
     };
   });
-  
+
   // 最近 4 周用于显示
   const recentFourWeeks = weeklyData.slice(-4);
-  
+
   // 计算 4 周平均
-  const fourWeekAvg = recentFourWeeks.reduce((acc, item) => acc + item.count, 0) / 4;
-  
+  const fourWeekAvg =
+    recentFourWeeks.reduce((acc, item) => acc + item.count, 0) / 4;
+
   // 计算 8 周平均
-  const eightWeekAvg = weeklyData.reduce((acc, item) => acc + item.count, 0) / 8;
-  
+  const eightWeekAvg =
+    weeklyData.reduce((acc, item) => acc + item.count, 0) / 8;
+
   // 生成图表标签和数据
   const labels = recentFourWeeks.map(
     (item) => `${formatDate2(item.startDate)}-${formatDate2(item.endDate)}`
   );
   const counts = recentFourWeeks.map((item) => item.count);
-  
+
   return { labels, counts, fourWeekAvg, eightWeekAvg };
 }
 
@@ -3815,16 +3974,15 @@ function renderChart(labels, counts, fourWeekAvg, eightWeekAvg) {
           bodyFont: { size: 14 },
           padding: 10,
           callbacks: {
-            label: function(context) {
+            label: function (context) {
               if (context.datasetIndex === 0) {
                 return `背诵次数: ${context.parsed.y}`;
               } else {
                 return `四周平均: ${fourWeekAvg.toFixed(1)}`;
               }
-            }
-          }
+            },
+          },
         },
-
       },
       scales: {
         y: {
@@ -3857,24 +4015,24 @@ function renderChart(labels, counts, fourWeekAvg, eightWeekAvg) {
       },
     },
   });
-  
+
   // 手动绘制数据标签
   const originalDraw = recitationChart.draw;
-  recitationChart.draw = function() {
+  recitationChart.draw = function () {
     originalDraw.apply(this, arguments);
-    
+
     const ctx = this.ctx;
-    ctx.textAlign = 'center';
-    
+    ctx.textAlign = "center";
+
     this.data.datasets.forEach((dataset, datasetIndex) => {
       const meta = this.getDatasetMeta(datasetIndex);
-      
+
       if (datasetIndex === 0) {
         // 柱状图数据标签（放在柱子内部）
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.textBaseline = 'top';
-        
+        ctx.font = "bold 14px sans-serif";
+        ctx.fillStyle = "#ffffff";
+        ctx.textBaseline = "top";
+
         meta.data.forEach((bar, index) => {
           const data = dataset.data[index];
           // 标签放在柱子顶部内侧，往下偏移10px
@@ -3882,31 +4040,41 @@ function renderChart(labels, counts, fourWeekAvg, eightWeekAvg) {
         });
       } else if (datasetIndex === 1) {
         // 平均线数据标签（只在最后一个点显示）
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillStyle = '#ef4444';
-        ctx.textBaseline = 'top';
-        
+        ctx.font = "bold 12px sans-serif";
+        ctx.fillStyle = "#ef4444";
+        ctx.textBaseline = "top";
+
         const lastPoint = meta.data[meta.data.length - 1];
         const avgValue = fourWeekAvg.toFixed(1);
-        
+
         // 绘制背景
         const textWidth = ctx.measureText(avgValue).width;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(lastPoint.x - textWidth / 2 - 4, lastPoint.y + 5, textWidth + 8, 18);
-        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.fillRect(
+          lastPoint.x - textWidth / 2 - 4,
+          lastPoint.y + 5,
+          textWidth + 8,
+          18
+        );
+
         // 绘制文字
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = "#ef4444";
         ctx.fillText(avgValue, lastPoint.x, lastPoint.y + 8);
       }
     });
   };
-  
+
   // 将 8 周平均数存储到全局变量，供模板使用
   window.eightWeekAverage = eightWeekAvg;
 }
 
 const onOpenedfourweeks = () => {
-  const { labels, counts, fourWeekAvg: avg4, eightWeekAvg: avg8 } = processDataForChart(dailyCalendarData.value);
+  const {
+    labels,
+    counts,
+    fourWeekAvg: avg4,
+    eightWeekAvg: avg8,
+  } = processDataForChart(dailyCalendarData.value);
   fourWeekAvg.value = avg4; // 保存四周平均
   eightWeekAvg.value = avg8; // 保存八周平均
   renderChart(labels, counts, avg4, avg8);
@@ -3949,7 +4117,7 @@ const generateWeekDays = async () => {
   params.append("method", "getUserWinningStreak");
   params.append("username", username.value);
   const response = await axios.post("words/", params);
-  
+
   if (response.data.status === "success") {
     completeWeeks.value = response.data.data.map((record) => ({
       monday: record.week_monday.split(" ")[0],
@@ -3984,7 +4152,7 @@ const generateWeekDays = async () => {
     if (Object.keys(dailyCalendarData.value).length > 0) {
       showfourweeksPopup.value = true;
     }
-    
+
     weekDays.value = weekDays.value.map((day) => {
       const dateKey = formatDate(new Date(day.date));
       const recordCount = dailyCalendarData.value[dateKey] || 0;
@@ -4514,6 +4682,12 @@ onMounted(async () => {
         :to="{ path: '/userinformation', query: { param: username } }"
         >商城</van-tabbar-item
       >
+      <van-tabbar-item
+        icon="question-o"
+        replace
+        :to="{ path: '/tutorial', query: { param: username } }"
+        >教程</van-tabbar-item
+      >
     </van-tabbar>
 
     <div class="custom-container">
@@ -4659,7 +4833,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="横屏（pc,平板）适配...有bug联系老师"
+        text="vote模式上线...有bug联系老师"
       />
     </div>
     <van-toast
@@ -4693,7 +4867,62 @@ onMounted(async () => {
           @load="onLoadOriginalData"
         >
           <div v-for="(item, index) in originalData" :key="index">
-            <div v-if="item.type !== 2 && item.type != 3">
+            <div v-if="item.type == 4">
+              <van-cell
+                is-link
+                center
+                clickable
+                @click="gotoItem(index)"
+                class="custom-cell"
+              >
+                <template #icon>
+                  <img
+                    src="../assets/vote.png"
+                    style="width: 23px; height: auto; margin-right: 0.5rem"
+                    alt="Item List"
+                  />
+                </template>
+
+                <template #title>
+                  <div
+                    v-if="item.swipe == 0"
+                    style="display: flex; align-items: flex-start; width: 160%"
+                  >
+                    <div
+                      style="
+                        margin-bottom: 7px;
+                        font-weight: 700;
+                        margin-left: 0.2rem;
+                      "
+                    >
+                      {{ processedTitle(item.title) }}
+                    </div>
+                  </div>
+                </template>
+
+                <template #value>
+                  <div style="font-size: 12px">
+                    <div style="margin-top: 0rem">
+                      {{ item.answers.length }}词
+                    </div>
+                  </div>
+                </template>
+
+                <template #label>
+                  <div
+                    style="
+                      margin-left: 4px;
+                      margin-top: 7px;
+                      width: 140%;
+                      font-size: 12px;
+                    "
+                  >
+                    <div>{{ item.create_time }}</div>
+                  </div>
+                </template>
+              </van-cell>
+            </div>
+            <div v-if="item.type !== 2 && item.type != 3 && item.type != 4">
               <van-cell
                 is-link
                 center
@@ -5163,7 +5392,66 @@ onMounted(async () => {
             </div>
 
             <div v-for="(item, index) in originalData" :key="index">
-              <div v-if="item.type !== 2 && item.type != 3">
+              <div v-if="item.type == 4">
+                <van-cell
+                  is-link
+                  center
+                  clickable
+                  @click="gotoItem(index)"
+                  class="custom-cell"
+                >
+                  <template #icon>
+                    <img
+                      src="../assets/vote.png"
+                      style="width: 23px; height: auto; margin-right: 0.5rem"
+                      alt="Item List"
+                    />
+                  </template>
+
+                  <template #title>
+                    <div
+                      v-if="item.swipe == 0"
+                      style="
+                        display: flex;
+                        align-items: flex-start;
+                        width: 160%;
+                      "
+                    >
+                      <div
+                        style="
+                          margin-bottom: 7px;
+                          font-weight: 700;
+                          margin-left: 0.2rem;
+                        "
+                      >
+                        {{ processedTitle(item.title) }}
+                      </div>
+                    </div>
+                  </template>
+
+                  <template #value>
+                    <div style="font-size: 12px">
+                      <div style="margin-top: 0rem">
+                        {{ item.answers.length }}词
+                      </div>
+                    </div>
+                  </template>
+
+                  <template #label>
+                    <div
+                      style="
+                        margin-left: 4px;
+                        margin-top: 7px;
+                        width: 140%;
+                        font-size: 12px;
+                      "
+                    >
+                      <div>{{ item.create_time }}</div>
+                    </div>
+                  </template>
+                </van-cell>
+              </div>
+              <div v-if="item.type !== 2 && item.type != 3 && item.type != 4">
                 <van-cell
                   is-link
                   center
@@ -6682,133 +6970,161 @@ onMounted(async () => {
     />
 
     <!-- 近四周曲线 -->
-<!-- 近四周曲线 -->
-<van-popup
-  v-model:show="showfourweeksPopup"
-  position="center"
-  style="width: 90%; max-width: 500px; padding: 16px; border-radius: 12px"
-  :close-on-click-overlay="true"
-  @opened="onOpenedfourweeks"
->
-  <div class="p-2">
-    <div
-      style="
-        font-size: 19px;
-        font-weight: 700;
-        display: flex;
-        justify-content: flex-start;
-        margin-bottom: 1.5rem;
-      "
+    <!-- 近四周曲线 -->
+    <van-popup
+      v-model:show="showfourweeksPopup"
+      position="center"
+      style="width: 90%; max-width: 500px; padding: 16px; border-radius: 12px"
+      :close-on-click-overlay="true"
+      @opened="onOpenedfourweeks"
     >
-      近四周趋势
-      <div
-        style="
-          font-size: 14px;
-          color: gray;
-          margin-left: 0.5rem;
-          margin-top: 0.4rem;
-        "
-      >
-        {{ username }}
+      <div class="p-2">
+        <div
+          style="
+            font-size: 19px;
+            font-weight: 700;
+            display: flex;
+            justify-content: flex-start;
+            margin-bottom: 1.5rem;
+          "
+        >
+          近四周趋势
+          <div
+            style="
+              font-size: 14px;
+              color: gray;
+              margin-left: 0.5rem;
+              margin-top: 0.4rem;
+            "
+          >
+            {{ username }}
+          </div>
+        </div>
+
+        <!-- canvas 组件用于 Chart.js 绘图 -->
+        <div class="chart-container" style="margin-bottom: 1rem">
+          <canvas id="recitationChart"></canvas>
+        </div>
+
+        <!-- 平均数标注 - 横线形式 -->
+        <div
+          style="
+            padding: 12px;
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          "
+        >
+          <!-- 根据数值大小动态排序 -->
+          <template v-if="fourWeekAvg >= eightWeekAvg">
+            <!-- 近四周平均（数值较大，排在上面） -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 13px; color: #6b7280; white-space: nowrap"
+              >
+                近四周平均
+              </span>
+              <div
+                style="
+                  flex: 1;
+                  height: 3px;
+                  background: linear-gradient(
+                    to right,
+                    #ef4444,
+                    #ef4444 70%,
+                    transparent
+                  );
+                  border-radius: 2px;
+                "
+              ></div>
+              <span style="font-size: 15px; font-weight: 600; color: #ef4444">
+                {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+              </span>
+            </div>
+
+            <!-- 近八周平均 -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 13px; color: #6b7280; white-space: nowrap"
+              >
+                近八周平均
+              </span>
+              <div
+                style="
+                  flex: 1;
+                  height: 3px;
+                  background: linear-gradient(
+                    to right,
+                    #10b981,
+                    #10b981 70%,
+                    transparent
+                  );
+                  border-radius: 2px;
+                "
+              ></div>
+              <span style="font-size: 15px; font-weight: 600; color: #10b981">
+                {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+              </span>
+            </div>
+          </template>
+
+          <template v-else>
+            <!-- 近八周平均（数值较大，排在上面） -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 13px; color: #6b7280; white-space: nowrap"
+              >
+                近八周平均
+              </span>
+              <div
+                style="
+                  flex: 1;
+                  height: 3px;
+                  background: linear-gradient(
+                    to right,
+                    #10b981,
+                    #10b981 70%,
+                    transparent
+                  );
+                  border-radius: 2px;
+                "
+              ></div>
+              <span style="font-size: 15px; font-weight: 600; color: #10b981">
+                {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
+              </span>
+            </div>
+
+            <!-- 近四周平均 -->
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 13px; color: #6b7280; white-space: nowrap"
+              >
+                近四周平均
+              </span>
+              <div
+                style="
+                  flex: 1;
+                  height: 3px;
+                  background: linear-gradient(
+                    to right,
+                    #ef4444,
+                    #ef4444 70%,
+                    transparent
+                  );
+                  border-radius: 2px;
+                "
+              ></div>
+              <span style="font-size: 15px; font-weight: 600; color: #ef4444">
+                {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
+              </span>
+            </div>
+          </template>
+        </div>
       </div>
-    </div>
-
-    <!-- canvas 组件用于 Chart.js 绘图 -->
-    <div class="chart-container" style="margin-bottom: 1rem">
-      <canvas id="recitationChart"></canvas>
-    </div>
-
-    <!-- 平均数标注 - 横线形式 -->
-    <div
-      style="
-        padding: 12px;
-        background-color: #f3f4f6;
-        border-radius: 8px;
-        margin-top: 1rem;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      "
-    >
-      <!-- 根据数值大小动态排序 -->
-      <template v-if="fourWeekAvg >= eightWeekAvg">
-        <!-- 近四周平均（数值较大，排在上面） -->
-        <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
-            近四周平均
-          </span>
-          <div
-            style="
-              flex: 1;
-              height: 3px;
-              background: linear-gradient(to right, #ef4444, #ef4444 70%, transparent);
-              border-radius: 2px;
-            "
-          ></div>
-          <span style="font-size: 15px; font-weight: 600; color: #ef4444">
-            {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
-          </span>
-        </div>
-
-        <!-- 近八周平均 -->
-        <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
-            近八周平均
-          </span>
-          <div
-            style="
-              flex: 1;
-              height: 3px;
-              background: linear-gradient(to right, #10b981, #10b981 70%, transparent);
-              border-radius: 2px;
-            "
-          ></div>
-          <span style="font-size: 15px; font-weight: 600; color: #10b981">
-            {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
-          </span>
-        </div>
-      </template>
-
-      <template v-else>
-        <!-- 近八周平均（数值较大，排在上面） -->
-        <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
-            近八周平均
-          </span>
-          <div
-            style="
-              flex: 1;
-              height: 3px;
-              background: linear-gradient(to right, #10b981, #10b981 70%, transparent);
-              border-radius: 2px;
-            "
-          ></div>
-          <span style="font-size: 15px; font-weight: 600; color: #10b981">
-            {{ eightWeekAvg ? eightWeekAvg.toFixed(1) : "0" }}
-          </span>
-        </div>
-
-        <!-- 近四周平均 -->
-        <div style="display: flex; align-items: center; gap: 8px">
-          <span style="font-size: 13px; color: #6b7280; white-space: nowrap">
-            近四周平均
-          </span>
-          <div
-            style="
-              flex: 1;
-              height: 3px;
-              background: linear-gradient(to right, #ef4444, #ef4444 70%, transparent);
-              border-radius: 2px;
-            "
-          ></div>
-          <span style="font-size: 15px; font-weight: 600; color: #ef4444">
-            {{ fourWeekAvg ? fourWeekAvg.toFixed(1) : "0" }}
-          </span>
-        </div>
-      </template>
-    </div>
-  </div>
-</van-popup>
+    </van-popup>
   </div>
 </template>
 

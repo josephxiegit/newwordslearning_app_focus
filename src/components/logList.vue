@@ -93,6 +93,8 @@ function processData(res) {
       const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
       // 替换所有的'变为".然后把s" 变为s' 。
+      let parsedLog;
+      let falseCount;
       let dataString = log
         .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
         .replace(/'/g, '"')
@@ -116,6 +118,7 @@ function processData(res) {
         .replace(/don"t/gi, "don't")
         .replace(/I"ll/gi, "I'll")
         .replace(/you"ll/gi, "you'll")
+        .replace(/you"d/gi, "you'd")
         .replace(/one"s/gi, "one's")
         .replace(/let"s/gi, "let's")
         .replace(/it" hard/gi, "it' hard")
@@ -127,60 +130,60 @@ function processData(res) {
         .replace(/\bTrue\b/g, "true")
         .replace(/\bNone\b/g, "null");
 
-      let parsedLog;
       try {
         parsedLog = JSON.parse(dataString);
       } catch (error) {
         console.error("JSON parsing error:", error);
         console.log("原始log数据:", log);
-        // 如果JSON解析失败，直接使用原始log数据
         parsedLog = log;
       }
+      if (swipe !== "投票") {
+        const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
+        // console.log('parsedLog: ', parsedLog);
+        if (!hasFlagField) {
+          parsedLog.forEach((logItem) => {
+            const correctAnswer = logItem.答案;
+            const userSelection = logItem.用户选择;
 
-      const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
-      // console.log('parsedLog: ', parsedLog);
-      if (!hasFlagField) {
-        parsedLog.forEach((logItem) => {
-          const correctAnswer = logItem.答案;
-          const userSelection = logItem.用户选择;
+            // 将字符串转换为数组并去除空格
+            const correctAnswerList = correctAnswer
+              .split("；")
+              .map((answer) => answer.trim());
 
-          // 将字符串转换为数组并去除空格
-          const correctAnswerList = correctAnswer
-            .split("；")
-            .map((answer) => answer.trim());
+            // 排序两个列表
+            correctAnswerList.sort();
+            userSelection.sort();
 
-          // 排序两个列表
-          correctAnswerList.sort();
-          userSelection.sort();
-
-          // 比较两个列表并设置 flag
-          if (logItem.排除 === "手写") {
-            const correctAnswer_2 = logItem.英文;
-            const cleanString = (str) =>
-              (str || "").toLowerCase().replace(/[^a-z]/g, "");
-            const userInput = cleanString(userSelection.join(","));
-            const target = cleanString(correctAnswer_2);
-            if (userInput && target && userInput === target) {
-              return true;
+            // 比较两个列表并设置 flag
+            if (logItem.排除 === "手写") {
+              const correctAnswer_2 = logItem.英文;
+              const cleanString = (str) =>
+                (str || "").toLowerCase().replace(/[^a-z]/g, "");
+              const userInput = cleanString(userSelection.join(","));
+              const target = cleanString(correctAnswer_2);
+              if (userInput && target && userInput === target) {
+                return true;
+              } else {
+                return false;
+              }
             } else {
-              return false;
+              logItem.flag =
+                correctAnswerList.length === userSelection.length &&
+                correctAnswerList.join(",") === userSelection.join(",")
+                  ? "true"
+                  : "false";
             }
-          } else {
-            logItem.flag =
-              correctAnswerList.length === userSelection.length &&
-              correctAnswerList.join(",") === userSelection.join(",")
-                ? "true"
-                : "false";
-          }
-        });
-      }
+          });
+        }
 
-      const falseCount = parsedLog.reduce((count, logItem) => {
-        return (
-          count + (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
-        );
-      }, 0);
-      parsedLog.falseCount = falseCount;
+        falseCount = parsedLog.reduce((count, logItem) => {
+          return (
+            count +
+            (logItem.flag === "false" || logItem.flag === "half" ? 1 : 0)
+          );
+        }, 0);
+        parsedLog.falseCount = falseCount;
+      }
 
       return {
         title,
@@ -326,6 +329,7 @@ const generateTitle = (item) => {
 };
 // 日志详情
 const showDetail = ref(false);
+const showVote = ref(false);
 const detailChallenge = ref(false);
 const detailName = ref("");
 const detailAlias = ref("");
@@ -400,7 +404,12 @@ const toggleDetail = async (index) => {
   detailRate.value =
     detail["log"].length - detail["falseCount"] + "/" + detail["log"].length;
   detailList.value = detail["log"];
-  showDetail.value = true;
+  if (detailMode.value == "投票") {
+    showVote.value = true;
+  } else {
+    showDetail.value = true;
+  }
+
   if (detailMode.value == "挑战") {
     const params = new URLSearchParams();
     params.append("method", "getAccountApplyChallenge");
@@ -579,7 +588,7 @@ const toggleCheckChallenge = (index) => {
     }
   }
   console.log("checkedChallenge", checkedChallenge.value);
-  if (detailMode.value === '挑战' && checkedChallenge.value) {
+  if (detailMode.value === "挑战" && checkedChallenge.value) {
     refreshDataChallenge();
   }
 };
@@ -794,6 +803,12 @@ const reloadPage = () => {
                     &nbsp;💎
                   </div>
                 </div>
+                <div
+                  v-if="item.complement == 0 && item.swipe == '投票'"
+                  style="display: flex; justify-content: flex-end"
+                >
+                  {{ item.log.length }}
+                </div>
                 <div v-else style="display: flex; justify-content: flex-end">
                   {{ item.log.length - item.falseCount }} /
                   {{ item.log.length }}
@@ -962,7 +977,7 @@ const reloadPage = () => {
               {{ detailXlsmName.slice(0, -5) }}
             </div>
           </div>
-          <div style="margin-top: 0.2rem; margin-left: 1rem;">
+          <div style="margin-top: 0.2rem; margin-left: 1rem">
             <van-button
               square
               type="primary"
@@ -1065,6 +1080,77 @@ const reloadPage = () => {
                 :disabled="detailChallenge"
                 @click.stop.prevent="toggleCheckChallenge(index)"
               />
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+    </van-popup>
+
+    <!-- 投票详情 -->
+    <van-popup
+      v-model:show="showVote"
+      :position="popupPosition"
+      :style="{ height: popupHeight, width: popupWidth }"
+      closeable
+      :lock-scroll="false"
+    >
+      <van-cell-group inset>
+        <div>
+          <div style="display: flex; justify-content: space-between">
+            <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+              用户名：{{ detailName }}
+            </div>
+            
+            <div
+              style="
+                margin-right: 2.5rem;
+                margin-top: 1.2rem;
+                font-size: 12px;
+                color: gray;
+              "
+            >
+              {{ detailDate }}
+            </div>
+          </div>
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 13px;
+            "
+          >
+            <div
+              style="
+                margin-left: 1rem;
+                color: blue;
+                font-weight: 600;
+                display: flex;
+              "
+            >
+              <div style="margin-top: 0rem">
+                选择{{ detailList.length }}个
+              </div>
+            </div>
+
+            <div style="margin-top: 0.1rem; color: gray">
+              {{ detailMode }} ｜
+              {{ detailXlsmName.slice(0, -5) }}
+            </div>
+          </div>
+          <div style="margin-top: 0.2rem; margin-left: 1rem">
+            <van-button
+              square
+              type="primary"
+              text="删除"
+              size="small"
+              @click="deleteItem(detailPopup, index)"
+            />
+          </div>
+        </div>
+        <div v-for="(item, index) in detailList" :key="index">
+          <van-cell>
+            <template #title>
+              {{ item }}
             </template>
           </van-cell>
         </div>

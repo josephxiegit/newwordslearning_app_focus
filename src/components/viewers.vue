@@ -421,7 +421,11 @@ const toggleDetail = async (item, index) => {
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
 
-  showDetail.value = true;
+  if (detailMode.value == "投票") {
+    showToast("投票模式不支持查看详情");
+  } else {
+    showDetail.value = true;
+  }
 
   getUncertain(item["nid"]).then((res) => {
     loadingUncertain.value = false;

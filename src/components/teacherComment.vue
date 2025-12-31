@@ -1040,6 +1040,169 @@ const confirmEditViewStudent = () => {
   });
 };
 
+// 单词发音
+const audioCache = new Map();
+const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
+function speakByTTSAndWait(text, { lang = "en-US", pitch = 0.5, rate = 1.3 } = {}) {
+  return new Promise((resolve, reject) => {
+    if (!("speechSynthesis" in window)) return reject(new Error("no speechSynthesis"));
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.pitch = pitch;
+    u.rate = rate;
+    u.onend = () => resolve();
+    u.onerror = (e) => reject(e);
+    window.speechSynthesis.speak(u);
+  });
+}
+
+function playBlobAndWait(blob, { rate = 1.5 } = {}) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.playbackRate = rate; // 🔥 加速播放
+
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      audio.onended = null;
+      audio.onerror = null;
+    };
+
+    audio.onended = () => {
+      cleanup();
+      resolve();
+    };
+    audio.onerror = (e) => {
+      cleanup();
+      reject(e);
+    };
+
+    audio.play().catch(e => {
+      cleanup();
+      reject(e);
+    });
+  });
+}
+
+
+const speakWord = async (english) => {
+  // 显示加载提示
+  let toast1 = showLoadingToast({
+    message: "加载中...",
+    forbidClick: true,
+    duration: 0,
+  });
+
+  // 设置8秒超时
+  const timeoutId = setTimeout(() => {
+    toast1.close();
+    showToast("超时，检查网络");
+  }, 8000);
+
+  try {
+    // 原有的发音逻辑
+    const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+      english
+    )}&type=1`;
+    const audio = new Audio(url);
+
+    await audio.play();
+
+    // 播放成功，清除超时定时器并关闭加载提示
+    clearTimeout(timeoutId);
+    toast1.close();
+  } catch (error) {
+    console.log("Fallback to SpeechSynthesis");
+
+    // 清除超时定时器
+    clearTimeout(timeoutId);
+
+    let utterance;
+    utterance = new SpeechSynthesisUtterance(english);
+
+    utterance.lang = "en-US";
+    utterance.pitch = 0.5;
+    window.speechSynthesis.speak(utterance);
+
+    // 备用方案播放完成，关闭加载提示
+    toast1.close();
+  }
+};
+
+const spellLetters = async (
+  word,
+  { lettersOnly = true, gapMs = 30 } = {}
+) => {
+  let s = word.trim();
+  // 保留字母、空格、-
+  s = s.replace(/[^a-zA-Z\s-]/g, "");
+
+  const arr = Array.from(s);
+
+  // 1) 向后端请求音频（空格和 - 不请求）
+  const request_arr = arr
+    .filter((ch) => ch !== " " && ch !== "-")
+    .map((ch) => ({ 英文: ch }));
+
+  let params = new URLSearchParams();
+  params.append("method", "getAudioList");
+  params.append("word_list", JSON.stringify(request_arr));
+
+  const response = await axios.post("words/", params);
+
+  if (response.data.success && response.data.audio_data) {
+    Object.entries(response.data.audio_data).forEach(([ch, obj]) => {
+      try {
+        const blob = base64ToBlob(obj.data, "audio/mpeg");
+        audioCache.set(ch, blob);
+      } catch (err) {
+        console.warn(`音频转换失败: ${ch}`, err);
+      }
+    });
+  }
+
+  // 2) 拼写播放：空格 或 "-" → 读中文“空”
+  for (const ch of arr) {
+    if (ch === " " || ch === "-") {
+      await speakByTTSAndWait("空", {
+        lang: "zh-CN",
+        rate: 1.1,
+        pitch: 1,
+      });
+      continue;
+    }
+
+    const blob = audioCache.get(ch);
+
+    try {
+      if (blob) {
+        await playBlobAndWait(blob);
+      } else {
+        await speakByTTSAndWait(ch, { lang: "en-US", rate: 1.3 });
+      }
+    } catch (e) {
+      try {
+        await speakByTTSAndWait(ch, { lang: "en-US", rate: 1.3 });
+      } catch {}
+    }
+
+    if (gapMs) await new Promise((r) => setTimeout(r, gapMs));
+  }
+};
+
+
+
+
+
+
 // 日志详情
 const showDetail = ref(false);
 const detailName = ref("");
@@ -1179,7 +1342,12 @@ const toggleDetail = async (item, index) => {
   diamondConsume.value = item["diamondConsume"];
 
   detailRate.value = item["true_length"] + "/" + item["log"].length;
-  showDetail.value = true;
+  if (detailMode.value == "投票") {
+    showToast("投票模式不支持查看详情");
+  } else {
+    showDetail.value = true;
+  }
+  
 
   getUncertain(item["nid"]).then((res) => {
     loadingUncertain.value = false;
@@ -2178,6 +2346,8 @@ const reloadPage = () => {
               >
                 {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
                 {{ item.用户选择.join("/") }}
+                <van-icon name="volume-o" @click="speakWord(item.英文)"/>
+                <van-icon name="service-o" @click="spellLetters(item.英文)"/>
               </div>
             </template>
           </van-cell>
@@ -2587,7 +2757,7 @@ const reloadPage = () => {
           placeholder="请输入题目类型"
         />
         <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
-          普通双模式：0｜ 限制模式：1｜ 考试模式：2｜ 考试完成模式：3
+          普通双模式：0｜ 限制模式：1｜ 考试模式：2｜ 考试完成模式：3｜ 投票模式：4
         </div>
         <van-field
           v-model="valueCoins"

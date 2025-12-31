@@ -717,6 +717,12 @@ onMounted(async () => {
       <van-tabbar-item icon="shopping-cart-o" replace to="/userinformation"
         >商城</van-tabbar-item
       >
+      <van-tabbar-item
+        icon="question-o"
+        replace
+        :to="{ path: '/tutorial', query: { param: username } }"
+        >教程</van-tabbar-item
+      >
     </van-tabbar>
 
     <div class="custom-container">
@@ -1021,7 +1027,7 @@ onMounted(async () => {
       </template>
     </van-card>
 
-    <van-card desc="查看答案减少一次" title="消除查看答案" class="custom-cell">
+    <van-card desc="查看答案减少一次" title="消除查看答案" class="custom-cell" style="margin-bottom: 4rem">
       <template #thumb>
         <img :src="viewPurchase" class="custom-thumb-image" alt="thumbnail" />
       </template>

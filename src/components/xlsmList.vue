@@ -891,7 +891,7 @@ const showPinned = ref(false);
 const valueType = ref("普通双模式");
 const valueNoneOfAbove = ref(7);
 const valuePinned = ref(1);
-const valueSpellNumber = ref(2);
+const valueSpellNumber = ref(0);
 const showSelectSpellVocabulary = ref(false);
 const synonymsSelected = ref([]);
 const selectSpellVocabulary = ref([]);
@@ -899,6 +899,7 @@ const columnsType = [
   { text: "普通双模式", value: "普通双模式" },
   { text: "限制模式", value: "限制模式" },
   { text: "考试模式", value: "考试模式" },
+  { text: "投票模式", value: "投票模式" },
 ];
 const columnsNoneOfAbove = [
   { text: 6, value: 6 },
@@ -1000,7 +1001,7 @@ const confirmSelectVocabulary = () => {
 };
 
 // 调节反转数量
-const valueReversedNumber = ref(2);
+const valueReversedNumber = ref(1);
 
 onMounted(async () => {
   refreshData();
