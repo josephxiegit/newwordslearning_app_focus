@@ -18,12 +18,16 @@
     ],
     "plugins": {
       "cordova-plugin-statusbar": {},
-      "cordova-plugin-certificates": {}
+      "cordova-plugin-certificates": {},
+      "cordova-plugin-inappbrowser": {},
+      "cordova-plugin-file-opener2": {}
     }
   },
   "devDependencies": {
     "cordova-android": "^14.0.1",
     "cordova-plugin-certificates": "^0.6.4",
+    "cordova-plugin-file-opener2": "^4.0.0",
+    "cordova-plugin-inappbrowser": "^6.0.0",
     "cordova-plugin-statusbar": "^4.0.0"
   }
 }
