@@ -847,10 +847,44 @@ const isDisabled = (index, index2) => {
   return chineseOption === "无";
 };
 
+
+const speakCooldownMap = ref(new Map());
+const SPEAK_COOLDOWN_MS = 3000;
+
+function speakWithCooldown(english) {
+  const word = (english || "").trim();
+  if (!word) return;
+
+  const now = Date.now();
+  const lastTime = speakCooldownMap.value.get(word) || 0;
+  if (now - lastTime < SPEAK_COOLDOWN_MS) return;
+
+  speakCooldownMap.value.set(word, now);
+  speakWord(word);
+}
+
+const wordSoundBusyUntil = ref(0);
+
+// 你点选时调用
+function markWordSoundBusy(ms = 900) {
+  wordSoundBusyUntil.value = Date.now() + ms;
+}
+
+function playEncourageWhenSafe(fn) {
+  const waitMs = Math.max(0, wordSoundBusyUntil.value - Date.now());
+  setTimeout(fn, waitMs + 120);
+}
+
+
 const toggleCheckChinese = (index, index2) => {
   if (isDisabled(index, index2)) {
     return;
   }
+  // 发音
+  const english = synonymsOptions.value[index]?.英文;
+  speakWithCooldown(english);
+  markWordSoundBusy(900);
+
   const key = `${index}-${index2}`;
   const checkboxRef = checkboxRefs.value[key];
   if (checkboxRef) {
@@ -1043,7 +1077,7 @@ const toggleCheckChinese = (index, index2) => {
   const halfOptions = Math.ceil(synonymsOptions.value.length / 2);
   if (completeCount.value == halfOptions && flagHalfEncouragement.value) {
     flagHalfEncouragement.value = false;
-    showAnimationShineEncouragement(); // 调用动画显示方法
+    playEncourageWhenSafe(() => showAnimationShineEncouragement());
   }
 };
 
@@ -1189,24 +1223,177 @@ const helpOutside = () => {
   }
 };
 // 单词发音
-const speakWord = (word) => {
+const audioCache = new Map();
+
+const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
+};
+
+const currentAudioRef = ref(null);
+const currentSpeakTimeoutRef = ref(null);
+
+function stopSpeak() {
+  // 1) 停止 HTMLAudio 播放
+  const curr = currentAudioRef.value;
+  if (curr?.audio) {
+    try {
+      curr.audio.pause();
+      curr.audio.currentTime = 0;
+    } catch (e) {}
+  }
+  if (typeof curr?.cleanup === "function") {
+    try {
+      curr.cleanup();
+    } catch (e) {}
+  }
+  currentAudioRef.value = null;
+
+  // 2) 取消 SpeechSynthesis（包含队列）
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+
+  // 3) 取消延迟触发的 speak（防止旧词 800ms 后突然开口）
+  if (currentSpeakTimeoutRef.value) {
+    clearTimeout(currentSpeakTimeoutRef.value);
+    currentSpeakTimeoutRef.value = null;
+  }
+}
+
+function playAudioAsCurrent(audio, objectUrl = null) {
+  // 每次要播放新音频前，先打断旧音频/旧TTS
+  stopSpeak();
+
+  const cleanup = () => {
+    // 清理事件 + 释放 ObjectURL
+    try {
+      audio.onended = null;
+      audio.onerror = null;
+    } catch (e) {}
+    if (objectUrl) {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (e) {}
+    }
+  };
+
+  currentAudioRef.value = { audio, objectUrl, cleanup };
+
+  audio.onended = () => {
+    // 只有它仍然是当前音频时才清理
+    if (currentAudioRef.value?.audio === audio) {
+      cleanup();
+      currentAudioRef.value = null;
+    } else {
+      cleanup();
+    }
+  };
+
+  audio.onerror = () => {
+    // 出错也清理
+    if (currentAudioRef.value?.audio === audio) {
+      cleanup();
+      currentAudioRef.value = null;
+    } else {
+      cleanup();
+    }
+  };
+
+  return audio.play();
+}
+
+const speakWord = async (english) => {
+  const word = (english || "").trim();
+  if (!word) return;
+
+  // 新词开始前：立刻打断（你要求“下一个发音的时候，上一个要立刻停止”）
+  stopSpeak();
+
+  // 1) 优先从缓存获取
+  const cached = audioCache.get(word);
+
+  // 1a) 缓存 Blob：每次生成 objectUrl + 新建 Audio
+  if (cached instanceof Blob) {
+    const audioUrl = URL.createObjectURL(cached);
+    const audio = new Audio(audioUrl);
+    audio.currentTime = 0;
+
+    try {
+      await playAudioAsCurrent(audio, audioUrl);
+      return;
+    } catch (err) {
+      try {
+        URL.revokeObjectURL(audioUrl);
+      } catch (e) {}
+      console.warn("播放被拒（缓存 Blob），将继续尝试有道：", err);
+      // 注意：这里不再回退 TTS，而是继续往下走有道
+    }
+  }
+
+  // 1b) 兼容历史缓存 Audio：不复用，clone 播放
+  if (cached instanceof Audio) {
+    const src = cached.src;
+    const audio = new Audio(src);
+    audio.currentTime = 0;
+
+    try {
+      await playAudioAsCurrent(audio, null);
+      return;
+    } catch (err) {
+      console.warn("播放失败（Audio cache -> clone），将继续尝试有道：", err);
+      // 继续尝试有道
+    }
+  }
+
+  // 2) 从接口返回的 audio_data 查找（base64 -> Blob -> cache -> 递归播放）
+  if (window.preloadedAudioData && window.preloadedAudioData[word]) {
+    try {
+      const base64 = window.preloadedAudioData[word].data;
+      const blob = base64ToBlob(base64, "audio/mpeg");
+      audioCache.set(word, blob);
+      return speakWord(word); // 递归后会走缓存 Blob 分支
+    } catch (err) {
+      console.warn("base64 转换失败，将继续尝试有道：", err);
+      // 继续尝试有道
+    }
+  }
+
+  // 3) 有道 dictvoice（如果失败：直接静默，不再回退任何声音）
   const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
     word
   )}&type=1`;
+
   const audio = new Audio(url);
-  audio.play().catch(() => {
-    console.log("Fallback to SpeechSynthesis");
-    let utterance;
-    utterance = new SpeechSynthesisUtterance(word);
-    if (!/[a-zA-Z]/.test(word)) {
-      utterance.lang = "zh-CN";
-    } else {
-      utterance.lang = "en-US";
+  audio.currentTime = 0;
+
+  try {
+    await playAudioAsCurrent(audio, null);
+    return;
+  } catch (err) {
+    // 关键：有道失败 => 不再播任何声音
+    console.warn("有道播放失败，按策略静默：", err);
+
+    // 额外保险：防止之前遗留的延迟 TTS 冒出来
+    if (currentSpeakTimeoutRef.value) {
+      clearTimeout(currentSpeakTimeoutRef.value);
+      currentSpeakTimeoutRef.value = null;
     }
-    utterance.pitch = 0.5;
-    window.speechSynthesis.speak(utterance);
-  });
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    return; // 关键：直接结束
+  }
+
 };
+
+
 
 // 动画鼓励
 const encouragementRef = ref(null);
@@ -1327,6 +1514,7 @@ onBeforeUnmount(() => {
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
+  stopSpeak();
 });
 function handleBeforeUnload(event) {
   event.preventDefault();
@@ -1417,6 +1605,51 @@ onMounted(async () => {
   //     console.log("正确答案：", item.正确答案);
   //   }
   // })
+  const toast = showLoadingToast({
+    duration: 0,
+    forbidClick: true,
+    message: "加载音频...",
+    loadingType: "spinner",
+  });
+
+      // 预加载语音
+    const answerSheetProList = answers.value.map((item) => ({
+      ...item,
+      showChinese: false,
+      audio: null,
+    }));
+    console.log("answerSheetProList: ", answerSheetProList);
+    let params = new URLSearchParams();
+    params.append("method", "getAudioList");
+    params.append("word_list", JSON.stringify(answerSheetProList));
+    const response = await axios.post("words/", params);
+    console.log("response: ", response.data);
+    if (response.data.success && response.data.audio_data) {
+      // 成功的音频存进缓存
+      Object.entries(response.data.audio_data).forEach(([word, obj]) => {
+        try {
+          const blob = base64ToBlob(obj.data, "audio/mpeg");
+          audioCache.set(word, blob);
+        } catch (err) {
+          console.warn(`音频转换失败: ${word}`, err);
+        }
+      });
+
+      // 检查是否有失败的词
+      if (response.data.failed_words && response.data.failed_words.length > 0) {
+        const failedList = response.data.failed_words.join("，");
+        // showConfirmDialog({
+        //   theme: "round-button",
+        //   title: "音频加载失败",
+        //   message: `以下单词的音频未能加载：\n${failedList}`,
+        //   confirmButtonText: "知道了",
+        // }).catch(() => {
+        //   // 用户点了取消（如果你保留了取消按钮）
+        // });
+      }
+    }
+
+    toast.close();
 });
 </script>
 
@@ -1426,6 +1659,7 @@ onMounted(async () => {
       <van-nav-bar
         title="学生题目"
         :left-text="`${completeCount}/${synonymsOptions.length}`"
+        fixed
       >
         <template #left>
           <div class="nav-bar-left">
@@ -1791,6 +2025,7 @@ onMounted(async () => {
 .checkbox-container {
   width: 100%;
   margin: 0 auto;
+  margin-top: 42px;
 }
 @media (min-width: 431px) {
   .checkbox-container {

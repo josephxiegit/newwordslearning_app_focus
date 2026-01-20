@@ -18,13 +18,18 @@ import {
   closeToast,
   Toast,
 } from "vant";
-import { useRouter } from "vue-router";
+
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import WolfBack from "./wolfBack.vue";
 import VictorySheep from "./victorySheep.vue";
 import HalfTrue from "./HalfTrue.vue";
 import VideoList from "./videoList.vue";
 import success1 from "../assets/sound/success1.mp3";
 import fail1 from "../assets/sound/fail1.mp3";
+
+import { useBgm } from "./userBGM.js";
+const { isPlayingBGM, toggleAudioBGM, pauseAudioBGM} = useBgm();
+
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
@@ -303,8 +308,16 @@ const handlePageUnload = () => {
   // 页面关闭
   handleAnswerSheetClose();
   sessionStorage.removeItem("videoGame");
+  pauseAudioBGM();
 };
+onBeforeRouteLeave(() => {
+  pauseAudioBGM();
+});
 
+// 组件卸载兜底
+onUnmounted(() => {
+  pauseAudioBGM();
+});
 // 看视频
 const showVideoPopup = ref(false);
 const showVideoButton = ref(true);
@@ -478,7 +491,6 @@ const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   // document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("beforeunload", handlePageUnload);
-  // window.removeEventListener("pagehide", handlePageUnload);
 });
 onUnmounted(() => {
   if (audio) {
@@ -519,15 +531,18 @@ const pauseAudio = () => {
 const toggleAudio = () => {
   if (isPlaying.value) {
     pauseAudio();
-  } else {111
+  } else {
     playAudio();
   }
+};
+const onWelcomeConfirm = () => {
+  toggleAudioBGM();
 };
 
 onMounted(async () => {
   window.addEventListener("beforeunload", handlePageUnload);
   createTimeAnswer.value = new Date();
-  console.log("history.state", history.state)
+  // console.log("history.state", history.state)
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
 
@@ -605,6 +620,7 @@ onMounted(async () => {
     return "ok";
   });
 });
+
 </script>
 
 <template>
@@ -615,7 +631,7 @@ onMounted(async () => {
       title="完成试题"
       theme="round-button"
       class="custom-dialog"
-      @confirm="playAudio"
+      @confirm="onWelcomeConfirm"
     >
       <template #title>
         <div class="custom-title">很遗憾！下次加油哦</div>
@@ -695,7 +711,7 @@ onMounted(async () => {
 
     <!-- 标题 -->
     <div class="nav-bar-container">
-      <van-nav-bar title="背诵答案">
+      <van-nav-bar title="背诵答案" fixed>
         <template #left>
           <div
             style="
@@ -732,10 +748,10 @@ onMounted(async () => {
     </div>
 
     <!-- 音乐控制 -->
-    <div class="music-bar" @click="toggleAudio">
+    <div class="music-bar" @click="toggleAudioBGM">
       🎵 背景音乐控制
       <button style="font-size: 12px">
-        {{ isPlaying ? "暂停" : "播放" }}
+        {{ isPlayingBGM ? "暂停" : "播放" }}
       </button>
     </div>
 
@@ -896,7 +912,7 @@ onMounted(async () => {
     <van-checkbox-group
       v-model="userSelected"
       class="checkbox-container"
-      style="padding-top: 32px"
+      style="padding-top: 75px"
     >
       <van-cell-group>
         <div

@@ -20,14 +20,21 @@
       "cordova-plugin-statusbar": {},
       "cordova-plugin-certificates": {},
       "cordova-plugin-inappbrowser": {},
-      "cordova-plugin-file-opener2": {}
+      "cordova-plugin-file-opener2": {},
+      "jpush-phonegap-plugin": {
+        "APP_KEY": "8010e8f9df03ff02bc1b7d69",
+        "CHANNEL": "developer-default"
+      }
     }
   },
   "devDependencies": {
     "cordova-android": "^14.0.1",
     "cordova-plugin-certificates": "^0.6.4",
+    "cordova-plugin-device": "^3.0.0",
     "cordova-plugin-file-opener2": "^4.0.0",
     "cordova-plugin-inappbrowser": "^6.0.0",
-    "cordova-plugin-statusbar": "^4.0.0"
+    "cordova-plugin-jcore": "^5.2.0",
+    "cordova-plugin-statusbar": "^4.0.0",
+    "jpush-phonegap-plugin": "^5.9.0"
   }
 }

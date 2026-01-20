@@ -23,6 +23,9 @@ import loading from "./loading.vue";
 import getPassive from "./getPassive.vue";
 import bearWarmup from "./bearWarmup.vue";
 import { Chart, registerables } from "chart.js";
+import { checkApkUpdate, openDirectDownload } from "./useUpdateCheck.js";
+import { APP_VERSION_INFO } from "../version.js";
+
 import {
   showFailToast,
   showToast,
@@ -1055,142 +1058,299 @@ const goToNextPage = (
   console.log("data_pinjie: ", data);
 
   // 增加中译英选项
+  // function processData3(data, reversd_number, numberOption) {
+  //   reversd_number = 16
+  //   // 创建 data 的深拷贝
+  //   const originalData = JSON.parse(JSON.stringify(data));
+
+  //   // 交换 data.answers 中的中文和英文，并处理分号分割
+  //   const processedAnswers = data.answers.map((item) => {
+  //     let chineseOptions;
+  //     if (item["中文"].includes("；")) {
+  //       chineseOptions = item["中文"].split("；");
+  //     } else if (item["中文"].includes(",")) {
+  //       chineseOptions = item["中文"].split(",");
+  //     } else {
+  //       chineseOptions = [item["中文"]];
+  //     }
+
+  //     const randomChinese =
+  //       chineseOptions[Math.floor(Math.random() * chineseOptions.length)];
+
+  //     return {
+  //       序号: item["序号"],
+  //       英文: randomChinese,
+  //       中文: item["英文"],
+  //     };
+  //   });
+  //   console.log("processedAnswers: ", processedAnswers);
+
+  //   // 获取所有英文答案
+  //   const allChinese = processedAnswers.map((item) => item["英文"]);
+  //   const allEnglish = processedAnswers.map((item) => item["中文"]);
+
+  //   const processedSynonyms = data.synonyms.map((synonym) => {
+  //     // 获取正确答案的中文
+  //     const correctAnswer = processedAnswers.find(
+  //       (answer) => answer["中文"] === synonym["英文"]
+  //     );
+
+  //     const correctChinese = correctAnswer.英文;
+  //     // console.log('correctChinese: ', correctChinese);
+
+  //     // 生成一个包含正确答案的随机中文列表
+  //     const englishOptions = [correctAnswer.中文];
+  //     const addedAnswers = new Set(englishOptions);
+  //     while (englishOptions.length < numberOption) {
+  //       if (addedAnswers.size >= allEnglish.length) {
+  //         englishOptions.push("无"); // 用“无”代替
+  //       } else {
+  //         const randomAnswer =
+  //           allEnglish[Math.floor(Math.random() * allEnglish.length)];
+  //         // console.log("randomAnswer: ", randomAnswer);
+  //         if (
+  //           randomAnswer !== null &&
+  //           randomAnswer !== "" &&
+  //           !addedAnswers.has(randomAnswer)
+  //         ) {
+  //           // 获取新添加的中文对应的英文
+  //           const randomAnswerEnglish = processedAnswers.find(
+  //             (answer) => answer["中文"] === randomAnswer
+  //           )?.英文;
+  //           // console.log("randomAnswerEnglish: ", randomAnswerEnglish);
+
+  //           const isDuplicate = englishOptions.some((existingChinese) => {
+  //             const existingAnswerEnglish = processedAnswers.find(
+  //               (answer) => answer["中文"] === existingChinese
+  //             )?.英文;
+
+  //             // Split the existing answer by '；' and check if it contains randomAnswerEnglish
+  //             if (existingAnswerEnglish) {
+  //               const splitExistingAnswers = existingAnswerEnglish.split("；");
+  //               return splitExistingAnswers.includes(randomAnswerEnglish);
+  //             }
+  //             return false;
+  //           });
+
+  //           if (!isDuplicate) {
+  //             englishOptions.push(randomAnswer);
+  //             addedAnswers.add(randomAnswer);
+  //           }
+  //         }
+  //       }
+  //     }
+
+  //     // 随机打乱数组顺序
+  //     for (let i = englishOptions.length - 1; i > 0; i--) {
+  //       const j = Math.floor(Math.random() * (i + 1));
+  //       [englishOptions[i], englishOptions[j]] = [
+  //         englishOptions[j],
+  //         englishOptions[i],
+  //       ];
+  //     }
+
+  //     return {
+  //       序号: synonym["序号"],
+  //       英文: correctChinese,
+  //       中文: englishOptions,
+  //     };
+  //   });
+
+  //   // console.log("processedSynonyms: ", processedSynonyms);
+
+  //   // 从 processedAnswers 和 processedSynonyms 中随机选取 reversd_number 个
+  //   const selectedIndexes = new Set();
+  //   while (selectedIndexes.size < reversd_number) {
+  //     selectedIndexes.add(Math.floor(Math.random() * processedAnswers.length));
+  //   }
+
+  //   // console.log('selectedIndexes: ', selectedIndexes);
+
+  //   const selectedAnswers = Array.from(selectedIndexes).map(
+  //     (index) => processedAnswers[index]
+  //   );
+  //   // console.log('selectedAnswers: ', selectedAnswers);
+
+  //   const selectedSynonyms = Array.from(selectedIndexes).map(
+  //     (index) => processedSynonyms[index]
+  //   );
+  //   // console.log("selectedSynonyms: ", selectedSynonyms);
+
+  //   // 在 originalData 中的 answers 和 synonyms 随机插入
+  //   selectedAnswers.forEach((answer, index) => {
+  //     const randomPosition = Math.floor(
+  //       Math.random() * (originalData.answers.length + 1)
+  //     );
+  //     originalData.answers.splice(
+  //       randomPosition,
+  //       0,
+  //       selectedAnswers.find((a) => a.序号 === answer.序号)
+  //     );
+  //     originalData.synonyms.splice(
+  //       randomPosition,
+  //       0,
+  //       selectedSynonyms.find((s) => s.序号 === selectedSynonyms[index].序号)
+  //     );
+  //   });
+
+  //   // 重新整理序号
+  //   originalData.answers.forEach((item, index) => {
+  //     item.序号 = index + 1;
+  //   });
+  //   originalData.synonyms.forEach((item, index) => {
+  //     item.序号 = index + 1;
+  //   });
+
+  //   // 返回处理后的数据和原始数据
+  //   return {
+  //     processedData: { answers: processedAnswers, synonyms: processedSynonyms },
+  //     NewData: originalData,
+  //   };
+  // }
   function processData3(data, reversd_number, numberOption) {
     // reversd_number = 10
-    // 创建 data 的深拷贝
+    // 创建 data 的深拷贝（在原题库上插入“反转题”）
     const originalData = JSON.parse(JSON.stringify(data));
 
-    // 交换 data.answers 中的中文和英文，并处理分号分割
+    // ===== 工具：拆分中文释义（兼容 ：；，,;）=====
+    function splitMeanings(s) {
+      if (!s) return [];
+      return s
+        .replace(/，/g, ",")
+        .replace(/；/g, ";")
+        .split(/[;,]/)
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+
+    // ===== 建索引：英文 -> Set(中文释义) =====
+    // 仅用于 B 方案：生成干扰项时，排除“也包含题干中文释义”的英文
+    const englishToMeanings = new Map();
+    data.answers.forEach((item) => {
+      const eng = item["英文"]; // 英文词
+      const meanings = splitMeanings(item["中文"]); // 中文释义列表
+      if (!englishToMeanings.has(eng)) englishToMeanings.set(eng, new Set());
+      meanings.forEach((m) => englishToMeanings.get(eng).add(m));
+    });
+
+    // ===== 1) 反转 answers：中文题干(随机选一个中文释义) + 正确答案(英文) =====
     const processedAnswers = data.answers.map((item) => {
-      let chineseOptions;
-      if (item["中文"].includes("；")) {
-        chineseOptions = item["中文"].split("；");
-      } else if (item["中文"].includes(",")) {
-        chineseOptions = item["中文"].split(",");
-      } else {
-        chineseOptions = [item["中文"]];
-      }
+      const meanings = splitMeanings(item["中文"]);
+      const chosenChinese =
+        meanings.length > 0
+          ? meanings[Math.floor(Math.random() * meanings.length)]
+          : "";
 
-      const randomChinese =
-        chineseOptions[Math.floor(Math.random() * chineseOptions.length)];
-
+      // 注意：为最小改动，沿用你的字段名：
+      //   英文字段承载“题干中文”，中文字段承载“正确英文”
       return {
         序号: item["序号"],
-        英文: randomChinese,
-        中文: item["英文"],
+        英文: chosenChinese, // 题干中文
+        中文: item["英文"], // 正确英文
       };
     });
-    // console.log("processedAnswers: ", processedAnswers);
 
-    // 获取所有英文答案
-    const allChinese = processedAnswers.map((item) => item["英文"]);
-    const allEnglish = processedAnswers.map((item) => item["中文"]);
+    // 候选池
+    const allPromptChinese = processedAnswers.map((x) => x["英文"]); // 所有题干中文（可能重复）
+    const allOptionEnglish = processedAnswers.map((x) => x["中文"]); // 所有可选英文（英文词）
 
+    // ===== 2) 生成 synonyms：题干中文 + 英文选项数组（唯一正确）=====
     const processedSynonyms = data.synonyms.map((synonym) => {
-      // 获取正确答案的中文
+      // 找到该题的正确项（根据英文词匹配）
       const correctAnswer = processedAnswers.find(
-        (answer) => answer["中文"] === synonym["英文"]
+        (a) => a["中文"] === synonym["英文"]
       );
 
-      const correctChinese = correctAnswer.英文;
-      // console.log('correctChinese: ', correctChinese);
-
-      // 生成一个包含正确答案的随机中文列表
-      const englishOptions = [correctAnswer.中文];
-      const addedAnswers = new Set(englishOptions);
-      while (englishOptions.length < numberOption) {
-        if (addedAnswers.size >= allEnglish.length) {
-          englishOptions.push("无"); // 用“无”代替
-        } else {
-          const randomAnswer =
-            allEnglish[Math.floor(Math.random() * allEnglish.length)];
-          // console.log("randomAnswer: ", randomAnswer);
-          if (
-            randomAnswer !== null &&
-            randomAnswer !== "" &&
-            !addedAnswers.has(randomAnswer)
-          ) {
-            // 获取新添加的中文对应的英文
-            const randomAnswerEnglish = processedAnswers.find(
-              (answer) => answer["中文"] === randomAnswer
-            )?.英文;
-            // console.log("randomAnswerEnglish: ", randomAnswerEnglish);
-
-            const isDuplicate = englishOptions.some((existingChinese) => {
-              const existingAnswerEnglish = processedAnswers.find(
-                (answer) => answer["中文"] === existingChinese
-              )?.英文;
-
-              // Split the existing answer by '；' and check if it contains randomAnswerEnglish
-              if (existingAnswerEnglish) {
-                const splitExistingAnswers = existingAnswerEnglish.split("；");
-                return splitExistingAnswers.includes(randomAnswerEnglish);
-              }
-              return false;
-            });
-
-            if (!isDuplicate) {
-              englishOptions.push(randomAnswer);
-              addedAnswers.add(randomAnswer);
-            }
-          }
-        }
+      // 兜底：数据不一致时，给一个可运行的返回
+      if (!correctAnswer) {
+        return {
+          序号: synonym["序号"],
+          英文: "", // 题干中文
+          中文: Array.from({ length: numberOption }, () => "无"),
+        };
       }
 
-      // 随机打乱数组顺序
-      for (let i = englishOptions.length - 1; i > 0; i--) {
+      const promptChinese = correctAnswer["英文"]; // 题干中文
+      const correctEnglish = correctAnswer["中文"]; // 正确英文
+
+      // 选项数组（存英文）
+      const options = [correctEnglish];
+      const added = new Set(options);
+
+      // === B 方案核心：干扰项英文必须排除“也包含 promptChinese”的英文 ===
+      // 候选干扰英文池：不为空、不是正确英文、且该英文释义集合不含 promptChinese
+      const candidatePool = allOptionEnglish.filter((eng) => {
+        if (!eng || eng === correctEnglish) return false;
+        const meaningsSet = englishToMeanings.get(eng);
+        // 如果该英文有释义且包含题干中文 => 也算对，必须排除
+        if (meaningsSet && meaningsSet.has(promptChinese)) return false;
+        return true;
+      });
+
+      // 填充到 numberOption
+      while (options.length < numberOption) {
+        // 如果候选池不足，补“无”
+        if (added.size >= 1 + candidatePool.length) {
+          // added.size>=1 表示已有正确答案；candidatePool.length 表示最多可加入的干扰数
+          options.push("无");
+          continue;
+        }
+
+        const pick =
+          candidatePool[Math.floor(Math.random() * candidatePool.length)];
+        if (!pick || added.has(pick)) continue;
+
+        options.push(pick);
+        added.add(pick);
+      }
+
+      // 随机打乱
+      for (let i = options.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [englishOptions[i], englishOptions[j]] = [
-          englishOptions[j],
-          englishOptions[i],
-        ];
+        [options[i], options[j]] = [options[j], options[i]];
       }
 
       return {
         序号: synonym["序号"],
-        英文: correctChinese,
-        中文: englishOptions,
+        英文: promptChinese, // 题干中文
+        中文: options, // 英文选项数组
       };
     });
 
-    // console.log("processedSynonyms: ", processedSynonyms);
-
-    // 从 processedAnswers 和 processedSynonyms 中随机选取 reversd_number 个
+    // ===== 3) 随机选择 reversd_number 个反转题插入 originalData =====
+    const maxSelectable = Math.min(reversd_number, processedAnswers.length);
     const selectedIndexes = new Set();
-    while (selectedIndexes.size < reversd_number) {
+    while (selectedIndexes.size < maxSelectable) {
       selectedIndexes.add(Math.floor(Math.random() * processedAnswers.length));
     }
-
-    // console.log('selectedIndexes: ', selectedIndexes);
 
     const selectedAnswers = Array.from(selectedIndexes).map(
       (index) => processedAnswers[index]
     );
-    // console.log('selectedAnswers: ', selectedAnswers);
-
     const selectedSynonyms = Array.from(selectedIndexes).map(
       (index) => processedSynonyms[index]
     );
-    // console.log("selectedSynonyms: ", selectedSynonyms);
 
-    // 在 originalData 中的 answers 和 synonyms 随机插入
-    selectedAnswers.forEach((answer, index) => {
+    // 随机插入
+    selectedAnswers.forEach((answer, idx) => {
       const randomPosition = Math.floor(
         Math.random() * (originalData.answers.length + 1)
       );
+
       originalData.answers.splice(
         randomPosition,
         0,
         selectedAnswers.find((a) => a.序号 === answer.序号)
       );
+
       originalData.synonyms.splice(
         randomPosition,
         0,
-        selectedSynonyms.find((s) => s.序号 === selectedSynonyms[index].序号)
+        selectedSynonyms.find((s) => s.序号 === selectedSynonyms[idx].序号)
       );
     });
 
-    // 重新整理序号
+    // ===== 4) 重新整理序号 =====
     originalData.answers.forEach((item, index) => {
       item.序号 = index + 1;
     });
@@ -1198,7 +1358,6 @@ const goToNextPage = (
       item.序号 = index + 1;
     });
 
-    // 返回处理后的数据和原始数据
     return {
       processedData: { answers: processedAnswers, synonyms: processedSynonyms },
       NewData: originalData,
@@ -1369,20 +1528,45 @@ const goToNextPage = (
           .filter((option) => option !== noneOfTheAbove)
           .concat(noneOfTheAbove);
 
+        // while (synonym.中文.length < 7) {
+        //   let randomAnswer = null;
+
+        //   // 循环直到找到一个中文字符
+        //   do {
+        //     randomAnswer =
+        //       originalAnswers[
+        //         Math.floor(Math.random() * originalAnswers.length)
+        //       ].中文;
+        //   } while (randomAnswer && randomAnswer.charCodeAt(0) <= 255);
+
+        //   // 检查随机答案是否在当前数组中且不为 null
+        //   if (!synonym.中文.includes(randomAnswer) && randomAnswer !== null) {
+        //     synonym.中文.splice(synonym.中文.length - 1, 0, randomAnswer);
+        //   }
+        // }
+        const correctPartsFlat = correctAnswers.flatMap(splitParts);
+
         while (synonym.中文.length < 7) {
-          let randomAnswer = null;
+          const pool = originalAnswers.filter(
+            (ans) =>
+              ans.中文 &&
+              ans.中文.charCodeAt(0) > 255 && // 是中文
+              !isEquivalentToCorrect(ans.中文, correctPartsFlat) && // 不是正确答案
+              !synonym.中文.includes(ans.中文) // 不重复
+          );
 
-          // 循环直到找到一个中文字符
-          do {
-            randomAnswer =
-              originalAnswers[
-                Math.floor(Math.random() * originalAnswers.length)
-              ].中文;
-          } while (randomAnswer && randomAnswer.charCodeAt(0) <= 255);
-
-          // 检查随机答案是否在当前数组中且不为 null
-          if (!synonym.中文.includes(randomAnswer) && randomAnswer !== null) {
-            synonym.中文.splice(synonym.中文.length - 1, 0, randomAnswer);
+          if (pool.length > 0) {
+            // 可选：随机选一个，避免总是补同一个
+            const candidate = pool[Math.floor(Math.random() * pool.length)];
+            synonym.中文.splice(synonym.中文.length - 1, 0, candidate.中文);
+          } else {
+            // 兜底：用“无”补齐
+            if (!synonym.中文.includes("无")) {
+              synonym.中文.splice(synonym.中文.length - 1, 0, "无");
+            } else {
+              // 如果“无”已经存在，就继续插“无”（或 break，视你产品需求）
+              synonym.中文.splice(synonym.中文.length - 1, 0, "无");
+            }
           }
         }
       });
@@ -4298,10 +4482,49 @@ const showUpdate = () => {
     });
   }
 };
+// 刷新数据
+const refreshData = async () => {
+  window.location.reload();
+};
+
+// setting设置
+const showSettingPopup = ref(false);
+function isAndroidApk() {
+  const ua = navigator.userAgent.toLowerCase();
+  const isAndroid = ua.indexOf("android") > -1;
+  const isCordova = !!window.cordova;
+  return isAndroid && isCordova;
+}
+function isAndroidWeb() {
+  const ua = navigator.userAgent.toLowerCase();
+  return /android/.test(ua) && !isAndroidApk();
+}
+
+const popupSetting = () => {
+  showSettingPopup.value = true;
+};
+
+const downloadNewversion = () => {
+  if (isAndroidApk()) {
+    console.log("安卓APK应用内更新");
+    checkApkUpdate({ showLatestToast: true });
+  } else if (isAndroidWeb()) {
+    console.log("安卓网页版更新");
+    openDirectDownload();
+  } else {
+    console.log("非安卓环境");
+    showToast("请在安卓App中更新");
+  }
+};
+
 // 主题
 onMounted(async () => {
   // 更新pro显示答案次数
   updateRemainingCount();
+
+  // 检查安卓版本
+  // checkApkUpdate();
+
   // 检查是否已经显示过更新提示
   // showUpdate();
 
@@ -4615,12 +4838,14 @@ onMounted(async () => {
         </template>
         <template #right>
           <div style="color: #1a89fa; font-size: 15px">
-            {{ username }}
+            <van-icon name="add-o" size="1.2rem" @click="popupSetting" />
           </div>
         </template>
         <template #left>
           <div style="color: #1a89fa; font-size: 14px">
-            {{ isMultiSelectMode ? "确定" : "登出" }}&nbsp;
+            {{ username }}&nbsp;&nbsp;{{
+              isMultiSelectMode ? "确定" : "登出"
+            }}&nbsp;
             <span @click.stop="handleCoinClick"> 💰 {{ usercoins }}</span>
             <span @click.stop="handleDiamondClick">
               &nbsp;&nbsp;💎 {{ userdiamonds }}
@@ -4634,20 +4859,33 @@ onMounted(async () => {
     </div>
 
     <!-- 本周日历 连胜 -->
-    <div style="font-size: 12px; margin: 0.3rem 0rem -0.1rem 0.7rem">
-      <span style="color: #1989fa">连胜{{ daysWinningStreak }}天</span>
-      <span
-        style="margin-left: 1rem"
-        :style="{
-          color: has_enough_today ? '#FFD700' : '#d0d0d0',
-          filter: has_enough_today
-            ? 'brightness(1.2) saturate(1.5) hue-rotate(-40deg)'
-            : 'brightness(0.8) saturate(0.3)',
-          textShadow: has_enough_today ? '0 0 8px #FFD700' : 'none',
-        }"
+    <div
+      style="
+        font-size: 12px;
+        margin: 0.3rem 0rem 0.6rem 0.7rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      "
+    >
+      <div style="display: flex; align-items: center">
+        <span style="color: #1989fa">连胜{{ daysWinningStreak }}天</span>
+        <span
+          style="margin-left: 1rem"
+          :style="{
+            color: has_enough_today ? '#FFD700' : '#d0d0d0',
+            filter: has_enough_today
+              ? 'brightness(1.2) saturate(1.5) hue-rotate(-40deg)'
+              : 'brightness(0.8) saturate(0.3)',
+            textShadow: has_enough_today ? '0 0 8px #FFD700' : 'none',
+          }"
+        >
+          {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
+        </span>
+      </div>
+      <span style="color: #1989fa; margin-right: 1rem" @click="refreshData"
+        >刷新</span
       >
-        {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
-      </span>
     </div>
 
     <div class="week-calendar">
@@ -4833,7 +5071,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="vote模式上线...有bug联系老师"
+        text="普通模式优化发音...有bug联系老师"
       />
     </div>
     <van-toast
@@ -6913,6 +7151,26 @@ onMounted(async () => {
           </van-cell>
         </div>
       </van-list>
+    </van-popup>
+
+    <!-- setting设置 -->
+    <van-popup
+      closeable
+      round=""
+      v-model:show="showSettingPopup"
+      position="left"
+      :style="{ height: '100%', width: '70%' }"
+    >
+      <div style="font-size: 18px; font-weight: 700; margin: 1rem">设置</div>
+      <div style="margin: -0.5rem 0 1rem 1rem; font-size: smaller; color: gray">
+        <div>版本号：{{ APP_VERSION_INFO.version }}</div>
+        <div>后续开发中...</div>
+        <div style="margin-top: 1rem">
+          <!-- <van-button type="primary" @click="downloadNewversion">
+            下载新版安卓apk
+          </van-button> -->
+        </div>
+      </div>
     </van-popup>
 
     <!-- 弹幕 -->

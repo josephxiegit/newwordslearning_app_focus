@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <div class="nav-bar-container">
-      <van-nav-bar title="投票模式">
+      <van-nav-bar title="投票模式" fixed>
         <template #left>
           <div class="nav-bar-left">
             <span class="nav-button-left">
@@ -70,6 +70,7 @@ import {
   showSuccessToast,
   showConfirmDialog,
   Empty,
+  Dialog,
 } from "vant";
 import {
   onBeforeRouteLeave,
@@ -156,9 +157,45 @@ async function onVisibilityChange() {
   }
 }
 
+// 防止页面下拉刷新
+let startY = 0;
+let triggered = false;
+
+const onTouchStart = (e) => {
+  startY = e.touches[0].clientY;
+  triggered = false;
+};
+const onTouchMove = (e) => {
+  const currentY = e.touches[0].clientY;
+  const deltaY = currentY - startY;
+
+  // 条件：页面在最顶部 + 向下拉
+  if (window.scrollY === 0 && deltaY > 15 && !triggered) {
+    triggered = true;
+
+    // 关键：阻止浏览器下拉刷新
+    e.preventDefault();
+
+    showConfirmDialog({
+      title: "提示",
+      message: "刷新将重新投票，是否确认？",
+      confirmButtonText: "确认刷新",
+      cancelButtonText: "取消",
+    })
+      .then(() => {
+        window.location.reload();
+      })
+      .catch(() => {
+        // 什么都不做，留在页面
+      });
+  }
+};
+
 onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onVisibilityChange);
   window.removeEventListener("popstate", onPopState);
+  document.removeEventListener("touchstart", onTouchStart);
+  document.removeEventListener("touchmove", onTouchMove);
 });
 
 onBeforeRouteLeave(async (to, from) => {
@@ -204,6 +241,8 @@ function onPopState() {
 }
 
 onMounted(() => {
+  document.addEventListener("touchstart", onTouchStart, { passive: false });
+  document.addEventListener("touchmove", onTouchMove, { passive: false });
   document.addEventListener("visibilitychange", onVisibilityChange, {
     passive: true,
   });
@@ -345,7 +384,7 @@ async function submitSelection() {
 
 /* 列表区域全宽：不要 padding，否则看起来像“卡片居中” */
 .list-wrap {
-  padding: 0;
+  padding-top: 3rem;
 }
 
 /* 关键：英文不要被挤成很窄；允许换行但占满可用宽度 */

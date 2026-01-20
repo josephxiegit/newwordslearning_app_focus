@@ -25,6 +25,10 @@ import HalfTrue from "./HalfTrue.vue";
 import VideoListPc from "./videoListPc.vue";
 import success1 from "../assets/sound/success1.mp3";
 import fail1 from "../assets/sound/fail1.mp3";
+
+import { useBgm } from "./userBGM.js";
+const { isPlayingBGM, toggleAudioBGM, pauseAudioBGM} = useBgm();
+
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
 const router = useRouter();
@@ -447,7 +451,6 @@ const RateOrigin = ref(0);
 onBeforeUnmount(() => {
   // document.removeEventListener("visibilitychange", handleVisibilityChange);
   window.removeEventListener("beforeunload", handlePageUnload);
-  // window.removeEventListener("pagehide", handlePageUnload);
 });
 onUnmounted(() => {
   if (audio) {
@@ -491,6 +494,10 @@ const toggleAudio = () => {
   } else {
     playAudio();
   }
+};
+
+const onWelcomeConfirm = () => {
+  toggleAudioBGM();
 };
 
 onMounted(async () => {
@@ -602,14 +609,14 @@ onMounted(async () => {
       </div>
 
       <!-- 背景音乐控制 -->
-      <div class="sidebar-item" @click="toggleAudio">
+      <div class="sidebar-item" @click="toggleAudioBGM">
         <van-icon
-          :name="isPlaying ? 'volume-o' : 'volume-o'"
+          :name="isPlayingBGM ? 'volume-o' : 'volume-o'"
           size="24"
-          :color="isPlaying ? '#07c160' : '#999'"
+          :color="isPlayingBGM ? '#07c160' : '#999'"
         />
         <div class="sidebar-text">
-          <div style="font-size: 11px">{{ isPlaying ? "暂停" : "播放" }}</div>
+          <div style="font-size: 11px">{{ isPlayingBGM ? "暂停" : "播放" }}</div>
         </div>
       </div>
 
@@ -636,7 +643,7 @@ onMounted(async () => {
         title="完成试题"
         theme="round-button"
         class="custom-dialog"
-        @confirm="playAudio"
+        @confirm="onWelcomeConfirm"
       >
         <template #title>
           <div class="custom-title">很遗憾！下次加油哦</div>
