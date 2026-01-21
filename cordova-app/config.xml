@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget id="com.newwordslearning" version="26.01.19.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+<widget id="com.focus.newwordslearning" version="f.26.01.20.1" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
     
     <allow-navigation href="http://39.105.1.189:8000/*" />
     
@@ -31,8 +31,6 @@
             <category android:name="android.intent.category.HOME" />
             <category android:name="android.intent.category.DEFAULT" />
         </config-file>
-
-
 
 
         <preference name="ContentSecurityPolicyString" value="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob: gap:; style-src * 'self' 'unsafe-inline' https: http:; font-src * 'self' data: https: http:; connect-src * 'self' https: http: ws: wss:; img-src * data: blob: https: http:; script-src * 'self' 'unsafe-inline' 'unsafe-eval'; media-src * 'self' data: blob: https: http:;" />

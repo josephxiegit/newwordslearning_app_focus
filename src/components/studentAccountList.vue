@@ -5071,7 +5071,7 @@ onMounted(async () => {
         scrollable
         :delay="1"
         :speed="80"
-        text="普通模式优化发音...有bug联系老师"
+        text="欢迎来到focus模式，体验沉浸式学习"
       />
     </div>
     <van-toast
