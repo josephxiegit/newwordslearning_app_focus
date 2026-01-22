@@ -1,4 +1,4 @@
-<!-- <script setup>
+<script setup>
 import { watch, onMounted, ref, computed, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getCurrentInstance } from "vue";
@@ -246,8 +246,8 @@ textarea,
   user-select: text !important;
   -webkit-touch-callout: default !important;
 }
-</style> -->
-
+</style>
+<!-- 
 <template>
   <div class="app-container">
     <div class="secret-zone" @click="handleSecretClick"></div>
@@ -534,3 +534,4 @@ textarea,
   -webkit-touch-callout: default !important;
 }
 </style>
+ -->
