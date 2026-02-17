@@ -26,6 +26,40 @@ const axios = instance.appContext.config.globalProperties.$ajax;
 
 const originalData = ref([]);
 const filterXlsmData = ref([]);
+const loadingXlsmData = ref(false);
+const finishedXlsmData = ref(false);
+const pageIndexXlsmData = ref(0);
+
+const onLoadXlsmData = async () => {
+  if (loadingXlsmData.value || finishedXlsmData.value) {
+    return;
+  }
+  const params = new URLSearchParams();
+  params.append("method", "filterTeacherComment2");
+  // params.append("alias", title);
+  params.append("filterStudent", valueSearchStudent.value);
+  params.append("filterXlsm", valueSearchXlsm.value);
+  params.append("filterGroup", valueSearchGroup.value);
+  params.append("filterLocation", valueLocation.value);
+  params.append("filterGrade", valueGrade.value);
+  params.append("filterDate", dateCalendar.value);
+  params.append("page", pageIndexXlsmData.value + 1); // 请求下一页的数据
+  params.append("page_size", 20); // 每页数据大小
+
+  const response = await axios.post("words/", params);
+  let moreData = response.data.data;
+  moreData = processData(moreData);
+  moreData = processDatetime(moreData);
+  filterXlsmData.value.push(...moreData);
+  // sortByXlsm();
+  console.log("moreData: ", moreData);
+
+  pageIndexXlsmData.value++;
+  finishedXlsmData.value = !response.data.has_more;
+
+  loadingXlsmData.value = false;
+  return filterXlsmData.value;
+};
 
 const props = defineProps({
   popupWidth: {
@@ -134,7 +168,42 @@ const showFilter = () => {
   });
 };
 function processData(res) {
-  return res.map((item) => {
+  const normalizeRecord = (item) => {
+    const normalized =
+      item && item.fields && typeof item.fields === "object"
+        ? { ...item.fields }
+        : { ...item };
+
+    if (item?.pk !== undefined && normalized.nid === undefined) {
+      normalized.nid = item.pk;
+    }
+    if (item?.lock_spell !== undefined && normalized.lock_spell === undefined) {
+      normalized.lock_spell = item.lock_spell;
+    }
+    if (item?.spell_words !== undefined && normalized.spell_words === undefined) {
+      normalized.spell_words = item.spell_words;
+    }
+    return normalized;
+  };
+
+  const parseJsonField = (value) => {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") return value;
+    if (typeof value !== "string") return [];
+
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    try {
+      return JSON.parse(trimmed);
+    } catch (error) {
+      console.warn("JSON parse failed:", value, error);
+      return [];
+    }
+  };
+
+  return res.map((rawItem) => {
+    const item = normalizeRecord(rawItem);
     const {
       title,
       username,
@@ -161,12 +230,8 @@ function processData(res) {
       review_time,
       apply_challenge,
     } = item;
-    let dataAnswers = JSON.stringify(answers);
-    // console.log("dataAnswers: ", dataAnswers);
-    const parsedAnswers = eval("(" + dataAnswers + ")");
-    let dataSynonyms = JSON.stringify(synonyms);
-    const parsedSynonyms = eval("(" + dataSynonyms + ")");
-    // const parsedSynonyms = JSON.parse(dataSynonyms);
+    const parsedAnswers = parseJsonField(answers);
+    const parsedSynonyms = parseJsonField(synonyms);
 
     let lock_spell_format;
     if (lock_spell === null) {
@@ -269,8 +334,12 @@ const sortByXlsm = () => {
 };
 
 const filteredStudent = () => {
-  filterData();
-  // showFliterBox.value = false;
+  filterXlsmData.value = [];
+  pageIndexXlsmData.value = 0;
+  finishedXlsmData.value = false;
+  loadingXlsmData.value = false;
+  onLoadXlsmData();
+  showFliterBox.value = false;
 };
 
 const updateReview = () => {
@@ -306,44 +375,14 @@ const updateReview = () => {
     });
 };
 
-const updateDaily = () => {
-  async function updateDaily() {
-    let params = new URLSearchParams();
-    params.append("method", "updateDaily");
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  showConfirmDialog({
-    title: "确认更新",
-    message: "是否确认更新Daily周长？",
-  })
-    .then(() => {
-      updateDaily().then((res) => {
-        console.log(res);
-        let message = "";
-        for (const [username, count] of Object.entries(res)) {
-          message += `${username}`;
-        }
-        showToast({
-          duration: 0,
-          closeOnClick: true,
-          closeOnClickOverlay: true,
-          message: message,
-        });
-      });
-    })
-    .catch(() => {
-      // on cancel
-    });
-};
 // 监听来自父组件的筛选参数变化
 watch(
   () => props.filterGrade,
   (newGrade) => {
     if (newGrade !== undefined && newGrade !== null) {
       valueGrade.value = newGrade;
-      filterData();
+      // filterData();
+      filteredStudent();
     }
   },
   { immediate: true }
@@ -354,7 +393,8 @@ watch(
   (newLocation) => {
     if (newLocation !== undefined && newLocation !== null) {
       valueLocation.value = newLocation;
-      filterData();
+      // filterData();
+      filteredStudent();
     }
   },
   { immediate: true }
@@ -365,7 +405,8 @@ watch(
   (newStudent) => {
     if (newStudent !== undefined && newStudent !== null) {
       valueSearchStudent.value = newStudent;
-      filterData();
+      // filterData();
+      filteredStudent();
     }
   },
   { immediate: true }
@@ -480,26 +521,6 @@ function processDatetime(res) {
   });
 }
 
-async function queryData() {
-  let params = new URLSearchParams();
-  params.append("method", "queryTeacherComment");
-  return await axios.post("words/", params).then((ret) => {
-    return ret.data;
-  });
-}
-
-function getListData() {
-  queryData().then((res) => {
-    console.log("res: ", res);
-    res = processDatetime(res);
-    originalData.value = [...res];
-    filterXlsmData.value = [...res];
-    console.log("filterXlsmData: ", filterXlsmData.value);
-
-    // filterData();
-  });
-}
-
 // 左右滑按钮
 const showPreviewDelete = ref(false);
 const actionsPreviewDelete = [{ name: "预览" }, { name: "删除" }];
@@ -570,7 +591,8 @@ const deleteItem = (item, index) => {
         reloadPage();
       } else {
         showSuccessToast("处于筛选状态");
-        filterData();
+        // filterData();
+        filteredStudent();
       }
     });
   });
@@ -1405,7 +1427,8 @@ const reviseGroup = () => {
     // console.log('res: ', res);
     selectedItems.value = [];
     if (res["message"] == "修改完成") {
-      filterData();
+      // filterData();
+      filteredStudent();
       showSuccessToast("修改成功");
     }
     return;
@@ -1483,7 +1506,8 @@ const confirmDeleteInDialog = () => {
         reloadPage();
       } else {
         showSuccessToast("处于筛选状态");
-        filterData();
+        // filterData();
+        filteredStudent();
       }
     });
   });
@@ -1691,7 +1715,8 @@ async function handleDataProcess() {
     reloadPage();
   } else {
     showSuccessToast("处于筛选状态");
-    filterData();
+    // filterData();
+    filteredStudent();
   }
   showReviseData.value = false;
 }
@@ -1711,7 +1736,8 @@ const reviseButton = () => {
         reloadPage();
       } else {
         showSuccessToast("处于筛选状态");
-        filterData();
+        // filterData();
+        filteredStudent();
       }
       showReviseData.value = false;
     });
@@ -1773,7 +1799,8 @@ const confirmSelectVocabulary = () => {
       reloadPage();
     } else {
       showSuccessToast("处于筛选状态");
-      filterData();
+      // filterData();
+      filteredStudent();
     }
   });
 };
@@ -1810,7 +1837,8 @@ const lockSelectVocabulary = () => {
       reloadPage();
     } else {
       showSuccessToast("处于筛选状态");
-      filterData();
+      // filterData();
+      filteredStudent();
     }
   });
 };
@@ -1897,18 +1925,17 @@ const onCalendarClose = () => {
 };
 
 onMounted(async () => {
-  let res = new Promise((resolve, reject) => {
-    getListData();
-    resolve("ok");
-  });
-  res.then(() => {});
 });
 
 // 刷新页面
 const reloadPage = () => {
   let res = new Promise((resolve, reject) => {
-    getListData();
-    resolve("ok");
+  filterXlsmData.value = [];
+  pageIndexXlsmData.value = 0;
+  finishedXlsmData.value = false;
+  loadingXlsmData.value = false;
+  onLoadXlsmData();
+  showFliterBox.value = false;
   });
   res.then(() => {
     isMultiSelectMode.value = false;
@@ -2406,230 +2433,241 @@ const reloadPage = () => {
     </van-popup>
 
     <!-- 数据列表 -->
-    <van-cell-group v-model="selectedItems" style="margin-bottom: 80px">
-      <van-swipe-cell
-        v-for="(item, index) in filterXlsmData"
-        :key="index"
-        stop-propagation
+    <van-cell-group 
+      v-model="selectedItems" 
+      style="margin-bottom: 80px"
+    >
+      <van-list
+        v-model="loadingXlsmData"
+        :finished="finishedXlsmData"
+        finished-text="没有更多了"
+        @load="onLoadXlsmData"
+        style="margin-bottom: 80px; padding-top: 0px"
       >
-        <van-cell
-          :label="item.title"
-          style="padding-top: 0.5rem; padding-bottom: 0.5rem"
-          @click="isMultiSelectMode ? selectItem(index) : editData(index)"
+        <van-swipe-cell
+          v-for="(item, index) in filterXlsmData"
+          :key="index"
+          stop-propagation
         >
-          <template #title>
-            <div style="display: flex; flex-direction: column">
-              <div v-if="item.is_review_required == 1">
-                <van-tag color="white" text-color="lightgray" plain
-                  >{{ item.username }}<van-icon
-                    color="blue"
-                    style="font-weight: 700"
-                    v-if="item.is_pinned && item.rate < 3"
-                    name="link-o"
-                  />
-                </van-tag>
+          <van-cell
+            :label="item.title"
+            style="padding-top: 0.5rem; padding-bottom: 0.5rem"
+            @click="isMultiSelectMode ? selectItem(index) : editData(index)"
+          >
+            <template #title>
+              <div style="display: flex; flex-direction: column">
+                <div v-if="item.is_review_required == 1">
+                  <van-tag color="white" text-color="lightgray" plain
+                    >{{ item.username }}<van-icon
+                      color="blue"
+                      style="font-weight: 700"
+                      v-if="item.is_pinned && item.rate < 3"
+                      name="link-o"
+                    />
+                  </van-tag>
+                </div>
+                <div v-else>
+                  <van-tag color="#ffe1e1" text-color="#ad0000" plain
+                    >{{ item.username }}<van-icon
+                      color="blue"
+                      style="font-weight: 700"
+                      v-if="item.is_pinned && item.rate < 3"
+                      name="link-o"
+                    />
+                  </van-tag>
+                </div>
+                <van-tag
+                  v-if="item.lock_spell == true"
+                  type="primary"
+                  style="
+                    margin: 0.2rem 0 0.1rem 0;
+                    width: 95%;
+                    border: none;
+                    background-color: transparent;
+                    color: #000080;
+                  "
+                  >拼写: {{ item.is_spell_number }} / 已锁
+                  {{ item.spell_words_length }}</van-tag
+                >
+                <van-tag
+                  v-else-if="item.lock_spell == '未选词'"
+                  type="primary"
+                  style="
+                    margin: 0.2rem 0 0.1rem 0;
+                    width: 95%;
+                    border: none;
+                    background-color: transparent;
+                    color: peru;
+                  "
+                  >拼写: {{ item.is_spell_number }} / 未选词</van-tag
+                >
+                <van-tag
+                  v-else
+                  type="primary"
+                  style="
+                    margin: 0.2rem 0 0.1rem 0;
+                    width: 95%;
+                    border: none;
+                    background-color: transparent;
+                    color: lightcoral;
+                  "
+                  >拼写: {{ item.is_spell_number }} / 未锁
+                  {{ item.spell_words_length }}</van-tag
+                >
               </div>
-              <div v-else>
-                <van-tag color="#ffe1e1" text-color="#ad0000" plain
-                  >{{ item.username }}<van-icon
-                    color="blue"
-                    style="font-weight: 700"
-                    v-if="item.is_pinned && item.rate < 3"
-                    name="link-o"
-                  />
-                </van-tag>
+            </template>
+            <template #label>
+              <div style="margin-top: 0.2rem">{{ item.title }}</div>
+              <div style="margin-top: 0.2rem">
+                {{ item.alias }} {{ item.answers_len }}词
               </div>
-              <van-tag
-                v-if="item.lock_spell == true"
-                type="primary"
-                style="
-                  margin: 0.2rem 0 0.1rem 0;
-                  width: 95%;
-                  border: none;
-                  background-color: transparent;
-                  color: #000080;
-                "
-                >拼写: {{ item.is_spell_number }} / 已锁
-                {{ item.spell_words_length }}</van-tag
-              >
-              <van-tag
-                v-else-if="item.lock_spell == '未选词'"
-                type="primary"
-                style="
-                  margin: 0.2rem 0 0.1rem 0;
-                  width: 95%;
-                  border: none;
-                  background-color: transparent;
-                  color: peru;
-                "
-                >拼写: {{ item.is_spell_number }} / 未选词</van-tag
-              >
-              <van-tag
-                v-else
-                type="primary"
-                style="
-                  margin: 0.2rem 0 0.1rem 0;
-                  width: 95%;
-                  border: none;
-                  background-color: transparent;
-                  color: lightcoral;
-                "
-                >拼写: {{ item.is_spell_number }} / 未锁
-                {{ item.spell_words_length }}</van-tag
-              >
-            </div>
-          </template>
-          <template #label>
-            <div style="margin-top: 0.2rem">{{ item.title }}</div>
-            <div style="margin-top: 0.2rem">
-              {{ item.alias }} {{ item.answers_len }}词
-            </div>
 
-          <div style="margin-top: 0.3rem">{{ item.create_time.slice(2) }}</div>
-          </template>
-          <!-- 原代码中的 #value 部分替换为以下内容 -->
-          <template #value>
-            <div
-              v-if="cellValue"
-              style="
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                min-height: 60px;
-              "
-            >
-              <div v-if="item.type == 0 || item.type == 1 || item.type == null">
-                <div style="display: flex; align-items: center">
-                  <van-rate
-                    v-model="item.rate"
-                    :size="rateSize"
-                    gutter="1"
-                    icon="like"
-                    void-icon="like-o"
-                    :count="3"
-                    readonly
-                    allow-half
-                  />
-                  <div style="margin-left: 0rem; width: 32px; font-size: 12px">
-                    <span v-if="showRatePlus[index]">
-                      +{{ formattedRate(item.rate) }}
-                    </span>
-                    <span v-else style="visibility: hidden"> +0 </span>
+            <div style="margin-top: 0.3rem">{{ item.create_time.slice(2) }}</div>
+            </template>
+            <!-- 原代码中的 #value 部分替换为以下内容 -->
+            <template #value>
+              <div
+                v-if="cellValue"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  min-height: 60px;
+                "
+              >
+                <div v-if="item.type == 0 || item.type == 1 || item.type == null">
+                  <div style="display: flex; align-items: center">
+                    <van-rate
+                      v-model="item.rate"
+                      :size="rateSize"
+                      gutter="1"
+                      icon="like"
+                      void-icon="like-o"
+                      :count="3"
+                      readonly
+                      allow-half
+                    />
+                    <div style="margin-left: 0rem; width: 32px; font-size: 12px">
+                      <span v-if="showRatePlus[index]">
+                        +{{ formattedRate(item.rate) }}
+                      </span>
+                      <span v-else style="visibility: hidden"> +0 </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div v-if="item.type == 2 || item.type == 3">
-                <div style="display: flex; align-items: center; gap: 0.5rem">
-                  <van-rate
-                    v-model="item.rate"
-                    :size="60"
-                    color="#ffd21e"
-                    void-icon="chart-trending-o"
-                    icon="chart-trending-o"
-                    void-color="#eee"
-                    :count="1"
-                    readonly
-                    allow-half
-                  />
-                  <span>{{ (item.rate * 100).toFixed(1) }}%</span>
+                <div v-if="item.type == 2 || item.type == 3">
+                  <div style="display: flex; align-items: center; gap: 0.5rem">
+                    <van-rate
+                      v-model="item.rate"
+                      :size="60"
+                      color="#ffd21e"
+                      void-icon="chart-trending-o"
+                      icon="chart-trending-o"
+                      void-color="#eee"
+                      :count="1"
+                      readonly
+                      allow-half
+                    />
+                    <span>{{ (item.rate * 100).toFixed(1) }}%</span>
+                  </div>
                 </div>
-              </div>
 
-              <div
-                style="
-                  font-size: 15px;
-                  color: black;
-                  font-weight: 700;
-                  margin-right: 20px;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: space-between;
-                  height: 60px;
-                "
-              >
                 <div
                   style="
+                    font-size: 15px;
+                    color: black;
+                    font-weight: 700;
+                    margin-right: 20px;
                     display: flex;
                     flex-direction: column;
-                    align-items: center;
+                    justify-content: space-between;
+                    height: 60px;
                   "
                 >
-                  <div>{{ item.attempt }}次</div>
                   <div
-                    v-if="item.view == null"
-                    style="font-size: 12px; color: lightgray"
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                    "
                   >
-                    0次
+                    <div>{{ item.attempt }}次</div>
+                    <div
+                      v-if="item.view == null"
+                      style="font-size: 12px; color: lightgray"
+                    >
+                      0次
+                    </div>
+                    <div v-else style="font-size: 12px; color: lightgray">
+                      {{ item.view }}次
+                    </div>
                   </div>
-                  <div v-else style="font-size: 12px; color: lightgray">
-                    {{ item.view }}次
+                  <div
+                    @click.stop="clickPreviewDelete(item, index)"
+                    style="display: flex; justify-content: center"
+                  >
+                    <van-icon name="ellipsis" size="1.1rem" />
                   </div>
-                </div>
-                <div
-                  @click.stop="clickPreviewDelete(item, index)"
-                  style="display: flex; justify-content: center"
-                >
-                  <van-icon name="ellipsis" size="1.1rem" />
                 </div>
               </div>
-            </div>
+              <div
+                v-else
+                style="margin-right: 2rem; display: flex; align-items: center"
+              >
+                <div style="font-weight: 700; color: red">{{ item.rate }}</div>
+                &nbsp;&nbsp;/&nbsp;&nbsp;{{ item.attempt }}
+              </div>
+            </template>
+
+            <template #right-icon>
+              <van-checkbox
+                v-if="isMultiSelectMode"
+                :checked="selectedItems.includes(index)"
+                @click.stop="selectItem(index)"
+              />
+            </template>
+          </van-cell>
+
+          <template #right>
+            <van-button
+              square
+              type="danger"
+              text="删除"
+              @click="deleteItem(item, index)"
+            />
+          </template>
+          <template #left>
             <div
-              v-else
-              style="margin-right: 2rem; display: flex; align-items: center"
+              style="display: flex; gap: 0px; height: 100%; padding-right: 0px"
             >
-              <div style="font-weight: 700; color: red">{{ item.rate }}</div>
-              &nbsp;&nbsp;/&nbsp;&nbsp;{{ item.attempt }}
+              <van-button
+                square
+                type="primary"
+                text="答案"
+                @click="searchAnswer(item, index)"
+                style="margin-right: rem"
+                block
+              />
+              <van-button
+                square
+                type="success"
+                text="日志"
+                @click="searchLog(item, index)"
+                style="margin-left: 0rem"
+                block
+              />
+              <van-button
+                square
+                type="warning"
+                text="预览"
+                @click="viewStudentsList(item, index)"
+                style="margin-left: 0rem"
+                block
+              />
             </div>
           </template>
-
-          <template #right-icon>
-            <van-checkbox
-              v-if="isMultiSelectMode"
-              :checked="selectedItems.includes(index)"
-              @click.stop="selectItem(index)"
-            />
-          </template>
-        </van-cell>
-
-        <template #right>
-          <van-button
-            square
-            type="danger"
-            text="删除"
-            @click="deleteItem(item, index)"
-          />
-        </template>
-        <template #left>
-          <div
-            style="display: flex; gap: 0px; height: 100%; padding-right: 0px"
-          >
-            <van-button
-              square
-              type="primary"
-              text="答案"
-              @click="searchAnswer(item, index)"
-              style="margin-right: rem"
-              block
-            />
-            <van-button
-              square
-              type="success"
-              text="日志"
-              @click="searchLog(item, index)"
-              style="margin-left: 0rem"
-              block
-            />
-            <van-button
-              square
-              type="warning"
-              text="预览"
-              @click="viewStudentsList(item, index)"
-              style="margin-left: 0rem"
-              block
-            />
-          </div>
-        </template>
-      </van-swipe-cell>
+        </van-swipe-cell>
+      </van-list>
     </van-cell-group>
 
     <!-- 删除和预览 - 居中弹窗 -->

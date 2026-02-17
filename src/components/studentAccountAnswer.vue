@@ -3,6 +3,7 @@ import {
   watch,
   onMounted,
   onUnmounted,
+  onDeactivated,
   ref,
   getCurrentInstance,
   onBeforeUnmount,
@@ -214,6 +215,21 @@ const showUncertainResult = () => {
   handleUncertainClose();
 };
 
+let resumeAudioTimer = null;
+const clearResumeAudioTimer = () => {
+  if (resumeAudioTimer) {
+    clearTimeout(resumeAudioTimer);
+    resumeAudioTimer = null;
+  }
+};
+const scheduleResumeAudio = () => {
+  clearResumeAudioTimer();
+  resumeAudioTimer = setTimeout(() => {
+    playAudio();
+    resumeAudioTimer = null;
+  }, 1000);
+};
+
 // 单词发音
 const speakWord = (english, answer) => {
   const word = /[a-zA-Z]/.test(english) ? english : answer;
@@ -308,15 +324,23 @@ const handlePageUnload = () => {
   // 页面关闭
   handleAnswerSheetClose();
   sessionStorage.removeItem("videoGame");
+  stopAllAudio();
+};
+const stopAllAudio = () => {
+  clearResumeAudioTimer();
   pauseAudioBGM();
+  pauseAudio();
 };
 onBeforeRouteLeave(() => {
-  pauseAudioBGM();
+  stopAllAudio();
 });
 
 // 组件卸载兜底
 onUnmounted(() => {
-  pauseAudioBGM();
+  stopAllAudio();
+});
+onDeactivated(() => {
+  stopAllAudio();
 });
 // 看视频
 const showVideoPopup = ref(false);
@@ -378,7 +402,7 @@ const handleConfirmResult = async () => {
         theme: "round-button",
         message: `当前账户💎${userDiamonds.value}\n看视频抵消背诵错误，消耗💎*3，\n是否确认？`,
       }).then(() => {
-        pauseAudio();
+        stopAllAudio();
         showVideoPopup.value = true;
       });
     } else {
@@ -402,9 +426,7 @@ const handleConfirmResult = async () => {
 
 const onFinishedVideo = () => {
   showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
+  scheduleResumeAudio();
   showVideoButton.value = false;
   showLoadingToast({
     message: "补全中...",
@@ -435,17 +457,13 @@ const onFinishedVideo = () => {
 
 const onExitVideo = () => {
   showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
+  scheduleResumeAudio();
   showToast("人不在屏幕前，游戏结束");
 };
 
 const onExitVideo2 = () => {
   showVideoPopup.value = false;
-  setTimeout(() => {
-    playAudio();
-  }, 1000);
+  scheduleResumeAudio();
   showToast("点击次数过多，不够专心");
 };
 
@@ -493,6 +511,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", handlePageUnload);
 });
 onUnmounted(() => {
+  clearResumeAudioTimer();
   if (audio) {
     audio.pause();
     audio.currentTime = 0;

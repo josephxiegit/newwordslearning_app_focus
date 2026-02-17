@@ -14,6 +14,7 @@ export default {
 
 // 可以不用执行: 造成不兼容
 /*
+cd cordova-app/ 
 cordova platform remove android
 cordova platform add android
 
@@ -51,22 +52,22 @@ cordova build android
 （可能要修改apk名字）
 全局删除
 adb uninstall com.focus.newwordslearning
-只删除主空间
-adb shell pm uninstall --user 0 com.focus.newwordslearning
+// 只删除主空间
+// adb shell pm uninstall --user 0 com.focus.newwordslearning
 
 // 安装主空间
 // adb install /Users/jiegengzhe/Desktop/newWordsLearning_app_focus/cordova-app/platforms/android/app/build/outputs/apk/debug/apk_f.26.01.20.1.apk
 安装主空间测试用：
 adb install /Users/jiegengzhe/Desktop/newWordsLearning_app_focus/cordova-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
 
-（第一空间/单空间/主空间）设置app为桌面应用：
-adb shell cmd package set-home-activity com.focus.newwordslearning/.MainActivity
-adb shell cmd package set-home-activity com.miui.home/com.miui.home.launcher.Launcher
+// （第一空间/单空间/主空间）设置app为桌面应用：
+// adb shell cmd package set-home-activity com.focus.newwordslearning/.MainActivity
+// adb shell cmd package set-home-activity com.miui.home/com.miui.home.launcher.Launcher
 
 
 /*
-第一空间apk复制到第二空间
-adb shell pm install-existing --user 10 com.focus.newwordslearning
+// 第一空间apk复制到第二空间
+// adb shell pm install-existing --user 10 com.focus.newwordslearning
 
 第二空间设置桌面为app：（卸载本身的桌面）
 adb shell pm uninstall --user 10 com.miui.home

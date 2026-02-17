@@ -247,11 +247,9 @@ textarea,
   -webkit-touch-callout: default !important;
 }
 </style>
-<!-- 
-<template>
-  <div class="app-container">
-    <div class="secret-zone" @click="handleSecretClick"></div>
 
+<!-- <template>
+  <div class="app-container">
     <router-view v-slot="{ Component }" :key="$route.fullPath">
       <transition :name="transitionName">
         <keep-alive>
@@ -263,12 +261,11 @@ textarea,
 </template>
 
 <script setup>
-import { watch, onMounted, ref, computed, onUnmounted } from "vue";
+import { onMounted, ref, computed, onUnmounted, getCurrentInstance } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { getCurrentInstance } from "vue";
 import { showToast, showDialog } from 'vant'; 
-import 'vant/es/dialog/style';
 import 'vant/es/toast/style';
+import 'vant/es/dialog/style';
 
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -281,64 +278,62 @@ const transitionName = computed(() => {
 });
 
 // ==========================================
-// A. 隐形按钮逻辑 (暗号：连击 5 次)
+// 1. 三指点击重启逻辑 (新增功能)
+//    当页面卡死时，三指同时按屏幕可触发软重启
 // ==========================================
-const TAP_COUNT_THRESHOLD = 5; // 需要点击 5 次
-const RESET_TIME = 1000;       // 1秒内没点完就重置
-const tapCount = ref(0);
-let tapTimer = null;
+const isRestartDialogShowing = ref(false);
 
-const handleSecretClick = () => {
-  tapCount.value++;
-  
-  // 每次点击都重置倒计时
-  clearTimeout(tapTimer);
-  tapTimer = setTimeout(() => {
-    tapCount.value = 0; // 超时归零
-  }, RESET_TIME);
-
-  // 达到 5 次，触发管理员面板
-  if (tapCount.value >= TAP_COUNT_THRESHOLD) {
-    tapCount.value = 0; 
-    showAdminPanel();
+const handleGlobalTouch = (e) => {
+  // 检测屏幕上是否同时按下了 3 根手指
+  if (e.touches.length === 3) {
+    showRestartConfirm();
   }
 };
 
-// ==========================================
-// B. 管理员验证逻辑 (输入密码)
-// ==========================================
-const showAdminPanel = () => {
+const showRestartConfirm = () => {
+  if (isRestartDialogShowing.value) return;
+  isRestartDialogShowing.value = true;
+
   showDialog({
-    title: '管理员解锁',
-    message: '确认退出专注模式？',
+    title: '系统维护',
+    message: '检测到三指操作，是否重新启动应用？\n(用于解决页面卡死问题)',
     showCancelButton: true,
+    confirmButtonText: '重启',
+    zIndex: 99999
   }).then(() => {
-    // 延时弹出输入框，避免冲突
-    setTimeout(() => {
-        const pwd = prompt("请输入管理密码:", "");
-        // 【注意】在这里修改你的密码，当前是 ss123456
-        if (pwd === "ss123456") { 
-            exitKioskMode();
-        } else if (pwd !== null) {
-            showToast('密码错误');
-        }
-    }, 100);
+    performRestart();
+    isRestartDialogShowing.value = false;
+  }).catch(() => {
+    isRestartDialogShowing.value = false;
   });
 };
 
+const performRestart = () => {
+  showToast('正在重启...');
+  setTimeout(() => {
+    if (navigator.app && navigator.app.exitApp) {
+      // Kiosk模式下，退出App会被系统立即重启，实现“软重启”
+      navigator.app.exitApp();
+    } else {
+      window.location.reload();
+    }
+  }, 500);
+};
+
 // ==========================================
-// C. 核心锁定逻辑 (屏幕固定 + 沉浸模式)
+// 2. 核心锁定逻辑 (合并了你之前的两个函数)
+//    禁止下拉菜单 + 禁止多任务上滑
 // ==========================================
 const enterKioskMode = () => {
-  // 1. 屏幕固定 (Screen Pinning) - 物理防下拉
+  // 1. Screen Pinning (物理防下拉/防多任务)
   if (window.cordova && window.cordova.plugins && window.cordova.plugins.screenPinning) {
     window.cordova.plugins.screenPinning.enterPinning(
       () => console.log('屏幕固定成功'),
-      (err) => console.error('屏幕固定失败(可能需授权)', err)
+      (err) => console.error('屏幕固定失败', err)
     );
   }
 
-  // 2. 沉浸式黏性模式 (Immersive Sticky) - 隐藏状态栏辅助
+  // 2. Immersive Sticky (隐藏状态栏辅助)
   if (window.AndroidFullScreen) {
     window.AndroidFullScreen.immersiveMode(
       () => console.log('沉浸模式已激活'),
@@ -348,61 +343,21 @@ const enterKioskMode = () => {
 };
 
 // ==========================================
-// D. 退出逻辑 (解锁 + 跳转设置)
-// ==========================================
-const exitKioskMode = () => {
-  showToast('正在解锁系统...');
-
-  // 1. 先尝试解除屏幕固定
-  if (window.cordova && window.cordova.plugins && window.cordova.plugins.screenPinning) {
-    window.cordova.plugins.screenPinning.exitPinning(
-      () => {
-        console.log('屏幕固定已解除');
-        jumpToSystemSettings();
-      },
-      (err) => {
-        console.error('解除固定失败，尝试强行跳转', err);
-        jumpToSystemSettings();
-      }
-    );
-  } else {
-    // 如果没有插件，直接跳转
-    jumpToSystemSettings();
-  }
-};
-
-const jumpToSystemSettings = () => {
-  // 2. 跳转到安卓设置页 (用于切换回小米桌面)
-  if (window.plugins && window.plugins.intentShim) {
-      window.plugins.intentShim.startActivity(
-          { action: "android.settings.HOME_SETTINGS" }, // 首选：默认桌面设置
-          () => {},
-          () => {
-              // 备选：普通设置页
-              window.plugins.intentShim.startActivity({ action: "android.settings.SETTINGS" });
-          }
-      );
-  } else {
-      alert("请手动去设置里切换桌面");
-  }
-};
-
-// ==========================================
-// E. 极光推送逻辑 (保留原功能)
+// 3. 极光推送逻辑 (保留原逻辑)
 // ==========================================
 const initJPush = () => {
   if (!window.JPush) return;
+
   try {
     window.JPush.init();
-    window.JPush.setDebugMode(true); 
+    window.JPush.setDebugMode(false); // 发布模式建议关闭Debug
 
     window.JPush.getRegistrationID((rId) => {
       console.log('【JPush】设备注册ID:', rId);
-      // TODO: 调用后端API保存 rId
+      // TODO: 调用API保存 rId
     });
 
     document.addEventListener('jpush.openNotification', (event) => {
-      console.log('【JPush】用户点击了通知:', event);
       let extras = event.extras || {}; 
       if (extras.targetPath) {
          router.push(extras.targetPath);
@@ -419,15 +374,17 @@ const initJPush = () => {
 };
 
 // ==========================================
-// F. 全局事件拦截 (禁用右键/长按/返回键)
+// 4. 全局事件拦截 (保留原逻辑)
 // ==========================================
 const preventAll = (e) => {
   const target = e.target;
   const tagName = target.tagName;
+  
   // 允许输入框操作
   if (tagName === 'INPUT' || tagName === 'TEXTAREA' || target.contentEditable === 'true') {
     return true; 
   }
+  
   e.preventDefault();
   e.stopPropagation();
   return false;
@@ -435,40 +392,45 @@ const preventAll = (e) => {
 
 const onBackKeyDown = (e) => {
   e.preventDefault();
-  // showToast('当前是专注模式，无法退出'); 
+  // 保持静默，不提示退出
 };
 
 // ==========================================
 // 生命周期挂载
 // ==========================================
 onMounted(() => {
-  // 1. Cordova 设备就绪后执行
   document.addEventListener('deviceready', () => {
-    // 初始化极光
+    // 1. 初始化极光
     initJPush();
     
-    // 拦截物理返回键
+    // 2. 拦截物理返回键
     document.addEventListener('backbutton', onBackKeyDown, false);
     
-    // 【关键】App 启动就立刻锁定
+    // 3. 启动锁定模式
     enterKioskMode();
     
-    // 【双保险】从后台切回来再次锁定
+    // 4. 从后台切回时再次锁定 (双保险)
     document.addEventListener('resume', enterKioskMode, false);
+    
   }, false);
 
-  // 2. 网页端事件拦截 (禁用长按、选择等)
+  // 监听三指点击 (用于重启)
+  document.addEventListener('touchstart', handleGlobalTouch, { passive: true });
+
+  // 网页端行为拦截
   document.addEventListener('contextmenu', preventAll, { passive: false, capture: true });
   document.addEventListener('dragstart', preventAll, { passive: false, capture: true });
   document.addEventListener('selectstart', preventAll, { passive: false, capture: true });
   
-  // 存储引用以便清理
   window._globalPreventAll = preventAll;
   
-  console.log('App初始化完成：专注模式已启用');
+  console.log('App初始化完成：列表滚动已修复，三指重启已启用');
 })
 
 onUnmounted(() => {
+  // 清理所有监听
+  document.removeEventListener('touchstart', handleGlobalTouch);
+  
   if (window._globalPreventAll) {
     document.removeEventListener('contextmenu', window._globalPreventAll, { capture: true });
     document.removeEventListener('dragstart', window._globalPreventAll, { capture: true });
@@ -481,48 +443,67 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* 容器样式 */
+/* --- 1. 容器样式 --- */
 .app-container {
   position: relative;
-  width: 100%;
+  width: 100vw;
   height: 100vh;
-  /* 防止溢出 */
-  overflow: hidden; 
+  overflow: hidden; /* 锁住外层，防止整个页面被拖动 */
+  background-color: #f7f8fa; /* 给个背景色防止白屏 */
 }
 
-/* 隐形按钮样式 */
-.secret-zone {
-  position: fixed;
+/* --- 2. 核心修复：内容滚动区域 --- */
+/* 这里是页面真正的内容容器 */
+.transitionBody {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  
+  /* 【关键修复】强制允许垂直滚动 */
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch; /* iOS 平滑滚动 */
+  
+  /* 【关键修复】告诉浏览器这个区域允许单指垂直操作 */
+  touch-action: pan-y !important;
+  
+  /* 确保位置正确 */
   top: 0;
-  left: 20%; /* 左右留白，防止误触 */
-  width: 60%;
-  height: 60px; /* 点击区域高度，状态栏位置 */
-  z-index: 9999; /* 保证在最上层 */
-  background-color: transparent; /* 透明 */
-  /* background-color: rgba(255, 0, 0, 0.2); */ /* 调试时取消注释可以看到红色区域 */
+  left: 0;
+  z-index: 10; /* 保证内容在最上层 */
+  
+  /* 底部安全距离，防止滑到底部被挡住 */
+  padding-bottom: 20px; 
+  box-sizing: border-box;
 }
 
-/* 全局禁用文字选择和长按菜单 */
+/* --- 3. 全局禁用样式 (防误触基础) --- */
 * {
+  /* 禁止选中文字 */
   -webkit-user-select: none !important;
   -moz-user-select: none !important;
   -ms-user-select: none !important;
   user-select: none !important;
+  
+  /* 禁止长按弹出菜单 (复制/粘贴/搜索) */
   -webkit-touch-callout: none !important;
+  
+  /* 去除点击高亮 */
   -webkit-tap-highlight-color: transparent !important;
 }
 
+/* 锁定 html 和 body，禁止橡皮筋效果 */
 html, 
 body, 
 #app {
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  user-select: none !important;
-  -webkit-touch-callout: none !important;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* 核心：禁止 body 滚动 */
+  position: fixed; /* 锁死 body */
 }
 
-/* 允许输入框选择文字 */
+/* --- 4. 例外：允许输入框操作 --- */
 input, 
 textarea, 
 [contenteditable="true"],
@@ -532,6 +513,9 @@ textarea,
   -ms-user-select: text !important;
   user-select: text !important;
   -webkit-touch-callout: default !important;
+  /* 输入框允许默认手势 */
+  touch-action: auto !important; 
 }
 </style>
  -->
+

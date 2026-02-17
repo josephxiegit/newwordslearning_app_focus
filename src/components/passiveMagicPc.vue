@@ -65,30 +65,22 @@ defineExpose(methods);
   height: 100%;
   background: transparent;
   display: flex;
-  /* 修改这里：改为 flex-start 让内容靠左、靠上 */
-  justify-content: flex-start; 
-  align-items: flex-start;
+  justify-content: center;
+  align-items: center;
   z-index: 9999;
-  /* 关键：让鼠标点击穿透透明区域，否则你整个屏幕都点不了 */
-  pointer-events: none; 
+  pointer-events: none;
 }
 
 .passive-magic {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* 修改这里：给一点内边距，不要紧贴屏幕边缘 */
-  padding: 10px; 
-  /* 或者使用 margin: 10px; */
-  
+  padding: 10px;
   border-radius: 10px;
   position: relative;
-  /* 限制一下最大宽度，防止图片太大挡住太多内容 */
-  max-width: 300px; 
+  max-width: 300px;
   box-sizing: border-box;
-  
-  /* 恢复内容区域的点击（如果需要的话） */
-  pointer-events: auto; 
+  pointer-events: auto;
 }
 
 .passive-magic img {

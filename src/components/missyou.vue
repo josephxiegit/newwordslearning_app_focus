@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="miss-you-overlay">
+  <div v-if="visible" class="miss-you-overlay" @click="hide">
     <div class="miss-you">
       <!-- 这里放置恶魔微笑的 SVG 或图片 -->
       <img :src="srcTheme" alt="miss you">

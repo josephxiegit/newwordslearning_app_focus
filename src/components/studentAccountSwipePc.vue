@@ -2682,13 +2682,12 @@ html {
 
 .encouragement-img {
   position: fixed;
-  left: 0;
-  top: 0;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 400px;
   z-index: 1000;
   pointer-events: none;
-  margin-left: 20px;
-  margin-top: 20px;
 }
 
 .control-section {
@@ -2828,13 +2827,31 @@ html {
 }
 
 .swipe-help-container {
-  height: 40%;
+  height: 46%;
   width: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
 }
+@media screen and (max-width: 1025px) {
+  .swipe-help-container {
+    height: 43%;
+    width: 100%;
+  }
+}
+@media screen and (max-width: 1024px) and (max-height: 768px) {
+  .swipe-help-container {
+    height: 48%;
+    width: 100%;
+  }
 
+}
+@media screen and (max-width: 768px) {
+  .swipe-help-container {
+    height: 40%;
+    width: 100%;
+  }
+}
 .close-icon {
   position: absolute;
   top: 10px;
@@ -2864,6 +2881,12 @@ html {
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+}
+
+@media screen and (max-width: 820px) and (max-height: 1180px) and (orientation: portrait) {
+  .space-buttons {
+    width: 180%;
+  }
 }
 
 .coins-info {

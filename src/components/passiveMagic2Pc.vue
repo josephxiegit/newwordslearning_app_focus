@@ -49,8 +49,8 @@ defineExpose(methods);
   background: transparent;
   display: flex;
   /* 修改这里：改为 flex-start 让内容靠左、靠上 */
-  justify-content: flex-start; 
-  align-items: flex-start;
+  justify-content: center; 
+  align-items: center;
   z-index: 9999;
   /* 关键：让鼠标点击穿透透明区域，否则你整个屏幕都点不了 */
   pointer-events: none; 
