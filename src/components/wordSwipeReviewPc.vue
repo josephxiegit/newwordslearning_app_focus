@@ -102,7 +102,6 @@
               @click="finishCards" 
               :disabled="isSubmitting" 
               size="large"
-              
             >完成复习</van-button
           >
         </div>
@@ -117,7 +116,7 @@
         <div
           ref="cardRef"
           class="card"
-          :class="{ dragging: isDragging, locked: isLocked }"
+          :class="{ dragging: isDragging && showChinese, locked: isLocked || !showChinese }"
           :style="cardStyle"
           @mousedown="handleDragStart"
           @mousemove="handleDragMove"
@@ -138,9 +137,13 @@
           <!-- 卡片内容 -->
           <div class="card-content">
             <div class="english-text">{{ currentCard.英文 }}</div>
-            <div class="answer-text">
+            <!-- 未点击前显示按钮，点击后显示中文 -->
+            <div v-if="showChinese" class="answer-text">
               {{ currentCard.中文 }}
             </div>
+            <button v-else class="show-chinese-btn" @click.stop="revealChinese">
+              显示中文
+            </button>
           </div>
 
           <!-- 提示文字 -->
@@ -149,6 +152,11 @@
       </div>
     </div>
     </div>
+
+    <!-- 请先显示中文提示 -->
+    <transition name="hint-fade">
+      <div v-if="showRevealHint" class="reveal-hint-toast">请先显示中文</div>
+    </transition>
 
     <!-- 鼓励动画 -->
     <img
@@ -172,7 +180,8 @@
         <!-- 模拟卡片 -->
         <div class="tutorial-card-wrapper">
           <div class="tutorial-card">
-            <div class="tutorial-card-text">单词</div>
+            <div class="tutorial-card-text">显示中文</div>
+            <div class="tutorial-card-text">左右滑动</div>
           </div>
         </div>
 
@@ -233,6 +242,23 @@ const dragOffset = ref({ x: 0, y: 0 });
 const isDragging = ref(false);
 const cardRef = ref(null);
 const isLocked = ref(false);
+const showChinese = ref(false); // 每张卡片初始隐藏中文
+
+// 提示"请先显示中文"
+const showRevealHint = ref(false);
+let revealHintTimer = null;
+const triggerRevealHint = () => {
+  if (revealHintTimer) clearTimeout(revealHintTimer);
+  showRevealHint.value = true;
+  revealHintTimer = setTimeout(() => {
+    showRevealHint.value = false;
+  }, 1500);
+};
+
+// 点击"显示中文"按钮
+const revealChinese = () => {
+  showChinese.value = true;
+};
 
 const currentCard = computed(() => cards.value[currentIndex.value]);
 const progress = computed(
@@ -264,8 +290,7 @@ const rightHintOpacity = computed(() => {
 });
 
 const handleDragStart = (e) => {
-  if (isLocked.value) return;
-
+  if (isLocked.value || !showChinese.value) return; // 未显示中文直接拦截
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
   dragStart.value = { x: clientX, y: clientY };
@@ -274,6 +299,7 @@ const handleDragStart = (e) => {
 
 const handleDragMove = (e) => {
   if (!isDragging.value || isLocked.value) return;
+  if (!showChinese.value) return; // 未显示中文时不跟随拖动
   e.preventDefault();
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
@@ -284,8 +310,15 @@ const handleDragMove = (e) => {
 
 const handleDragEnd = () => {
   if (!isDragging.value || isLocked.value) return;
-  const threshold = 100;
+  isDragging.value = false;
 
+  if (!showChinese.value) {
+    dragOffset.value = { x: 0, y: 0 };
+    triggerRevealHint();
+    return;
+  }
+
+  const threshold = 100;
   if (Math.abs(dragOffset.value.x) > threshold) {
     if (dragOffset.value.x > 0) {
       handleKnow();
@@ -295,11 +328,12 @@ const handleDragEnd = () => {
   } else {
     dragOffset.value = { x: 0, y: 0 };
   }
-  isDragging.value = false;
 };
 
 const handleKnow = () => {
   if (isLocked.value) return;
+  if (!showChinese.value) { triggerRevealHint(); return; }
+
   const audio = new Audio(turnpage);
   audio.play().catch((err) => console.warn("播放失败：", err));
   isLocked.value = true;
@@ -308,6 +342,7 @@ const handleKnow = () => {
   setTimeout(() => {
     currentIndex.value++;
     dragOffset.value = { x: 0, y: 0 };
+    showChinese.value = false; // 下一张重置
     
     const halfPoint = Math.floor(cards.value.length / 2);
     const isHalfway = currentIndex.value === halfPoint;
@@ -329,6 +364,8 @@ const handleKnow = () => {
 
 const handleUnknown = () => {
   if (isLocked.value) return;
+  if (!showChinese.value) { triggerRevealHint(); return; }
+
   const audio = new Audio(turnpage);
   audio.play().catch((err) => console.warn("播放失败：", err));
   isLocked.value = true;
@@ -339,6 +376,7 @@ const handleUnknown = () => {
   setTimeout(() => {
     currentIndex.value++;
     dragOffset.value = { x: 0, y: 0 };
+    showChinese.value = false; // 下一张重置
     
     const halfPoint = Math.floor(cards.value.length / 2);
     const isHalfway = currentIndex.value === halfPoint;
@@ -361,6 +399,7 @@ const handleUnknown = () => {
 const nextCard = () => {
   dragOffset.value = { x: 0, y: 0 };
   currentIndex.value++;
+  showChinese.value = false;
 
   const halfPoint = Math.floor(cards.value.length / 2);
   const isHalfway = currentIndex.value === halfPoint;
@@ -939,6 +978,32 @@ html, body {
   position: relative;
 }
 
+/* 显示中文按钮 */
+.show-chinese-btn {
+  margin-top: 4px;
+  padding: 12px 36px;
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(90deg, #9c27b0 0%, #e91e63 100%);
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: auto;
+}
+
+.show-chinese-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(156, 39, 176, 0.45);
+}
+
+.show-chinese-btn:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(156, 39, 176, 0.25);
+}
+
 .tap-hint {
   position: absolute;
   bottom: 16px;
@@ -1124,6 +1189,34 @@ html, body {
   margin-top: 20px;
 }
 
+/* 请先显示中文提示 */
+.reveal-hint-toast {
+  position: fixed;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.72);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px 28px;
+  border-radius: 9999px;
+  z-index: 3000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hint-fade-enter-active,
+.hint-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.hint-fade-enter-from,
+.hint-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
 .encouragement-overlay {
   position: fixed;
   left: 50%;
@@ -1181,6 +1274,8 @@ html, body {
 }
 
 .tutorial-card {
+    flex-direction: column;
+  gap: 12px;
   width: 280px;
   height: 180px;
   background: white;
@@ -1194,7 +1289,7 @@ html, body {
 }
 
 .tutorial-card-text {
-  font-size: 36px;
+  font-size: 24px;
   font-weight: bold;
   color: #1f2937;
 }

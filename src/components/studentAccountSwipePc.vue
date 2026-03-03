@@ -1164,6 +1164,12 @@ const handleButtonClick = (buttonType) => {
 };
 const showOverlay = ref(true);
 const pauseSwipe = () => {
+  if (pauseBlackOverlay.value <= 0) {
+    showToast("场外支援已达上限");
+    return;
+  };
+  pauseBlackOverlay.value -= 1;
+
   showAnswerButton.value = true;
   durationRolling.value = 2;
   rollingTextRef.value.reset();
@@ -1367,6 +1373,9 @@ const purchaseMagic = (buttonStyle) => {
       });
   }
 };
+
+// 暂停功能
+const pauseBlackOverlay = ref(5);
 // 魔法赠送答案
 const numberShowAnswer = ref(2);
 const disabledShowAnswer = ref(false);
@@ -2213,6 +2222,10 @@ onMounted(async () => {
       numberPrev.value = 1;
     }
 
+    if (titleData.value.length <= 20) {
+      numberShowAnswer.value = 1;
+    }
+
     username.value = data.username;
 
     submittoken.value = new Date().getTime();
@@ -2365,7 +2378,7 @@ onMounted(async () => {
               size="large"
               block
             >
-              场外支援
+              场外支援: {{ pauseBlackOverlay }}
             </van-button>
           </div>
 

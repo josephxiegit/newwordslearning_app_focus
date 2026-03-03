@@ -8,10 +8,10 @@
  */
 
 // 客户端版本号（用于与后端对比）
-export const CLIENT_VERSION = "f.26.01.21.1";
+export const CLIENT_VERSION = "26.03.03.1";
 
 // 当前 APK 文件名（用于后端识别、展示）
-export const CLIENT_APK = "apk_f.26.01.21.1.apk";
+export const CLIENT_APK = "apk_26.03.03.1.apk";
 
 // 可选：发布渠道
 export const RELEASE_CHANNEL = "stable"; // stable | beta | test
