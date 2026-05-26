@@ -38,6 +38,8 @@ const onLoadXlsmData = async () => {
   params.append("method", "filterTeacherComment2");
   // params.append("alias", title);
   params.append("filterStudent", valueSearchStudent.value);
+  params.append("filterCompleteStatus", valueSearchCompleteStatus.value);
+  params.append("filterTypeMode", valueTypeMode.value);
   params.append("filterXlsm", valueSearchXlsm.value);
   params.append("filterGroup", valueSearchGroup.value);
   params.append("filterLocation", valueLocation.value);
@@ -108,6 +110,8 @@ const formattedRate = (rate) => {
 const showFliterBox = ref(false);
 const valueSearchStudent = ref("");
 const valueSearchXlsm = ref("");
+const valueSearchCompleteStatus = ref("");
+const valueTypeMode = ref("");
 const valueSearchGroup = ref("");
 const columnsGrade = [
   //年级
@@ -156,6 +160,8 @@ const clearFilterData = () => {
   valueSearchGroup.value = "";
   valueLocation.value = "";
   valueGrade.value = "";
+  valueSearchCompleteStatus.value = "";
+  valueTypeMode.value = "";
 };
 const showFilter = () => {
   showFliterBox.value = true;
@@ -180,7 +186,10 @@ function processData(res) {
     if (item?.lock_spell !== undefined && normalized.lock_spell === undefined) {
       normalized.lock_spell = item.lock_spell;
     }
-    if (item?.spell_words !== undefined && normalized.spell_words === undefined) {
+    if (
+      item?.spell_words !== undefined &&
+      normalized.spell_words === undefined
+    ) {
       normalized.spell_words = item.spell_words;
     }
     return normalized;
@@ -229,6 +238,10 @@ function processData(res) {
       is_review_required,
       review_time,
       apply_challenge,
+      complete_status,
+      earning_half,
+      listening_number,
+      writingwords_number,
     } = item;
     const parsedAnswers = parseJsonField(answers);
     const parsedSynonyms = parseJsonField(synonyms);
@@ -239,6 +252,8 @@ function processData(res) {
     } else {
       lock_spell_format = lock_spell;
     }
+
+    // === 删除原来错误的 if (Array.isArray(parsedSynonyms)) 计算逻辑 ===
 
     const noneOfAboveValue = none_of_above ? 1 : 0;
     return {
@@ -266,6 +281,10 @@ function processData(res) {
       is_review_required,
       review_time,
       apply_challenge,
+      complete_status,
+      earning_half,
+      listening_number: listening_number || 0,
+      writingwords_number: writingwords_number || 0,
     };
   });
 }
@@ -455,6 +474,8 @@ function processDatetime(res) {
       is_review_required,
       review_time,
       apply_challenge,
+      listening_number,
+      writingwords_number,
     } = item;
 
     const formattedCreateTime = formatDateString(create_time);
@@ -517,6 +538,8 @@ function processDatetime(res) {
       is_review_required,
       review_time: formattedReviewTime,
       apply_challenge,
+      listening_number,
+      writingwords_number,
     };
   });
 }
@@ -691,22 +714,29 @@ const searchLog = (item, index) => {
           .replace(/"t /g, "'t ")
           .replace(/"m /g, "'m ")
           .replace(/can"t/g, "can't")
+          .replace(/couldn"t/g, "could't")
           .replace(/mustn"t/g, "mustn't")
           .replace(/must"t/g, "mustn't")
           .replace(/nustn"t/g, "nustn't")
           .replace(/needn"t/g, "needn't")
+          .replace(/need"t/g, "need't")
           .replace(/o"clock/g, "o'clock")
           .replace(/won"t/g, "won't")
           .replace(/it"s/g, "it's")
           .replace(/we"re/gi, "we're'")
           .replace(/You"re/gi, "you're'")
+          .replace(/You"ve/gi, "you've'")
           .replace(/they"re/gi, "they're'")
           .replace(/doesn"t/gi, "doesn't")
           .replace(/don"t/gi, "don't")
           .replace(/I"ll/gi, "I'll")
           .replace(/you"ll/gi, "you'll")
+          .replace(/you"d/gi, "you'd")
           .replace(/one"s/gi, "one's")
           .replace(/let"s/gi, "let's")
+          .replace(/who"s/gi, "who's")
+          .replace(/weren"t/gi, "weren't")
+          .replace(/daren"t/gi, "daren't")
           .replace(/it" hard/gi, "it' hard")
           .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
@@ -722,8 +752,17 @@ const searchLog = (item, index) => {
         ).length;
 
         item.true_length = trueCount;
+        // ================= [新增代码] 统计当前日志里的听力盲猜数量 =================
+        const listeningCount = item.log.filter(
+          (entry) => entry.听力 === true
+        ).length;
+        item.listening_number = listeningCount;
+        const writingwordsCount = item.log.filter(
+          (entry) => entry.默写 === true
+        ).length;
+        item.writingwords_number = writingwordsCount;
+        // =========================================================================
       });
-      console.log(res);
       answerLogList.value = res;
     }
   });
@@ -1073,9 +1112,13 @@ const base64ToBlob = (base64, mimeType = "audio/mpeg") => {
   const byteArray = new Uint8Array(byteNumbers);
   return new Blob([byteArray], { type: mimeType });
 };
-function speakByTTSAndWait(text, { lang = "en-US", pitch = 0.5, rate = 1.3 } = {}) {
+function speakByTTSAndWait(
+  text,
+  { lang = "en-US", pitch = 0.5, rate = 1.3 } = {}
+) {
   return new Promise((resolve, reject) => {
-    if (!("speechSynthesis" in window)) return reject(new Error("no speechSynthesis"));
+    if (!("speechSynthesis" in window))
+      return reject(new Error("no speechSynthesis"));
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     u.pitch = pitch;
@@ -1107,13 +1150,12 @@ function playBlobAndWait(blob, { rate = 1.5 } = {}) {
       reject(e);
     };
 
-    audio.play().catch(e => {
+    audio.play().catch((e) => {
       cleanup();
       reject(e);
     });
   });
 }
-
 
 const speakWord = async (english) => {
   // 显示加载提示
@@ -1159,10 +1201,7 @@ const speakWord = async (english) => {
   }
 };
 
-const spellLetters = async (
-  word,
-  { lettersOnly = true, gapMs = 30 } = {}
-) => {
+const spellLetters = async (word, { lettersOnly = true, gapMs = 30 } = {}) => {
   let s = word.trim();
   // 保留字母、空格、-
   s = s.replace(/[^a-zA-Z\s-]/g, "");
@@ -1219,11 +1258,6 @@ const spellLetters = async (
     if (gapMs) await new Promise((r) => setTimeout(r, gapMs));
   }
 };
-
-
-
-
-
 
 // 日志详情
 const showDetail = ref(false);
@@ -1369,7 +1403,6 @@ const toggleDetail = async (item, index) => {
   } else {
     showDetail.value = true;
   }
-  
 
   getUncertain(item["nid"]).then((res) => {
     loadingUncertain.value = false;
@@ -1383,6 +1416,7 @@ const toggleDetail = async (item, index) => {
 const cellValue = ref(true);
 const valueNewGroup = ref("");
 const valueNewIspinned = ref("");
+const valueNewIsCompleteStatus = ref("");
 const valueReview = ref("");
 const showReviseGroup = ref(false);
 const isMultiSelectMode = ref(false);
@@ -1418,7 +1452,11 @@ const reviseGroup = () => {
     params.append("nids", JSON.stringify(selectedNids));
     params.append("groupName", valueNewGroup.value);
     params.append("ispinned", valueNewIspinned.value);
+    params.append("complete_status", valueNewIsCompleteStatus.value);
     params.append("valueReview", valueReview.value);
+    params.append("listening_number", valueListeningNumber.value);
+    params.append("writingwords_number", valueWritingwordsNumber.value);
+    params.append("type_mode", valueTypeMode.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -1529,17 +1567,23 @@ const valueNoneOfAbove = ref(0);
 const valueCoins = ref(2000);
 const valueContents = ref("");
 const valueIsPinned = ref("");
+const valueIsCompleteStatus = ref("");
 const valueNid = ref("");
 const valueIsSpell = ref(3);
 const valueIsReviewRequired = ref(0);
 const valueChallenge = ref(0);
 const valueReviewTime = ref("");
+const valueListeningNumber = ref("");
+const valueWritingwordsNumber = ref("");
 const editData = (index) => {
   itemEdit.value = filterXlsmData.value[index];
-  // console.log("itemEdit: ", itemEdit.value);
+  console.log("itemEdit: ", itemEdit.value);
 
   showReviseData.value = true;
+  valueListeningNumber.value = itemEdit.value.listening_number;
+  valueWritingwordsNumber.value = itemEdit.value.writingwords_number;
   valueIsPinned.value = itemEdit.value.is_pinned ? 1 : 0;
+  valueIsCompleteStatus.value = itemEdit.value.complete_status ? 1 : 0;
   valueAlias.value = itemEdit.value.alias;
   valueIsReviewRequired.value = itemEdit.value.is_review_required;
   valueReviewTime.value = itemEdit.value.review_time;
@@ -1673,6 +1717,10 @@ async function reviseUserData() {
   params.append("is_review_required", valueIsReviewRequired.value);
   params.append("is_spell_number", valueIsSpell.value);
   params.append("apply_challenge", valueChallenge.value);
+  params.append("complete_status", valueIsCompleteStatus.value);
+  params.append("listening_number", valueListeningNumber.value);
+  params.append("writingwords_number", valueWritingwordsNumber.value);
+  params.append("coins", valueCoins.value);
   return await axios.post("words/", params).then((ret) => {
     return ret.data;
   });
@@ -1924,18 +1972,17 @@ const onCalendarClose = () => {
   // 关闭日历回调
 };
 
-onMounted(async () => {
-});
+onMounted(async () => {});
 
 // 刷新页面
 const reloadPage = () => {
   let res = new Promise((resolve, reject) => {
-  filterXlsmData.value = [];
-  pageIndexXlsmData.value = 0;
-  finishedXlsmData.value = false;
-  loadingXlsmData.value = false;
-  onLoadXlsmData();
-  showFliterBox.value = false;
+    filterXlsmData.value = [];
+    pageIndexXlsmData.value = 0;
+    finishedXlsmData.value = false;
+    loadingXlsmData.value = false;
+    onLoadXlsmData();
+    showFliterBox.value = false;
   });
   res.then(() => {
     isMultiSelectMode.value = false;
@@ -1957,7 +2004,6 @@ const reloadPage = () => {
         @click-right="isMultiSelectMode ? selectAll() : toggleMultiSelectMode()"
         @click-left="isMultiSelectMode ? popReviseGroup() : showFilter()"
       />
-
     </div>
 
     <router-view />
@@ -1979,6 +2025,9 @@ const reloadPage = () => {
       >
       <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
         >消费</van-tabbar-item
+      >
+      <van-tabbar-item icon="envelop-o" replace to="/notificationLog"
+        >通知</van-tabbar-item
       >
     </van-tabbar>
 
@@ -2063,9 +2112,11 @@ const reloadPage = () => {
         <div v-for="(item, index) in answerLogList" :key="index">
           <van-cell is-link @click="toggleDetail(item, index)">
             <template #label>
-              <div>
+              <div style="display: flex">
                 {{ formatDate_log(item.create_time) }}<br />
                 {{ item.teacher_mark }}
+                <div v-if="item.complete_status">⚡️</div>
+                <div v-if="item.earning_half">💔</div>
               </div>
             </template>
             <template #title>
@@ -2183,6 +2234,18 @@ const reloadPage = () => {
           label="试题"
           placeholder="请输入试题"
         />
+        <!-- 地狱闪电 -->
+        <van-field
+          v-model="valueSearchCompleteStatus"
+          label="地狱闪电"
+          placeholder="请输入0或1"
+        />
+        <!-- 模式选择 -->
+        <van-field
+          v-model="valueTypeMode"
+          label="模式选择"
+          placeholder="双模式：0｜ 限制：1｜ 简单：2｜ 投票：4"
+        />
         <!-- 日期 -->
         <van-field
           v-model="dateCalendar"
@@ -2229,7 +2292,6 @@ const reloadPage = () => {
           style="margin-top: 0.2rem"
           >更新复习</van-button
         >
-
       </van-cell-group>
     </van-popup>
 
@@ -2342,6 +2404,8 @@ const reloadPage = () => {
               <div style="font-size: larger; font-weight: 700">
                 {{ item.排除 === "手写" ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
+                <van-tag v-if="item.听力" type="warning" mark>听</van-tag>
+                <van-tag v-if="item.默写" type="danger" mark>默</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>
@@ -2373,8 +2437,8 @@ const reloadPage = () => {
               >
                 {{ item.排除 === "手写" ? "用户手写" : "用户选择" }}：
                 {{ item.用户选择.join("/") }}
-                <van-icon name="volume-o" @click="speakWord(item.英文)"/>
-                <van-icon name="service-o" @click="spellLetters(item.英文)"/>
+                <van-icon name="volume-o" @click="speakWord(item.英文)" />
+                <van-icon name="service-o" @click="spellLetters(item.英文)" />
               </div>
             </template>
           </van-cell>
@@ -2433,10 +2497,7 @@ const reloadPage = () => {
     </van-popup>
 
     <!-- 数据列表 -->
-    <van-cell-group 
-      v-model="selectedItems" 
-      style="margin-bottom: 80px"
-    >
+    <van-cell-group v-model="selectedItems" style="margin-bottom: 80px">
       <van-list
         v-model="loadingXlsmData"
         :finished="finishedXlsmData"
@@ -2458,7 +2519,8 @@ const reloadPage = () => {
               <div style="display: flex; flex-direction: column">
                 <div v-if="item.is_review_required == 1">
                   <van-tag color="white" text-color="lightgray" plain
-                    >{{ item.username }}<van-icon
+                    >{{ item.username
+                    }}<van-icon
                       color="blue"
                       style="font-weight: 700"
                       v-if="item.is_pinned && item.rate < 3"
@@ -2468,12 +2530,19 @@ const reloadPage = () => {
                 </div>
                 <div v-else>
                   <van-tag color="#ffe1e1" text-color="#ad0000" plain
-                    >{{ item.username }}<van-icon
+                    >{{ item.username
+                    }}<van-icon
                       color="blue"
                       style="font-weight: 700"
                       v-if="item.is_pinned && item.rate < 3"
                       name="link-o"
                     />
+                    <div
+                      v-if="item.complete_status"
+                      style="filter: brightness(0.8)"
+                    >
+                      &nbsp;⚡️
+                    </div>
                   </van-tag>
                 </div>
                 <van-tag
@@ -2522,7 +2591,9 @@ const reloadPage = () => {
                 {{ item.alias }} {{ item.answers_len }}词
               </div>
 
-            <div style="margin-top: 0.3rem">{{ item.create_time.slice(2) }}</div>
+              <div style="margin-top: 0.3rem">
+                {{ item.create_time.slice(2) }}
+              </div>
             </template>
             <!-- 原代码中的 #value 部分替换为以下内容 -->
             <template #value>
@@ -2535,7 +2606,9 @@ const reloadPage = () => {
                   min-height: 60px;
                 "
               >
-                <div v-if="item.type == 0 || item.type == 1 || item.type == null">
+                <div
+                  v-if="item.type == 0 || item.type == 1 || item.type == null"
+                >
                   <div style="display: flex; align-items: center">
                     <van-rate
                       v-model="item.rate"
@@ -2547,7 +2620,9 @@ const reloadPage = () => {
                       readonly
                       allow-half
                     />
-                    <div style="margin-left: 0rem; width: 32px; font-size: 12px">
+                    <div
+                      style="margin-left: 0rem; width: 32px; font-size: 12px"
+                    >
                       <span v-if="showRatePlus[index]">
                         +{{ formattedRate(item.rate) }}
                       </span>
@@ -2557,18 +2632,18 @@ const reloadPage = () => {
                 </div>
                 <div v-if="item.type == 2 || item.type == 3">
                   <div style="display: flex; align-items: center; gap: 0.5rem">
-                    <van-rate
-                      v-model="item.rate"
-                      :size="60"
-                      color="#ffd21e"
-                      void-icon="chart-trending-o"
-                      icon="chart-trending-o"
-                      void-color="#eee"
-                      :count="1"
-                      readonly
-                      allow-half
+                    <img
+                      v-if="item.rate < 3"
+                      src="../assets/cry_emoji.png"
+                      style="width: 50px; height: auto"
+                      alt="Cry"
                     />
-                    <span>{{ (item.rate * 100).toFixed(1) }}%</span>
+                    <img
+                      v-else
+                      src="../assets/smile_emoji.png"
+                      style="width: 50px; height: auto"
+                      alt="Smile"
+                    />
                   </div>
                 </div>
 
@@ -2712,9 +2787,29 @@ const reloadPage = () => {
           placeholder="请输入0或1"
         />
         <van-field
+          v-model="valueNewIsCompleteStatus"
+          label="地狱闪电"
+          placeholder="请输入0或1"
+        />
+        <van-field
           v-model="valueReview"
           label="复习"
           placeholder="请输入0或1"
+        />
+        <van-field
+          v-model="valueListeningNumber"
+          label="听力"
+          placeholder="请输入听力次数"
+        />
+        <van-field
+          v-model="valueWritingwordsNumber"
+          label="默写"
+          placeholder="请输入默写次数"
+        />
+        <van-field
+          v-model="valueTypeMode"
+          label="模式选择"
+          placeholder="双模式：0｜ 限制：1｜ 简单：2｜ 投票：4"
         />
       </van-cell-group>
       <!-- 删除按钮 -->
@@ -2727,13 +2822,7 @@ const reloadPage = () => {
         >
           删除选中的 {{ selectedItems.length }} 个项目
         </van-button>
-        <van-button
-          type="primary"
-          block
-          @click="reloadPage"
-        >
-          刷新
-        </van-button>
+        <van-button type="primary" block @click="reloadPage"> 刷新 </van-button>
       </div>
     </van-dialog>
 
@@ -2782,6 +2871,16 @@ const reloadPage = () => {
           placeholder="请输入游戏次数"
         />
         <van-field
+          v-model="valueListeningNumber"
+          label="听力"
+          placeholder="请输入听力次数"
+        />
+        <van-field
+          v-model="valueWritingwordsNumber"
+          label="默写"
+          placeholder="请输入默写次数"
+        />
+        <van-field
           v-model="valueMerge"
           label="拼接选项"
           placeholder="请输入拼接选项"
@@ -2795,7 +2894,8 @@ const reloadPage = () => {
           placeholder="请输入题目类型"
         />
         <div style="color: gray; font-size: 12px; margin: 0.5rem 0 0 1rem">
-          普通双模式：0｜ 限制模式：1｜ 考试模式：2｜ 考试完成模式：3｜ 投票模式：4
+          普通双模式：0｜ 限制模式：1｜ 简单模式：2｜ 考试完成模式：3｜
+          投票模式：4
         </div>
         <van-field
           v-model="valueCoins"
@@ -2821,6 +2921,11 @@ const reloadPage = () => {
         <van-field
           v-model="valueIsPinned"
           label="置顶"
+          placeholder="请输入0或1"
+        />
+        <van-field
+          v-model="valueIsCompleteStatus"
+          label="地狱闪电"
           placeholder="请输入0或1"
         />
         <van-field
@@ -3479,10 +3584,16 @@ const reloadPage = () => {
                       alt="Item List Complete"
                     />
                     <img
-                      v-if="item.type == 2"
-                      src="../assets/item_list.png"
+                      v-if="item.type == 2 && item.rate < 3"
+                      src="../assets/cry_emoji.png"
                       style="width: 27px; height: auto; margin-right: 0.5rem"
-                      alt="Item List"
+                      alt="Cry Emoji"
+                    />
+                    <img
+                      v-if="item.type == 2 && item.rate >= 3"
+                      src="../assets/smile_emoji.png"
+                      style="width: 27px; height: auto; margin-right: 0.5rem"
+                      alt="Smile Emoji"
                     />
                   </template>
 
@@ -3523,16 +3634,17 @@ const reloadPage = () => {
                   </template>
 
                   <template #label>
-                    <van-rate
-                      v-model="item.rate"
-                      :size="50"
-                      color="#ffd21e"
-                      void-icon="chart-trending-o"
-                      icon="chart-trending-o"
-                      void-color="#eee"
-                      :count="1"
-                      readonly
-                      allow-half
+                    <img
+                      v-if="item.rate < 3"
+                      src="../assets/cry_emoji.png"
+                      style="width: 50px; height: auto"
+                      alt="Cry"
+                    />
+                    <img
+                      v-else
+                      src="../assets/smile_emoji.png"
+                      style="width: 50px; height: auto"
+                      alt="Smile"
                     />
                     <div
                       style="
@@ -4033,16 +4145,17 @@ const reloadPage = () => {
                     </template>
 
                     <template #label>
-                      <van-rate
-                        v-model="item.rate"
-                        :size="50"
-                        color="#ffd21e"
-                        void-icon="chart-trending-o"
-                        icon="chart-trending-o"
-                        void-color="#eee"
-                        :count="1"
-                        readonly
-                        allow-half
+                      <img
+                        v-if="item.rate < 3"
+                        src="../assets/cry_emoji.png"
+                        style="width: 50px; height: auto"
+                        alt="Cry"
+                      />
+                      <img
+                        v-else
+                        src="../assets/smile_emoji.png"
+                        style="width: 50px; height: auto"
+                        alt="Smile"
                       />
                       <div
                         style="

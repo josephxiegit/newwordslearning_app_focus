@@ -44,8 +44,8 @@ cordova build android
 
 // 复制版本号
 // 修改apk文件名称：/Users/jiegengzhe/Desktop/newWordsLearning_app/cordova-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
-// 将文件放入网盘：apk_26.01.19.1.apk
-// 将文件放入服务器：ssh://root@39.105.1.189/usr/StudentsRehearsals/data/app/apk_26.01.19.1.apk
+// 将文件放入网盘：apk_26.03.24.1.apk
+// 将文件放入服务器：ssh://root@39.105.1.189/usr/StudentsRehearsals/data/app/apk_26.03.24.1.apk
 
 ----------------------------------------------------------------------------------------------------
 // adb 相关命令
@@ -56,7 +56,7 @@ adb uninstall com.focus.newwordslearning
 // adb shell pm uninstall --user 0 com.focus.newwordslearning
 
 // 安装主空间
-// adb install /Users/jiegengzhe/Desktop/newWordsLearning_app_focus/cordova-app/platforms/android/app/build/outputs/apk/debug/apk_f.26.01.20.1.apk
+// adb install /Users/jiegengzhe/Desktop/newWordsLearning_app_focus/cordova-app/platforms/android/app/build/outputs/apk/debug/apk_f.26.03.05.1.apk
 安装主空间测试用：
 adb install /Users/jiegengzhe/Desktop/newWordsLearning_app_focus/cordova-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
 

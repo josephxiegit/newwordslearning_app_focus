@@ -205,6 +205,10 @@ const reloadPage = () => {
       <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
         >消费</van-tabbar-item
       >
+      <van-tabbar-item icon="envelop-o" replace to="/notificationLog"
+        >通知</van-tabbar-item
+      >
+
     </van-tabbar>
 
     <!-- 搜索单词本 -->

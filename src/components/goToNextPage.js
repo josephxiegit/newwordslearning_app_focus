@@ -9,8 +9,13 @@ export const goToNextPage = (
     type = 0,
     is_spell_number = 3,
     device_type = "mobile",
+    complete_status = false,
+    isBroken = false,
+    listening_number_user = 0,
+    writingwords_number_user = 0,
     // ↓ 把所有组件内部响应式变量作为普通值参数传入
     {
+
         isInChooseMode,      // 传 ref 对象本身，函数内用 .value 赋值
         checkedNoneOfAbove,  // 传 ref 对象本身
         checkedSpell,        // 传 ref 对象本身
@@ -22,6 +27,7 @@ export const goToNextPage = (
         getSpellVocabulary,  // 传获取拼写词汇函数
     } = {}
 ) => {
+
     if (!router || typeof router.push !== "function") {
         throw new Error("goToNextPage: router 未传入或无效");
     }
@@ -577,156 +583,6 @@ export const goToNextPage = (
     }
     console.log("data_pinjie: ", data);
 
-    // 增加中译英选项
-    // function processData3(data, reversd_number, numberOption) {
-    //   reversd_number = 16
-    //   // 创建 data 的深拷贝
-    //   const originalData = JSON.parse(JSON.stringify(data));
-
-    //   // 交换 data.answers 中的中文和英文，并处理分号分割
-    //   const processedAnswers = data.answers.map((item) => {
-    //     let chineseOptions;
-    //     if (item["中文"].includes("；")) {
-    //       chineseOptions = item["中文"].split("；");
-    //     } else if (item["中文"].includes(",")) {
-    //       chineseOptions = item["中文"].split(",");
-    //     } else {
-    //       chineseOptions = [item["中文"]];
-    //     }
-
-    //     const randomChinese =
-    //       chineseOptions[Math.floor(Math.random() * chineseOptions.length)];
-
-    //     return {
-    //       序号: item["序号"],
-    //       英文: randomChinese,
-    //       中文: item["英文"],
-    //     };
-    //   });
-    //   console.log("processedAnswers: ", processedAnswers);
-
-    //   // 获取所有英文答案
-    //   const allChinese = processedAnswers.map((item) => item["英文"]);
-    //   const allEnglish = processedAnswers.map((item) => item["中文"]);
-
-    //   const processedSynonyms = data.synonyms.map((synonym) => {
-    //     // 获取正确答案的中文
-    //     const correctAnswer = processedAnswers.find(
-    //       (answer) => answer["中文"] === synonym["英文"]
-    //     );
-
-    //     const correctChinese = correctAnswer.英文;
-    //     // console.log('correctChinese: ', correctChinese);
-
-    //     // 生成一个包含正确答案的随机中文列表
-    //     const englishOptions = [correctAnswer.中文];
-    //     const addedAnswers = new Set(englishOptions);
-    //     while (englishOptions.length < numberOption) {
-    //       if (addedAnswers.size >= allEnglish.length) {
-    //         englishOptions.push("无"); // 用“无”代替
-    //       } else {
-    //         const randomAnswer =
-    //           allEnglish[Math.floor(Math.random() * allEnglish.length)];
-    //         // console.log("randomAnswer: ", randomAnswer);
-    //         if (
-    //           randomAnswer !== null &&
-    //           randomAnswer !== "" &&
-    //           !addedAnswers.has(randomAnswer)
-    //         ) {
-    //           // 获取新添加的中文对应的英文
-    //           const randomAnswerEnglish = processedAnswers.find(
-    //             (answer) => answer["中文"] === randomAnswer
-    //           )?.英文;
-    //           // console.log("randomAnswerEnglish: ", randomAnswerEnglish);
-
-    //           const isDuplicate = englishOptions.some((existingChinese) => {
-    //             const existingAnswerEnglish = processedAnswers.find(
-    //               (answer) => answer["中文"] === existingChinese
-    //             )?.英文;
-
-    //             // Split the existing answer by '；' and check if it contains randomAnswerEnglish
-    //             if (existingAnswerEnglish) {
-    //               const splitExistingAnswers = existingAnswerEnglish.split("；");
-    //               return splitExistingAnswers.includes(randomAnswerEnglish);
-    //             }
-    //             return false;
-    //           });
-
-    //           if (!isDuplicate) {
-    //             englishOptions.push(randomAnswer);
-    //             addedAnswers.add(randomAnswer);
-    //           }
-    //         }
-    //       }
-    //     }
-
-    //     // 随机打乱数组顺序
-    //     for (let i = englishOptions.length - 1; i > 0; i--) {
-    //       const j = Math.floor(Math.random() * (i + 1));
-    //       [englishOptions[i], englishOptions[j]] = [
-    //         englishOptions[j],
-    //         englishOptions[i],
-    //       ];
-    //     }
-
-    //     return {
-    //       序号: synonym["序号"],
-    //       英文: correctChinese,
-    //       中文: englishOptions,
-    //     };
-    //   });
-
-    //   // console.log("processedSynonyms: ", processedSynonyms);
-
-    //   // 从 processedAnswers 和 processedSynonyms 中随机选取 reversd_number 个
-    //   const selectedIndexes = new Set();
-    //   while (selectedIndexes.size < reversd_number) {
-    //     selectedIndexes.add(Math.floor(Math.random() * processedAnswers.length));
-    //   }
-
-    //   // console.log('selectedIndexes: ', selectedIndexes);
-
-    //   const selectedAnswers = Array.from(selectedIndexes).map(
-    //     (index) => processedAnswers[index]
-    //   );
-    //   // console.log('selectedAnswers: ', selectedAnswers);
-
-    //   const selectedSynonyms = Array.from(selectedIndexes).map(
-    //     (index) => processedSynonyms[index]
-    //   );
-    //   // console.log("selectedSynonyms: ", selectedSynonyms);
-
-    //   // 在 originalData 中的 answers 和 synonyms 随机插入
-    //   selectedAnswers.forEach((answer, index) => {
-    //     const randomPosition = Math.floor(
-    //       Math.random() * (originalData.answers.length + 1)
-    //     );
-    //     originalData.answers.splice(
-    //       randomPosition,
-    //       0,
-    //       selectedAnswers.find((a) => a.序号 === answer.序号)
-    //     );
-    //     originalData.synonyms.splice(
-    //       randomPosition,
-    //       0,
-    //       selectedSynonyms.find((s) => s.序号 === selectedSynonyms[index].序号)
-    //     );
-    //   });
-
-    //   // 重新整理序号
-    //   originalData.answers.forEach((item, index) => {
-    //     item.序号 = index + 1;
-    //   });
-    //   originalData.synonyms.forEach((item, index) => {
-    //     item.序号 = index + 1;
-    //   });
-
-    //   // 返回处理后的数据和原始数据
-    //   return {
-    //     processedData: { answers: processedAnswers, synonyms: processedSynonyms },
-    //     NewData: originalData,
-    //   };
-    // }
     function processData3(data, reversd_number, numberOption) {
         // reversd_number = 10
         // 创建 data 的深拷贝（在原题库上插入“反转题”）
@@ -940,7 +796,7 @@ export const goToNextPage = (
                     : [correctAnswer];
 
                 // console.log('correctAnswers: ', correctAnswers);
-                console.log("synonym.中文: ", synonym.中文);
+                // console.log("synonym.中文: ", synonym.中文);
                 // console.log("-----------------");
                 // 决定是否替换正确答案，概率在10%-20%之间
                 let replaceCorrectAnswer = false;
@@ -1163,8 +1019,10 @@ export const goToNextPage = (
                 return "";
             }
         }
-
-        if (mode == 0) {
+        if (complete_status == true) {
+            data["complete_status"] = true;
+        }
+        if (mode == 0 || mode == 2) {
             const message = getStatusMessage(
                 checkedSpell.value,
                 checkedNoneOfAbove.value
@@ -1192,6 +1050,10 @@ export const goToNextPage = (
                         checkedNoneOfAbove: checkedNoneOfAbove.value,
                         checkedSpell: checkedSpell.value,
                         RateOrigin: data["rate"],
+                        complete_status: data["complete_status"],
+                        isBroken: isBroken,
+                        listening_number: (data["listening_number"] ?? listening_number_user) ?? 0,
+                        writingwords_number: (data["writingwords_number"] ?? writingwords_number_user) ?? 0,
                     },
                 });
             } else {
@@ -1209,6 +1071,10 @@ export const goToNextPage = (
                         checkedNoneOfAbove: checkedNoneOfAbove.value,
                         checkedSpell: checkedSpell.value,
                         RateOrigin: data["rate"],
+                        complete_status: data["complete_status"],
+                        isBroken: isBroken,
+                        listening_number: (data["listening_number"] ?? listening_number_user) ?? 0,
+                        writingwords_number: (data["writingwords_number"] ?? writingwords_number_user) ?? 0,
                     },
                 });
             }
@@ -1252,6 +1118,10 @@ export const goToNextPage = (
                         checkedNoneOfAbove: checkedNoneOfAbove.value,
                         checkedSpell: checkedSpell.value,
                         RateOrigin: data["rate"],
+                        complete_status: data["complete_status"],
+                        isBroken: isBroken,
+                        listening_number: (data["listening_number"] ?? listening_number_user) ?? 0,
+                        writingwords_number: (data["writingwords_number"] ?? writingwords_number_user) ?? 0,
                     },
                 });
             } else {
@@ -1270,30 +1140,35 @@ export const goToNextPage = (
                         checkedNoneOfAbove: checkedNoneOfAbove.value,
                         checkedSpell: checkedSpell.value,
                         RateOrigin: data["rate"],
+                        complete_status: data["complete_status"],
+                        isBroken: isBroken,
+                        listening_number: (data["listening_number"] ?? listening_number_user) ?? 0,
+                        writingwords_number: (data["writingwords_number"] ?? writingwords_number_user) ?? 0,
                     },
                 });
 
             }
 
         }
-        if (mode == 2) {
-            sessionStorage.setItem("testFreshFlag", false);
-            router.push({
-                path: "/studentAccountTest",
-                state: {
-                    checkedNoneOfAbove: checkedNoneOfAbove.value,
-                    checkedSpell: checkedSpell.value,
-                    data: JSON.stringify(data),
-                    nid: originalData.value[index].nid,
-                    title: data["title"],
-                    type: data["type"],
-                    username: data["username"],
-                    usercoins: usercoins.value,
-                    isRewardEligible: isRewardEligible,
-                    lock_spell: lock_spell.value,
-                },
-            });
-        }
+        // if (mode == 2) {
+        //     sessionStorage.setItem("testFreshFlag", false);
+        //     router.push({
+        //         path: "/studentAccountTest",
+        //         state: {
+        //             checkedNoneOfAbove: checkedNoneOfAbove.value,
+        //             checkedSpell: checkedSpell.value,
+        //             data: JSON.stringify(data),
+        //             nid: originalData.value[index].nid,
+        //             title: data["title"],
+        //             type: data["type"],
+        //             username: data["username"],
+        //             usercoins: usercoins.value,
+        //             isRewardEligible: isRewardEligible,
+        //             lock_spell: lock_spell.value,
+        //             isBroken: isBroken,
+        //         },
+        //     });
+        // }
         if (mode == 4) {
             const message = getStatusMessage(
                 checkedSpell.value,
@@ -1322,6 +1197,7 @@ export const goToNextPage = (
                     checkedNoneOfAbove: checkedNoneOfAbove.value,
                     checkedSpell: checkedSpell.value,
                     RateOrigin: data["rate"],
+                    isBroken: isBroken,
                 },
             });
         }

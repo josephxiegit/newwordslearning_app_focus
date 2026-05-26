@@ -45,27 +45,41 @@ function getListData() {
 function processData(data) {
   return data.map((item) => {
     const { nid, username, textbook, modify_time } = item; // 使用解构赋值提取所需字段
-    let dataString = textbook.replace(/(\W)'|'(\W)/g, '$1"$2'); // 替换单引号为双引号
-    dataString = dataString
-      .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
-      .replace(/'/g, '"')
+        let dataString = textbook.replace(/(\W)'|'(\W)/g, '$1"$2');
+        dataString = dataString
+        .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3')
+        .replace(/'/g, '"')
         .replace(/s" /g, "s' ")
         .replace(/"s /g, "'s ")
         .replace(/"t /g, "'t ")
         .replace(/"m /g, "'m ")
         .replace(/can"t/g, "can't")
+        .replace(/couldn"t/g, "could't")
         .replace(/mustn"t/g, "mustn't")
+        .replace(/must"t/g, "mustn't")
+        .replace(/nustn"t/g, "nustn't")
         .replace(/needn"t/g, "needn't")
+        .replace(/need"t/g, "need't")
         .replace(/o"clock/g, "o'clock")
-        .replace(/"are/g, "'are'")
         .replace(/won"t/g, "won't")
         .replace(/it"s/g, "it's")
-        .replace(/you"d/g, "you'd");
+        .replace(/we"re/gi, "we're'")
+        .replace(/You"re/gi, "you're'")
+        .replace(/they"re/gi, "they're'")
+        .replace(/doesn"t/gi, "doesn't")
+        .replace(/don"t/gi, "don't")
+        .replace(/I"ll/gi, "I'll")
+        .replace(/you"ll/gi, "you'll")
+        .replace(/you"d/gi, "you'd")
+        .replace(/one"s/gi, "one's")
+        .replace(/let"s/gi, "let's")
+        .replace(/it" hard/gi, "it' hard")
+        .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
-    dataString = dataString
-      .replace(/\bFalse\b/g, "false")
-      .replace(/\bTrue\b/g, "true")
-      .replace(/\bNone\b/g, "null");
+        dataString = dataString
+          .replace(/\bFalse\b/g, "false")
+          .replace(/\bTrue\b/g, "true")
+          .replace(/\bNone\b/g, "null");
     // console.log('dataString: ', dataString);
 
     const parsedLog = JSON.parse(dataString);
@@ -161,6 +175,9 @@ const reloadPage = () => {
       >
       <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
         >消费</van-tabbar-item
+      >
+      <van-tabbar-item icon="envelop-o" replace to="/notificationLog"
+        >通知</van-tabbar-item
       >
     </van-tabbar>
 

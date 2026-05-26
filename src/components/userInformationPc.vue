@@ -126,6 +126,7 @@ const clickOrderList = () => {
 
 // 购买列表
 const isLoading = ref(false);
+const isBroken = ref(false);
 const priceBears = ref(20000);
 const pricePassiveMagic = ref(25000);
 const priceRemoveBarrage = ref(1200);
@@ -152,10 +153,13 @@ const getPurchaseList = (method) => {
 };
 const confirmPurchase = (index) => {
   let rate = originalData.value[index]["rate"];
-  // priceStar.value = rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
-  priceStar.value =
-    rate >= 2.5 ? 1000 : rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
-  // console.log("priceStar: ", priceStar.value);
+  if (isBroken.value) {
+    priceStar.value =
+      rate >= 2.5 ? 3000 : rate >= 2 ? 6000 : rate >= 1.5 ? 10000 : 0;
+  } else {
+    priceStar.value =
+      rate >= 2.5 ? 1000 : rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
+  }
   if (originalData.value[index]["rate"] < 1.5) {
     showToast("至少拥有1.5颗星星");
     return;
@@ -709,6 +713,13 @@ onMounted(async () => {
     emit("update:userdiamonds", res["data_coins"][0]["diamonds"]);
     emit("update:userflowers", res["data_coins"][0]["flowers"]);
     userPassiveMagic.value = res["passive_magic"];
+    isBroken.value = res["isBroken"];
+    if (isBroken.value) {
+      priceStar.value = 3000;
+    } else {
+      priceStar.value = 1000;
+    }
+
     userOwnThemes.value = res["theme_name_list"];
     valueTheme.value = localStorage.getItem("theme_name");
 
@@ -837,7 +848,11 @@ onMounted(async () => {
         </template>
         <template #price>
           <div class="price-container">
-            <span class="price-text">价格：{{ priceStar }} ～ 8000 金币</span>
+            <span v-if="!isBroken">价格：{{ priceStar }} ～ 8000 金币</span>
+            <span v-else>
+              <div>价格：{{ priceStar }} ～ 10000 金币</div>
+              <div>💔 消费提高</div>
+            </span>
           </div>
         </template>
         <template #footer>
@@ -1073,7 +1088,7 @@ onMounted(async () => {
           </div>
         </template>
       </van-card>
-      
+
       <!-- 消除查看答案 -->
       <van-card
         desc="查看答案减少一次"
@@ -1099,7 +1114,6 @@ onMounted(async () => {
           </div>
         </template>
       </van-card>
-      
     </div>
 
     <!-- 购买列表 -->
@@ -1432,11 +1446,11 @@ onMounted(async () => {
     margin-bottom: 150px;
     padding-bottom: 80px;
   }
-  
+
   .card-container {
     padding-bottom: 200px;
   }
-  
+
   .custom-cell:last-child {
     margin-bottom: 80px; /* 增加最后一个卡片的底部间距 */
   }
@@ -1448,11 +1462,11 @@ onMounted(async () => {
     margin-bottom: 20px; /* 大屏幕更大的底部边距 */
     padding-bottom: 10px;
   }
-  
+
   .card-container {
     padding-bottom: 5px; /* 确保足够的底部空间 */
   }
-  
+
   .custom-cell:last-child {
     margin-bottom: 10px; /* 增加大屏幕上最后一个卡片的底部间距 */
   }
@@ -1464,7 +1478,7 @@ onMounted(async () => {
     margin-bottom: 250px;
     padding-bottom: 100px;
   }
-  
+
   .card-container {
     padding-bottom: 250px;
   }
@@ -1472,7 +1486,6 @@ onMounted(async () => {
 
 /* 小平板竖屏及更小屏幕优化 */
 @media (max-width: 1024px) {
-  
   .container {
     min-height: 120vh;
   }
@@ -1485,16 +1498,16 @@ onMounted(async () => {
   /* 2. 卡片样式重置 */
   .custom-cell {
     /* 限制最大宽度，防止卡片在iPad上显得傻大 */
-    max-width: 480px !important; 
+    max-width: 480px !important;
     /* 居中显示 */
-    margin: 0 auto !important; 
+    margin: 0 auto !important;
     /* 增加底部间距 */
     margin-bottom: 20px !important;
-    
+
     /* 解决高度太矮的问题：改为自动高度 */
     height: auto !important;
     min-height: 140px !important; /* 给一个最小高度 */
-    
+
     /* 重新整理内部布局 */
     display: flex !important;
     flex-direction: column !important;
@@ -1504,7 +1517,7 @@ onMounted(async () => {
   /* 3. 修复价格区域被遮挡或位置不对 */
   .price-container {
     /* 取消原来的 margin-top: -20px，改为正常间距 */
-    margin-top: 10px !important; 
+    margin-top: 10px !important;
     height: auto !important;
     margin-bottom: 10px !important;
   }
@@ -1512,12 +1525,12 @@ onMounted(async () => {
   /* 4. 修复按钮看不见的问题 */
   .button-purchase {
     /* 取消原来的 margin-top: 70px，那个值太大了导致溢出 */
-    margin-top: 0 !important; 
+    margin-top: 0 !important;
     padding-bottom: 10px !important;
-    
+
     /* 让按钮居右显示（可选，如果想居中改为 center） */
     display: flex;
-    justify-content: flex-end; 
+    justify-content: flex-end;
   }
 
   /* 调整图片大小，避免在宽卡片中比例失调 */
@@ -1533,7 +1546,6 @@ onMounted(async () => {
   .container {
     min-height: 185vh;
   }
-  
 }
 
 @keyframes starFadeInOut {

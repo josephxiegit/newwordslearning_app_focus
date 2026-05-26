@@ -28,7 +28,7 @@ import success1 from "../assets/sound/success1.mp3";
 import fail1 from "../assets/sound/fail1.mp3";
 
 import { useBgm } from "./userBGM.js";
-const { isPlayingBGM, toggleAudioBGM, pauseAudioBGM} = useBgm();
+const { isPlayingBGM, toggleAudioBGM, pauseAudioBGM } = useBgm();
 
 const instance = getCurrentInstance();
 const axios = instance.appContext.config.globalProperties.$ajax;
@@ -51,6 +51,30 @@ const halfCount = computed(() => {
 const falseCount = computed(() => {
   return compareResult.value.filter((item) => item.flag === "false").length;
 });
+
+// 判断是否为默写题（优先使用后端标记的默写字段）
+const isDictation = (item) => {
+  // 直接使用提交时带过来的默写标志
+  if (item.默写 === true) return true;
+  // 兼容其他可能的情况
+  if (item.排除 === "默写" || item.type === "默写") return true;
+  // 以下为原有兜底逻辑（手写/试题/拼写直接返回 false）
+  if (item.排除 === "手写" || item.排除 === "试题" || item.is_spell) {
+    return false;
+  }
+  // 如果用户选择了不在中文列表中的答案（不太可能），也视为默写
+  if (Array.isArray(item.用户选择) && item.用户选择.length > 0) {
+    return item.用户选择.some((answer) => {
+      if (answer === "无") return false;
+      if (Array.isArray(item.中文)) {
+        return !item.中文.includes(answer);
+      }
+      return true;
+    });
+  }
+  return false;
+};
+
 // 继续跳转做题
 const gotoNext = () => {
   const toast1 = showLoadingToast({
@@ -243,7 +267,7 @@ const handleAnswerSheetClose = async () => {
     .getSeconds()
     .toString()
     .padStart(2, "0")}秒`;
-  console.log('account_data_id: ', account_data_id);
+  console.log("account_data_id: ", account_data_id);
   let params = new URLSearchParams();
   params.append("method", "updateAnswerDuration");
   params.append("username", username.value);
@@ -310,12 +334,62 @@ onUnmounted(() => {
 onDeactivated(() => {
   stopAllAudio();
 });
+
+// 小惩大戒
+const isBroken = ref(false);
+const showPunishmentLog = ref(false);
+const durationPunishment = ref(10);
+const punishmentProgress = ref(0);
+let punishmentTimer = null;
+const closePunishmentLog = () => {
+  showPunishmentLog.value = false;
+  onWelcomeConfirm();
+};
+const popPunishmentLog = () => {
+  durationPunishment.value = (compareResult.value.length - trueCount.value) * 2;
+  if (durationPunishment.value > 0) {
+    showPunishmentLog.value = true;
+  } else {
+    onWelcomeConfirm();
+  }
+};
+
+watch(showPunishmentLog, (val) => {
+  if (val) {
+    punishmentProgress.value = 0;
+    clearInterval(punishmentTimer);
+
+    const totalMs = durationPunishment.value * 1000;
+    const intervalMs = 50; // 每50ms更新一次，共200步
+    const step = 100 / (totalMs / intervalMs);
+
+    punishmentTimer = setInterval(() => {
+      punishmentProgress.value = Math.min(punishmentProgress.value + step, 100);
+      if (punishmentProgress.value >= 100) {
+        clearInterval(punishmentTimer);
+      }
+    }, intervalMs);
+  } else {
+    clearInterval(punishmentTimer);
+    punishmentProgress.value = 0;
+  }
+});
+
+const sortedCompareResult = computed(() => {
+  return [...compareResult.value].sort((a, b) => {
+    const aRed = a.flag !== "true" ? 0 : 1;
+    const bRed = b.flag !== "true" ? 0 : 1;
+    return aRed - bRed;
+  });
+});
+
 // 看视频
 const showVideoPopup = ref(false);
 const showVideoButton = ref(true);
 const videoList = ref([]);
 const customWord = ref([]);
 const userDiamonds = ref("");
+const currentCostDiamonds = ref(3); // 全局记录本次真实花费
 
 const offsetDaily = ref({
   x: window.innerWidth - 67,
@@ -323,7 +397,7 @@ const offsetDaily = ref({
 });
 const handleConfirmResult = async () => {
   // if (falseCount_danci.value > 0 && falseCount_danci.value <= 2) {
-    if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
+  if (falseCount_danci.value > 0 && falseCount_danci.value <= 8) {
     // console.log('补全单词');
     let toast1 = showLoadingToast({
       message: "查询中...",
@@ -344,7 +418,12 @@ const handleConfirmResult = async () => {
     }
     userDiamonds.value = res.data.diamonds;
     console.log("userDiamonds: ", userDiamonds.value);
-    if (userDiamonds.value >= 3) {
+
+    // 🌟 核心修复：直接将算好的花费赋给全局的 ref 变量
+    currentCostDiamonds.value = isBroken.value ? 4 : 3;
+
+    // 🌟 修改：使用 currentCostDiamonds.value 作为判断和提示条件
+    if (userDiamonds.value >= currentCostDiamonds.value) {
       videoList.value = [];
       compareResult.value.forEach((item) => {
         if (item.flag !== "true" && item.排除 !== "试题") {
@@ -364,20 +443,31 @@ const handleConfirmResult = async () => {
         (item) => `${item.英文} ${item.答案}`
       );
 
+      const warningHtml = isBroken.value
+        ? '<div style="color: #ee0a24; font-weight: bold; margin-bottom: 8px;">💔 消费提升</div>'
+        : "";
+
       showConfirmDialog({
         title: "视频看单词",
         showCancelButton: true,
         theme: "round-button",
-        message: `当前账户💎${userDiamonds.value}\n看视频抵消背诵错误，消耗💎*3，\n是否确认？`,
+        allowHtml: true, 
+        // 🌟 修改：提示文案中也使用 currentCostDiamonds.value
+        message: `${warningHtml}当前账户💎${userDiamonds.value}<br>看视频抵消背诵错误，消耗💎*${currentCostDiamonds.value}，<br>是否确认？`,
       }).then(() => {
         stopAllAudio();
         showVideoPopup.value = true;
       });
     } else {
+      const failWarningHtml = isBroken.value
+        ? `<div style="color: #ee0a24; font-weight: bold; margin-bottom: 8px;">💔 消费提升，至少需要${currentCostDiamonds.value}个💎</div>`
+        : "";
+
       showConfirmDialog({
         title: "视频补全失败",
         theme: "round-button",
-        message: "钻石数量不足，周长任务可以获得钻石",
+        allowHtml: true, 
+        message: `${failWarningHtml}钻石数量不足，周常任务可以获得钻石`,
         showCancelButton: false,
       });
     }
@@ -407,6 +497,8 @@ const onFinishedVideo = () => {
     params.append("account_log_id", account_log_id.value);
     params.append("complement", complement.value);
     params.append("user", username.value);
+    // 这里就能正确读取到刚刚在 handleConfirmResult 里赋的值了！
+    params.append("cost", currentCostDiamonds.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -417,7 +509,7 @@ const onFinishedVideo = () => {
     showConfirmDialog({
       title: "恭喜！本次补全完成",
       theme: "round-button",
-      message: "多多完成周长任务吧！",
+      message: "多多完成周常任务吧！",
       showCancelButton: false,
     });
   });
@@ -526,10 +618,11 @@ const onWelcomeConfirm = () => {
   toggleAudioBGM();
 };
 
+const flagSwipeStatus = ref(false);
 onMounted(async () => {
   window.addEventListener("beforeunload", handlePageUnload);
   createTimeAnswer.value = new Date();
-  console.log("history.state", history.state)
+  console.log("history.state", history.state);
   let res = new Promise((resolve, reject) => {
     compareResult.value = JSON.parse(history.state.compareResult);
 
@@ -538,6 +631,18 @@ onMounted(async () => {
     RateOrigin.value = history.state.RateOrigin;
     complement.value = history.state.complement;
     username.value = history.state.username;
+    isBroken.value = history.state.isBroken;
+    // isBroken.value = false;
+
+    const swipeStatus = parseInt(history?.state?.swipe_status);
+    if (swipeStatus === 0) {
+      flagSwipeStatus.value = 1;
+    } else if (swipeStatus === 1) {
+      flagSwipeStatus.value = 0;
+    } else {
+      console.warn("未找到有效的 swipe_status，默认设置为 0");
+      flagSwipeStatus.value = 0; // 默认值
+    }
 
     uncertainResult.value = JSON.parse(history.state.uncertainResult);
     spellVocabulary.value = JSON.parse(history.state.spellVocabulary);
@@ -615,7 +720,11 @@ onMounted(async () => {
     <div class="left-sidebar">
       <!-- 眼睛符号和正确率 -->
       <div class="sidebar-item" @click="toggleShowAll">
-        <van-icon :name="showAll ? 'eye-o' : 'closed-eye'" size="24" color="#4087f2" />
+        <van-icon
+          :name="showAll ? 'eye-o' : 'closed-eye'"
+          size="24"
+          color="#4087f2"
+        />
         <div class="sidebar-text">
           <div style="font-size: 12px; color: #666">正确率</div>
           <div style="font-weight: bold; color: #4087f2">
@@ -642,7 +751,9 @@ onMounted(async () => {
           :color="isPlayingBGM ? '#07c160' : '#999'"
         />
         <div class="sidebar-text">
-          <div style="font-size: 11px">{{ isPlayingBGM ? "暂停" : "播放" }}</div>
+          <div style="font-size: 11px">
+            {{ isPlayingBGM ? "暂停" : "播放" }}
+          </div>
         </div>
       </div>
 
@@ -669,7 +780,7 @@ onMounted(async () => {
         title="完成试题"
         theme="round-button"
         class="custom-dialog"
-        @confirm="onWelcomeConfirm"
+        @confirm="popPunishmentLog"
       >
         <template #title>
           <div class="custom-title">很遗憾！下次加油哦</div>
@@ -681,17 +792,16 @@ onMounted(async () => {
             <div class="result-row">错误{{ falseCount }}道题</div>
             <div class="result-row">新获得{{ newCoins }}金币</div>
             <Divider></Divider>
-            <van-tag type="warning" size="large" round
-              >下次将进行拼写考察，点击
-              <van-tag
-                type="danger"
-                size="large"
-                round
-                @click="showUncertainAndSpell"
-                >迟疑/拼写</van-tag
-              >
-              复习</van-tag
+            <div v-if="isBroken" style="color: red">
+              💔 收益减半，先完成回顾
+            </div>
+            <div
+              v-if="flagSwipeStatus"
+              class="result-row"
+              style="color: red; font-weight: 700"
             >
+              正确率过低，触发滑动
+            </div>
           </div>
         </template>
       </van-dialog>
@@ -714,17 +824,9 @@ onMounted(async () => {
             <div class="result-row">错误{{ falseCount }}道题</div>
             <div class="result-row">新获得{{ newCoins }}金币</div>
             <Divider></Divider>
-            <van-tag type="warning" size="large" round
-              >下次将进行拼写考察，点击
-              <van-tag
-                type="danger"
-                size="large"
-                round
-                @click="showUncertainAndSpell"
-                >迟疑/拼写</van-tag
-              >
-              复习</van-tag
-            >
+            <div v-if="isBroken" style="color: red">
+              💔 收益减半，先完成回顾
+            </div>
           </div>
         </template>
       </van-dialog>
@@ -743,6 +845,9 @@ onMounted(async () => {
         <template #default>
           <div class="custom-content">
             <div class="result-row">新获得{{ newCoins }}金币</div>
+            <div v-if="isBroken" style="color: red">
+              💔 收益减半，先完成回顾
+            </div>
           </div>
         </template>
       </van-dialog>
@@ -899,8 +1004,23 @@ onMounted(async () => {
 
           <!-- 卡片内容 -->
           <div class="card-body">
-            <!-- 非手写题 -->
-            <div v-if="item.排除 !== '手写'">
+            <!-- 默写题：只显示用户填写和正确答案，不显示任何选项 -->
+            <div v-if="isDictation(item)">
+              <div class="option-item">
+                <div class="option-text">
+                  用户填写：{{ item.用户选择.join("，") }}
+                </div>
+              </div>
+              <div
+                class="answer-box"
+                :class="item.flag === 'true' ? 'correct-answer' : 'wrong-answer'"
+              >
+                正确答案：{{ item.正确答案 || item.答案 }}
+              </div>
+            </div>
+
+            <!-- 非手写题（普通选择题、拼写题等） -->
+            <div v-else-if="item.排除 !== '手写'">
               <div
                 v-for="(chinese, index2) in item.中文"
                 :key="index2"
@@ -991,6 +1111,98 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- 小惩大戒 -->
+    <van-popup
+      v-model:show="showPunishmentLog"
+      position="right"
+      :style="{ width: '40%', height: '100%' }"
+      :lock-scroll="false"
+      :close-on-click-overlay="false"
+    >
+      <div
+        style="
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: white;
+          padding: 0.5rem 1rem 0.8rem 1rem;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        "
+      >
+        <p
+          style="
+            font-size: 24px;
+            color: black;
+            font-weight: 700;
+            margin: 0.5rem 0;
+          "
+        >
+          小惩大戒
+        </p>
+        <p
+          style="
+            font-size: 15px;
+            color: #888;
+            font-style: italic;
+            font-family: 'Georgia', serif;
+            letter-spacing: 0.05em;
+            margin: 0.2rem 0;
+          "
+        >
+          punish small, warn big
+        </p>
+
+        <!-- 进度条阶段 -->
+        <van-progress
+          v-if="punishmentProgress < 100"
+          :percentage="punishmentProgress"
+          :show-pivot="false"
+          stroke-width="6"
+          color="#ee0a24"
+        />
+
+        <!-- 按钮阶段 -->
+        <van-button
+          v-else
+          type="primary"
+          size="normal"
+          block
+          @click="closePunishmentLog"
+        >
+          我已牢记，关闭
+        </van-button>
+      </div>
+
+      <!-- 可滚动的列表区域 -->
+      <van-cell-group inset style="margin-top: 0">
+        <div v-for="(item, index) in sortedCompareResult" :key="index">
+          <van-cell :value="item.duration" :label="item.create_time">
+            <template #title>
+              <div
+                :style="{
+                  color: item.flag !== 'true' ? 'red' : 'inherit',
+                  fontSize: '15px',
+                }"
+              >
+                {{ item.序号 }} &nbsp;&nbsp;&nbsp; {{ item.英文 }}
+              </div>
+            </template>
+            <template #value>
+              <div
+                :style="{
+                  marginTop: '0.3rem',
+                  fontSize: '15px',
+                  color: item.flag !== 'true' ? 'red' : 'inherit',
+                }"
+              >
+                <div>{{ item.正确答案 || "答案" }}</div>
+              </div>
+            </template>
+          </van-cell>
+        </div>
+      </van-cell-group>
+    </van-popup>
 
     <!-- 动画组件 -->
     <WolfBack ref="wolfBackRef" />
@@ -1132,24 +1344,24 @@ onMounted(async () => {
   .cards-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .left-sidebar {
     width: 60px;
     top: 60px;
     height: calc(100vh - 60px);
   }
-  
+
   .right-content {
     margin-left: 60px;
     padding: 80px 12px 12px;
     width: calc(100% - 60px);
   }
-  
+
   .sidebar-item {
     width: 48px;
     padding: 8px 4px;
   }
-  
+
   .sidebar-text {
     font-size: 10px;
   }

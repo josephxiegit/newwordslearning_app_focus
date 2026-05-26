@@ -27,8 +27,8 @@ const axios = instance.appContext.config.globalProperties.$ajax;
 const props = defineProps({
   isEmbedded: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 });
 
 const originalData = ref([]);
@@ -368,9 +368,9 @@ const deleteItem = (item, index) => {
   }).then(() => {
     // console.log(item["nid"]);
     let toast1 = showLoadingToast({
-    message: "删除中...",
-    forbidClick: true,
-  });
+      message: "删除中...",
+      forbidClick: true,
+    });
     DeleteUser().then((ret) => {
       toast1.close();
       // refreshUserList();
@@ -442,12 +442,17 @@ const columnsReviseViewers = ref([]);
 const checkboxRefsViewerRevised = ref([]);
 const showViewers = (item, index) => {
   console.log("item: ", item);
+  listening_number.value = item["listening_number"];
+  writingwords_number.value = item["writingwords_number"];
   valueGrade.value = item["grade__grade_name"];
   valueLocation.value = item["location__location_name"];
   userAccount.value = item["username"];
   valueFlowers.value = item["flowers"];
   selectedLocationIndex.value = [valueLocation.value];
   selectedGradeIndex.value = [valueGrade.value];
+  userBarkKey.value = item["bark_key"];
+  userWxpusherUid.value = item["wxpusher_uid"];
+  userNtfyTopic.value = item["ntfy_topic"];
 
   // 被动技能
   selectedPassiveMagicIndex.value = item["passive_magic"]
@@ -541,6 +546,11 @@ const viewersRevised = () => {
     params.append("status", valueStatus.value);
     params.append("passive_magic", valuePassiveMagic.value);
     params.append("daily_times", daily_times.value);
+    params.append("listening_number", listening_number.value);
+    params.append("writingwords_number", writingwords_number.value);
+    params.append("bark_key", userBarkKey.value);
+    params.append("wxpusher_uid", userWxpusherUid.value);
+    params.append("ntfy_topic", userNtfyTopic.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -606,7 +616,7 @@ const onConfirmPassiveMagic = ({ selectedValues }) => {
 const showNewStudent = ref(false);
 const showGradePicker = ref(false); //年级
 const valueGrade = ref("");
-const valueFlowers = ref(0)
+const valueFlowers = ref(0);
 const selectedGradeIndex = ref([]);
 const columnsGrade = [
   { text: "七年级", value: "七年级" },
@@ -633,6 +643,8 @@ const onConfirmLocation = ({ selectedValues }) => {
 const userAccount = ref("");
 const userPassword = ref("123456");
 const daily_times = ref(4);
+const listening_number = ref(0);
+const writingwords_number = ref(0);
 
 function newStudent() {
   async function addStudent() {
@@ -647,6 +659,9 @@ function newStudent() {
     params.append("location", valueLocation.value);
     params.append("viewer_names", JSON.stringify(selectedViewers.value));
     params.append("method", "addStudent");
+    params.append("bark_key", userBarkKey.value);
+    params.append("wxpusher_uid", userWxpusherUid.value);
+    params.append("ntfy_topic", userNtfyTopic.value);
     return await axios.post("words/", params).then((ret) => {
       return ret.data;
     });
@@ -682,6 +697,8 @@ function clearStudent() {
   columnsViewers.value = [];
   checkedViewers.value = [];
   errorMessage.value = "";
+  userBarkKey.value = "";
+  userWxpusherUid.value = "";
 }
 
 const showReviseCoins = ref(false);
@@ -815,6 +832,9 @@ const addNewStudentList = () => {
         params.append("is_spell_number", valueSpellNumber.value);
         params.append("lock_spell", lock_spell.value);
         params.append("pinned", valuePinned.value);
+        params.append("listening_number", valueListeningNumber.value);
+        params.append("writingwords_number", valueWritingwordsNumber.value);
+        params.append("complete_status", valueCompleteStatus.value);
         params.append(
           "selectedVocabulary",
           JSON.stringify(selectedVocabulary.value)
@@ -876,6 +896,92 @@ const sortXlsm = () => {
   }
 };
 
+// 查看缺失天数
+const showPopupMissdays = ref(false);
+const showMsgCalendar = ref(false);
+const sortedUserList = ref([]);
+const selectedUsers = ref([]);
+
+const getUsersMissDays = () => {
+  async function queryUserList() {
+    let params = new URLSearchParams();
+    params.append("method", "get_all_users_miss_days");
+    return await axios.post("words/", params).then((ret) => {
+      return ret.data;
+    });
+  }
+
+  let toast1 = showLoadingToast({
+    message: "查询中...",
+    forbidClick: true,
+  });
+  queryUserList().then((ret) => {
+    toast1.close();
+    if (ret.message === "success" && ret.data) {
+      console.log("ret:", ret.data);
+      const list = [];
+      const userDict = ret.data;
+
+      // 解析新的字典结构：[name, info]
+      for (const [name, info] of Object.entries(userDict)) {
+        const days = info.days;
+        const canSend = info.can_send; // 获取后端的发送状态
+        const pinnedCount = info.pinned_low_rate_count; // 【新增】获取待复习次数
+
+        const numericDays = days === "无" ? -1 : parseInt(days);
+        list.push({
+          name: name,
+          sortDays: numericDays,
+          daysText: days === "无" ? "暂无记录" : `未打卡 ${days} 天`,
+          canSend: canSend, // 保存到数组对象中
+          pinned_low_rate_count: pinnedCount, // 【新增】塞进列表对象里，供模板读取
+        });
+      }
+
+      // 按天数降序排序
+      list.sort((a, b) => b.sortDays - a.sortDays);
+
+      sortedUserList.value = list;
+      selectedUsers.value = [];
+      showPopupMissdays.value = true;
+    }
+  });
+};
+
+const toggleCheckbox = (name) => {
+  const index = selectedUsers.value.indexOf(name);
+  if (index > -1) {
+    selectedUsers.value.splice(index, 1); // 已存在则移除
+  } else {
+    selectedUsers.value.push(name); // 不存在则添加
+  }
+};
+
+const openCalendar = async () => {
+  if (selectedUsers.value.length === 0) {
+    showToast("请至少选择一个用户");
+    return;
+  }
+
+  // 此时 selectedUsers.value 里面就是你勾选的人名数组
+  console.log("准备发送给:", selectedUsers.value);
+  showPopupMissdays.value = false; // 隐藏列表
+
+  // studentsSelected.value = selectedUsers.value;
+  // showPushDialog.value = true;
+
+  userAccount.value = selectedUsers.value;
+  openStudentCalendar();
+};
+
+const openMsgCalendar = () => {
+  if (selectedUsers.value.length === 0) {
+    showToast("请至少选择一个用户");
+    return;
+  }
+  // showPopupMissdays.value = false;
+};
+
 // 其他按钮
 const showOthers = ref(false);
 const checkedMergeOption = ref(true);
@@ -888,9 +994,11 @@ const popupOthers = () => {
 const showTypePicker = ref(false);
 const showNoneOfAbove = ref(false);
 const showPinned = ref(false);
+const showCompleteStatus = ref(false);
 const valueType = ref("普通双模式");
 const valueNoneOfAbove = ref(7);
 const valuePinned = ref(1);
+const valueCompleteStatus = ref(0);
 const valueSpellNumber = ref(0);
 const showSelectSpellVocabulary = ref(false);
 const synonymsSelected = ref([]);
@@ -898,7 +1006,7 @@ const selectSpellVocabulary = ref([]);
 const columnsType = [
   { text: "普通双模式", value: "普通双模式" },
   { text: "限制模式", value: "限制模式" },
-  { text: "考试模式", value: "考试模式" },
+  { text: "简单模式", value: "简单模式" },
   { text: "投票模式", value: "投票模式" },
 ];
 const columnsNoneOfAbove = [
@@ -909,13 +1017,21 @@ const columnsPinned = [
   { text: 0, value: 0 },
   { text: 1, value: 1 },
 ];
+const columnsCompleteStatus = [
+  { text: 0, value: 0 },
+  { text: 1, value: 1 },
+];
 const onConfirmType = ({ selectedValues }) => {
   showTypePicker.value = false;
   valueType.value = selectedValues[0];
 };
 const onConfirmPinned = ({ selectedValues }) => {
-  showPinned.value = false;
+  showCompleteStatus.value = false;
   valuePinned.value = selectedValues[0];
+};
+const onConfirmCompleteStatus = ({ selectedValues }) => {
+  showCompleteStatus.value = false;
+  valueCompleteStatus.value = selectedValues[0];
 };
 const onConfirmNoneOfAbove = ({ selectedValues }) => {
   showNoneOfAbove.value = false;
@@ -1002,6 +1118,8 @@ const confirmSelectVocabulary = () => {
 
 // 调节反转数量
 const valueReversedNumber = ref(1);
+const valueListeningNumber = ref(-1);
+const valueWritingwordsNumber = ref(-1);
 
 onMounted(async () => {
   refreshData();
@@ -1117,6 +1235,384 @@ const viewersConfirm = () => {
   // console.log('checkedViewers', checkedViewers.value);
   errorMessage.value = selectedViewers.value.join(",");
 };
+
+// 推送信息
+const userBarkKey = ref("");
+const userWxpusherUid = ref("");
+const userNtfyTopic = ref("");
+const showPushDialog = ref(false);
+const pushContent = ref("");
+const pushImage = ref("");
+const quickMessages = ref([
+  "⛽️马上上课了，赶紧背单词了",
+  "🎉在背一组单词吧",
+  "⚡️闪电要来了，快背单词躲闪电",
+  "😠多久没背单词了，赶紧动手了",
+]);
+
+// ntfy生成
+const getNtfyTopic = () => {
+  userNtfyTopic.value = "joseph" + userAccount.value.trim();
+};
+// 推送级别
+const pushLevel = ref("0");
+const pushLevelTip = computed(() => {
+  if (pushLevel.value === "2") return "⚡️ 将以紧急方式推送";
+  if (pushLevel.value === "1") return "⏰ 将以时效方式推送";
+  if (pushLevel.value === "3") return "🎉 将以赞美方式推送";
+  return "普通推送";
+});
+
+// 定时相关
+const isScheduled = ref(false);
+const showDatePicker = ref(false);
+const showHourPicker = ref(false);
+
+// 日期
+const today = new Date();
+const minDate = today;
+const maxDate = new Date(
+  today.getFullYear(),
+  today.getMonth() + 3,
+  today.getDate()
+);
+const selectedDate = ref([
+  String(today.getFullYear()),
+  String(today.getMonth() + 1).padStart(2, "0"),
+  String(today.getDate()).padStart(2, "0"),
+]);
+const scheduleDate = ref("");
+
+// 小时
+const selectedHour = ref([String(today.getHours()).padStart(2, "0")]);
+const scheduleHourLabel = ref("");
+const hourColumns = Array.from({ length: 24 }, (_, i) => ({
+  text: `${String(i).padStart(2, "0")}:00`,
+  value: String(i).padStart(2, "0"),
+}));
+
+const onDateConfirm = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+
+  scheduleDate.value = `${y}-${m}-${d}`;
+  showDatePicker.value = false;
+};
+
+const onHourConfirm = ({ selectedValues }) => {
+  scheduleHourLabel.value = `${selectedValues[0]}:00`;
+  showHourPicker.value = false;
+};
+
+const selectQuickMessage = (msg) => {
+  pushContent.value = msg;
+};
+
+const pushTaskMap = ref({});
+const pushMessage = async () => {
+  if (!studentsSelected.value || studentsSelected.value.length === 0) {
+    showFailToast("没有选中学生");
+    return;
+  }
+  pushContent.value = ""; // 清空上次内容
+  pushImage.value = "";
+  showPushDialog.value = true;
+
+  // 👇【新增逻辑】：拉取当前选中学生的已有任务分布
+  try {
+    let params = new URLSearchParams();
+    params.append("method", "getBatchStudentTasks");
+    // 把当前选中的学生数组传给后端
+    params.append("students", JSON.stringify(studentsSelected.value));
+    const ret = await axios.post("words/", params);
+    if (ret.data.code === 200) {
+      pushTaskMap.value = ret.data.data; // 后端返回 { '2026-05-15': [...], ... }
+    }
+  } catch (e) {
+    console.error("拉取任务分布失败", e);
+  }
+};
+
+const pushCalendarFormatter = (day) => {
+  const y = day.date.getFullYear();
+  const m = String(day.date.getMonth() + 1).padStart(2, "0");
+  const d = String(day.date.getDate()).padStart(2, "0");
+  const dateStr = `${y}-${m}-${d}`;
+
+  if (pushTaskMap.value[dateStr] && pushTaskMap.value[dateStr].length > 0) {
+    // 动态显示人数，比如 "2人有任务"
+    const count = pushTaskMap.value[dateStr].length;
+    day.bottomInfo = `${count}人有排期`;
+  }
+  return day;
+};
+
+const onCalendarSelect = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const dateStr = `${y}-${m}-${d}`;
+
+  // 判断这一天是否有任务
+  if (pushTaskMap.value[dateStr] && pushTaskMap.value[dateStr].length > 0) {
+    // 把所有有任务的学生名字用逗号拼起来
+    const names = pushTaskMap.value[dateStr].join("，");
+
+    // 使用 Vant 的轻量级 Toast 弹出提示
+    showToast({
+      message: `📅 ${dateStr}\n已有任务的学生：\n${names}`,
+      wordBreak: "break-word", // 名字太长时自动换行
+      duration: 3000, // 停留 3 秒钟方便看清楚
+    });
+  }
+};
+const showTimePicker = ref(false);
+const recurringTime = ref(""); // 输入框里显示的最终文本，如 "14:30"
+const selectedRecurringTime = ref([]); // picker 绑定的当前选中值
+
+const recurringTimeColumns = ref([]);
+for (let i = 0; i < 24; i++) {
+  const hour = i.toString().padStart(2, "0");
+  // 按照每半小时一个跨度，你也可以自己改成每15分钟
+  recurringTimeColumns.value.push({ text: `${hour}:00`, value: `${hour}:00` });
+  recurringTimeColumns.value.push({ text: `${hour}:30`, value: `${hour}:30` });
+}
+
+const onRecurringTimeConfirm = (event) => {
+  // Vant 4 的 picker 确认事件会返回 { selectedValues, selectedOptions } 等信息
+  // 我们直接取选中项的值
+  let timeStr = "";
+
+  if (event.selectedValues && event.selectedValues.length > 0) {
+    timeStr = event.selectedValues[0];
+  } else if (typeof event === "string") {
+    // 兼容 Vant 3 的直接返回值
+    timeStr = event;
+  } else if (event.value) {
+    timeStr = event.value;
+  }
+
+  recurringTime.value = timeStr; // 赋值给输入框展示
+  showTimePicker.value = false; // 关闭弹窗
+};
+const sendMode = ref("immediate"); // 'immediate', 'once', 'recurring'
+const recurringDays = ref([]); // 例如: [1, 3, 5] 代表周一、周三、周五
+const recurrenceEndDate = ref(""); // 例如: '2026-06-30'
+const selectedEndDate = ref([]);
+// --- 确认选择截止日期的回调 ---
+const onEndDateConfirm = ({ selectedValues }) => {
+  // selectedValues 比如 ['2026', '06', '30']，转成 '2026-06-30'
+  recurrenceEndDate.value = selectedValues.join("-");
+  showEndDatePicker.value = false;
+};
+const showEndDatePicker = ref(false);
+
+// 日历发送
+// --- 日历及单人任务管理相关的状态 ---
+const showStudentCalendar = ref(false);
+const showDayTasks = ref(false);
+const showSingleTaskDialog = ref(false);
+const showSingleTimePicker = ref(false);
+
+const calendarMaxDate = ref(
+  new Date(new Date().getFullYear(), new Date().getMonth() + 3, 0)
+); // 日历往后看3个月
+const studentTaskMap = ref({}); // 存储按日期分组的任务，格式: { '2026-04-25': [{...}, {...}] }
+const selectedDateStr = ref("");
+const dayTasks = ref([]);
+
+const singleTaskContent = ref("");
+const singleTaskTime = ref("");
+const singleTaskLevel = ref("0");
+const singleTaskImage = ref("");
+
+// 日期格式化辅助函数
+const formatDateStr = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+// 1. 打开日历并拉取数据
+const openStudentCalendar = async () => {
+  showStudentCalendar.value = true;
+  await fetchStudentTasks();
+};
+
+// 2. 从后端获取该学生的所有未执行排期
+const fetchStudentTasks = async () => {
+  try {
+    let params = new URLSearchParams();
+    params.append("method", "getStudentTasks");
+    // 兼容数组和字符串
+    const student = Array.isArray(userAccount.value)
+      ? JSON.stringify(userAccount.value)
+      : userAccount.value;
+    params.append("student", student);
+
+    const ret = await axios.post("words/", params);
+    if (ret.data.code === 200) {
+      console.log(ret.data);
+      studentTaskMap.value = ret.data.data;
+    }
+  } catch (e) {
+    showFailToast("获取排期失败");
+  }
+};
+
+// 3. Vant 日历的格式化函数（有任务的日期加红点显示）
+const calendarFormatter = (day) => {
+  const dateStr = formatDateStr(day.date);
+  if (
+    studentTaskMap.value[dateStr] &&
+    studentTaskMap.value[dateStr].length > 0
+  ) {
+    day.bottomInfo = "有任务";
+    // 可以自定义颜色
+    day.bottomInfoPosition = "bottom";
+  }
+  return day;
+};
+
+// 4. 点击日历中的某一天
+const onSelectCalendarDate = (date) => {
+  selectedDateStr.value = formatDateStr(date);
+  // 获取当天的任务列表
+  dayTasks.value = studentTaskMap.value[selectedDateStr.value] || [];
+  showDayTasks.value = true;
+};
+
+// 5. 删除个人的某条任务记录
+const deleteStudentTask = async (recordId) => {
+  try {
+    let params = new URLSearchParams();
+    params.append("method", "deleteStudentTask");
+    params.append("recordId", recordId);
+    const ret = await axios.post("words/", params);
+    if (ret.data.code === 200) {
+      showToast("已删除");
+      await fetchStudentTasks(); // 刷新全部数据
+      // 刷新当日列表
+      dayTasks.value = studentTaskMap.value[selectedDateStr.value] || [];
+    }
+  } catch (e) {
+    showFailToast("删除失败");
+  }
+};
+
+// 6. 准备新增当日任务
+const openAddSingleTask = () => {
+  singleTaskContent.value = "";
+  singleTaskTime.value = "18:00"; // 默认时间
+  singleTaskLevel.value = "0";
+  showSingleTaskDialog.value = true;
+};
+
+// 时间选择确认
+const onSingleTimeConfirm = (event) => {
+  let timeStr = event.selectedValues
+    ? event.selectedValues[0]
+    : event.value || event;
+  singleTaskTime.value = timeStr;
+  showSingleTimePicker.value = false;
+};
+
+// 7. 提交新增的个人任务
+const submitSingleTask = async () => {
+  if (!singleTaskContent.value.trim()) return showFailToast("内容不能为空");
+
+  try {
+    let params = new URLSearchParams();
+    params.append("method", "addStudentTask");
+    // 兼容数组和字符串
+    const student = Array.isArray(userAccount.value)
+      ? JSON.stringify(userAccount.value)
+      : userAccount.value;
+    params.append("student", student);
+    params.append("content", singleTaskContent.value);
+    params.append("pushLevel", singleTaskLevel.value);
+    params.append(
+      "scheduleTime",
+      `${selectedDateStr.value} ${singleTaskTime.value}`
+    );
+    if (singleTaskImage.value.trim()) {
+      params.append("imageUrl", singleTaskImage.value.trim());
+    }
+
+    const ret = await axios.post("words/", params);
+    if (ret.data.code === 200) {
+      showToast("新增成功");
+      await fetchStudentTasks();
+      dayTasks.value = studentTaskMap.value[selectedDateStr.value] || [];
+    }
+  } catch (e) {
+    showFailToast("新增失败");
+  }
+};
+
+// 确认发送
+const confirmPush = async () => {
+  if (!pushContent.value.trim()) {
+    showFailToast("请输入推送内容");
+    return;
+  }
+
+  // 校验参数
+  if (
+    sendMode.value === "once" &&
+    (!scheduleDate.value || !scheduleHourLabel.value)
+  ) {
+    showFailToast("请选择单次发送时间");
+    return;
+  }
+  if (sendMode.value === "recurring") {
+    if (recurringDays.value.length === 0) {
+      showFailToast("请选择每周重复的日子");
+      return;
+    }
+    if (!recurringTime.value || !recurrenceEndDate.value) {
+      showFailToast("请完整选择循环时间和截止日期");
+      return;
+    }
+  }
+
+  try {
+    let toast1 = showLoadingToast({
+      message: "推送中...",
+      forbidClick: true,
+    });
+    let params = new URLSearchParams();
+    params.append("method", "pushMessage");
+    params.append("students", JSON.stringify(studentsSelected.value));
+    params.append("content", pushContent.value);
+    params.append("pushLevel", pushLevel.value);
+    params.append("sendMode", sendMode.value);
+    if (pushImage.value.trim()) {
+      params.append("imageUrl", pushImage.value.trim());
+    }
+
+    // 根据模式传参
+    if (sendMode.value === "once") {
+      params.append(
+        "scheduleTime",
+        `${scheduleDate.value} ${scheduleHourLabel.value}`
+      );
+    } else if (sendMode.value === "recurring") {
+      params.append("recurringDays", JSON.stringify(recurringDays.value));
+      params.append("recurringTime", recurringTime.value);
+      params.append("recurrenceEndDate", recurrenceEndDate.value);
+    }
+
+    const ret = await axios.post("words/", params);
+    toast1.close();
+    showToast(ret.data.msg || "任务布置成功");
+    showPushDialog.value = false;
+  } catch (e) {
+    showFailToast("推送失败");
+  }
+};
 </script>
 
 <template>
@@ -1125,10 +1621,17 @@ const viewersConfirm = () => {
       <van-nav-bar
         title="词汇分配列表"
         right-text="分配"
-        left-text="排序"
         @click-right="toggleMultiSelect()"
-        @click-left="sortXlsm()"
-      />
+      >
+        <template #left>
+          <div class="nav-left-buttons">
+            <span class="nav-text-btn" @click="sortXlsm()">排序</span>
+            <span class="nav-text-btn new-btn" @click="getUsersMissDays()"
+              >查看天数</span
+            >
+          </div>
+        </template>
+      </van-nav-bar>
     </div>
 
     <!-- 只在正常访问时显示router-view和tabbar -->
@@ -1153,6 +1656,9 @@ const viewersConfirm = () => {
         <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
           >消费</van-tabbar-item
         >
+        <van-tabbar-item icon="envelop-o" replace to="/notificationLog"
+          >通知</van-tabbar-item
+        >
       </van-tabbar>
     </template>
 
@@ -1167,7 +1673,74 @@ const viewersConfirm = () => {
       />
     </form>
 
-    <!-- 日期选择 -->
+    <!-- missdays多选 -->
+    <van-popup
+      v-model:show="showPopupMissdays"
+      position="bottom"
+      :style="{ height: '90%', display: 'flex', flexDirection: 'column' }"
+    >
+      <div class="popup-header">
+        <span class="title">选择发送信息的用户</span>
+        <van-button type="primary" size="small" @click="openCalendar"
+          >去发信息</van-button
+        >
+      </div>
+
+      <div class="list-container">
+        <van-checkbox-group v-model="selectedUsers">
+          <van-cell-group>
+            <van-cell
+              v-for="user in sortedUserList"
+              :key="user.name"
+              :title="user.name"
+              :value="user.daysText"
+              clickable
+              @click="toggleCheckbox(user.name)"
+            >
+              <template #title>
+                <!-- 增加一个包裹的 div，使用 flex 布局，并强制垂直居中和不换行 -->
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    white-space: nowrap;
+                  "
+                >
+                  <span class="user-name">{{ user.name }}</span>
+
+                  <!-- 保持原有的可发送标签，加一点左边距防贴贴 -->
+                  <span
+                    v-if="user.canSend"
+                    class="send-tag"
+                    style="margin-left: 5px"
+                    >(可发送)</span
+                  >
+
+                  <!-- 新增：显示置顶且未达标的次数，关键是加上 white-space: nowrap; -->
+                  <span
+                    v-if="user.pinned_low_rate_count > 0"
+                    class="pinned-tag"
+                    style="
+                      margin-left: 5px;
+                      color: #ee0a24;
+                      font-size: 12px;
+                      white-space: nowrap;
+                    "
+                  >
+                    (待复习: {{ user.pinned_low_rate_count }})
+                  </span>
+                </div>
+              </template>
+
+              <template #right-icon>
+                <van-checkbox :name="user.name" @click.stop />
+              </template>
+            </van-cell>
+          </van-cell-group>
+        </van-checkbox-group>
+      </div>
+    </van-popup>
+
     <van-calendar
       v-model:show="showCalendar"
       :confirm-text="editXlsmNameCalendar"
@@ -1261,6 +1834,9 @@ const viewersConfirm = () => {
             </div>
           </div>
           <div style="margin-right: 3rem; margin-top: 1rem">
+            <van-button type="warning" size="small" @click="pushMessage"
+              >推送</van-button
+            >
             <van-button type="primary" size="small" @click="popupOthers"
               >其他</van-button
             >
@@ -1295,6 +1871,9 @@ const viewersConfirm = () => {
               拼写数: {{ valueSpellNumber }} / 已选
               {{ synonymsSelected.length }}
             </div>
+          </div>
+          <div style="margin-left: 1.2rem">
+            地狱闪电 : {{ valueCompleteStatus }}
           </div>
         </div>
 
@@ -1638,6 +2217,28 @@ const viewersConfirm = () => {
               新增监督
             </van-button>
           </van-popup>
+          <!-- 推送信息 -->
+          <van-field
+            v-model="userBarkKey"
+            label="Bark_Key"
+            placeholder="请输入ios bark key"
+          />
+          <van-field
+            v-model="userWxpusherUid"
+            label="Wx_uid"
+            placeholder="请输入android wxpusher uid"
+          />
+          <van-field
+            v-model="userNtfyTopic"
+            label="ntfy_topic"
+            placeholder="请输入ntfy topic"
+          >
+            <template #button>
+              <van-button size="small" type="primary" @click="getNtfyTopic">
+                生成
+              </van-button>
+            </template>
+          </van-field>
         </van-cell-group>
         <!-- 按钮 -->
         <div style="padding: auto">
@@ -1706,7 +2307,6 @@ const viewersConfirm = () => {
               />
             </template>
             <van-cell
-              :label="item2.password"
               :value="`${item2.location__location_name}: ${item2.grade__grade_name}`"
               is-link
               clickable
@@ -1723,14 +2323,15 @@ const viewersConfirm = () => {
                     :text="`${item2.coins}/${item2.diamonds}/${item2.flowers}`"
                     @click.stop="reviseCoins(index2)"
                   />
-                  <!-- <div style="font-size: 13px;color: goldenrod;margin-top: 2px;">{{ item2.diamonds }}</div> -->
                 </div>
               </template>
+
+              <template #label>
+                {{ item2.password }} <span v-if="item2.earning_half">💔</span>
+              </template>
+
               <template #right-icon>
-                <van-checkbox
-                  :name="item2.username"
-                  @click.stop="() => {}"
-                />
+                <van-checkbox :name="item2.username" @click.stop="() => {}" />
               </template>
             </van-cell>
           </van-swipe-cell>
@@ -1794,7 +2395,7 @@ const viewersConfirm = () => {
             <van-switch v-model="checkedMergeOption" />
             <div style="display: flex; align-items: center; margin-left: 30px">
               <span style="margin-right: 16px">清除置顶</span>
-              <van-switch v-model="checkedClearPinned" active-color="#ee0a24"/>
+              <van-switch v-model="checkedClearPinned" active-color="#ee0a24" />
             </div>
           </div>
         </template>
@@ -1821,6 +2422,16 @@ const viewersConfirm = () => {
         label="中译英数量"
       />
       <van-field
+        v-model="valueListeningNumber"
+        type="number"
+        label="听力数量"
+      />
+      <van-field
+        v-model="valueWritingwordsNumber"
+        type="number"
+        label="默写数量"
+      />
+      <van-field
         v-model="valueNoneOfAbove"
         is-link
         readonly
@@ -1835,7 +2446,13 @@ const viewersConfirm = () => {
         label="是否置顶"
         @click="showPinned = true"
       />
-
+      <van-field
+        v-model="valueCompleteStatus"
+        is-link
+        readonly
+        label="地狱闪电"
+        @click="showCompleteStatus = true"
+      />
       <van-field v-model="valueSpellNumber" type="digit" label="拼写数量">
         <template #right-icon>
           <van-button
@@ -1860,6 +2477,13 @@ const viewersConfirm = () => {
           :columns="columnsPinned"
           @cancel="showPinned = false"
           @confirm="onConfirmPinned"
+        />
+      </van-popup>
+      <van-popup v-model:show="showCompleteStatus" round position="bottom">
+        <van-picker
+          :columns="columnsCompleteStatus"
+          @cancel="showCompleteStatus = false"
+          @confirm="onConfirmCompleteStatus"
         />
       </van-popup>
       <div style="margin-top: 1rem">
@@ -1965,7 +2589,7 @@ const viewersConfirm = () => {
       v-model:show="showReviseViewers"
       round
       position="bottom"
-      :style="{ height: '90%' }"
+      :style="{ height: '100%' }"
       closeable
     >
       <van-checkbox-group v-model="checkedRevisedViewers">
@@ -2026,11 +2650,45 @@ const viewersConfirm = () => {
           placeholder="请输入密码"
         />
 
+        <!-- 推送信息 -->
+        <van-field
+          v-model="userBarkKey"
+          label="Bark_Key"
+          placeholder="请输入ios bark key"
+        />
+        <van-field
+          v-model="userWxpusherUid"
+          label="Wx_uid"
+          placeholder="请输入android wxpusher uid"
+        />
+        <van-field
+          v-model="userNtfyTopic"
+          label="ntfy_topic"
+          placeholder="请输入ntfy topic"
+        >
+          <template #button>
+            <van-button size="small" type="primary" @click="getNtfyTopic">
+              生成
+            </van-button>
+          </template>
+        </van-field>
         <!-- 周长 -->
         <van-field
           v-model="daily_times"
           label="周长"
           placeholder="请输入周长次数"
+        />
+        <!-- 听力 -->
+        <van-field
+          v-model="listening_number"
+          label="听力"
+          placeholder="请输入听力数量"
+        />
+        <!-- 默写 -->
+        <van-field
+          v-model="writingwords_number"
+          label="默写"
+          placeholder="请输入默写数量"
         />
 
         <!-- 在校状态 -->
@@ -2072,6 +2730,15 @@ const viewersConfirm = () => {
             @confirm="onConfirmPassiveMagic"
           />
         </van-popup>
+
+        <van-cell-group inset style="margin-bottom: 1rem">
+          <van-cell
+            title="📅 个人推送排期日历"
+            is-link
+            value="查看/管理"
+            @click="openStudentCalendar"
+          />
+        </van-cell-group>
 
         <!-- 监管 -->
         <van-cell-group inset>
@@ -2126,6 +2793,405 @@ const viewersConfirm = () => {
         确定
       </van-button>
     </van-popup>
+
+    <!-- 推送排期 -->
+    <van-popup
+      v-model:show="showStudentCalendar"
+      position="bottom"
+      round
+      style="height: 85%; display: flex; flex-direction: column"
+    >
+      <!-- 姓名单独放在日历上方 -->
+      <div
+        style="
+          text-align: center;
+          padding: 12px 16px 0;
+          font-size: 12px;
+          color: #969799;
+          flex-shrink: 0;
+        "
+      >
+        {{ Array.isArray(userAccount) ? userAccount.join("，") : userAccount }}
+      </div>
+
+      <van-calendar
+        title="推送排期"
+        :poppable="false"
+        :show-confirm="false"
+        :formatter="calendarFormatter"
+        @select="onSelectCalendarDate"
+        :min-date="minDate"
+        :max-date="calendarMaxDate"
+        style="flex: 1"
+      />
+    </van-popup>
+
+    <van-popup
+      v-model:show="showDayTasks"
+      position="bottom"
+      round
+      style="height: 60%; display: flex; flex-direction: column"
+    >
+      <div
+        style="
+          padding: 16px;
+          text-align: center;
+          font-weight: bold;
+          font-size: 18px;
+          flex-shrink: 0;
+        "
+      >
+        {{ selectedDateStr }} 推送任务
+      </div>
+
+      <!-- 中间列表区域可滚动 -->
+      <div style="flex: 1; overflow-y: auto">
+        <van-cell-group v-if="dayTasks.length > 0">
+          <van-swipe-cell v-for="task in dayTasks" :key="task.record_id">
+            <van-cell
+              :title="task.time + ' - ' + task.content"
+              :label="`${task.username ? task.username + ' · ' : ''}级别: ${
+                task.level === '2'
+                  ? '紧急'
+                  : task.level === '1'
+                  ? '时效'
+                  : task.level === '3'
+                  ? '赞美'
+                  : '普通'
+              }`"
+            />
+            <template #right>
+              <van-button
+                square
+                type="danger"
+                text="删除"
+                style="height: 100%"
+                @click="deleteStudentTask(task.record_id)"
+              />
+            </template>
+          </van-swipe-cell>
+        </van-cell-group>
+        <van-empty v-else description="当日无未发送的推送任务" />
+      </div>
+
+      <!-- 底部按钮固定 -->
+      <div style="padding: 16px; flex-shrink: 0">
+        <van-button block type="primary" @click="openAddSingleTask"
+          >新增当日推送</van-button
+        >
+      </div>
+    </van-popup>
+
+    <van-dialog
+      v-model:show="showSingleTaskDialog"
+      title="新增当日推送"
+      show-cancel-button
+      @confirm="submitSingleTask"
+    >
+      <div class="dialog-content" style="padding: 16px 16px 0 16px">
+        <div
+          class="quick-btns"
+          style="margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 8px"
+        >
+          <van-button
+            v-for="(item, index) in quickMessages"
+            :key="index"
+            size="small"
+            plain
+            type="primary"
+            @click="singleTaskContent = item"
+          >
+            {{ item }}
+          </van-button>
+        </div>
+
+        <van-field
+          v-model="singleTaskContent"
+          type="textarea"
+          placeholder="请输入推送内容..."
+          rows="3"
+          autosize
+          show-word-limit
+          maxlength="200"
+          style="
+            border: 1px solid #ebedf0;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 12px;
+          "
+        />
+
+        <van-field
+          v-model="singleTaskImage"
+          placeholder="选填: 输入图片URL (http/https开头)"
+          clearable
+          style="
+            border: 1px solid #ebedf0;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 12px;
+          "
+        >
+          <template #label>
+             <span style="color: #323233;">附带图片1</span>
+          </template>
+        </van-field>
+
+        <van-field
+          v-model="singleTaskTime"
+          is-link
+          readonly
+          label="发送时间"
+          placeholder="选择时间"
+          @click="showSingleTimePicker = true"
+          style="padding-left: 0; padding-right: 0"
+        />
+
+        <div
+          class="schedule-section"
+          style="margin-top: 12px; margin-bottom: 8px"
+        >
+          <div class="schedule-header" style="margin-bottom: 10px">
+            <span class="schedule-label" style="font-size: 14px; color: #323233"
+              >推送级别</span
+            >
+          </div>
+          <van-radio-group
+            v-model="singleTaskLevel"
+            direction="horizontal"
+            class="push-level-group"
+          >
+            <van-radio name="0" style="margin-bottom: 8px; margin-right: 12px"
+              >普通</van-radio
+            >
+            <van-radio name="1" style="margin-bottom: 8px; margin-right: 12px"
+              >时效</van-radio
+            >
+            <van-radio
+              name="2"
+              icon-color="#ee0a24"
+              style="margin-bottom: 8px; margin-right: 12px"
+            >
+              <span :style="singleTaskLevel === '2' ? 'color:#ee0a24' : ''"
+                >紧急</span
+              >
+            </van-radio>
+            <van-radio name="3" style="margin-bottom: 8px">赞美</van-radio>
+          </van-radio-group>
+        </div>
+      </div>
+    </van-dialog>
+
+    <van-popup v-model:show="showSingleTimePicker" position="bottom" round>
+      <van-picker
+        :columns="recurringTimeColumns"
+        @confirm="onSingleTimeConfirm"
+        @cancel="showSingleTimePicker = false"
+      />
+    </van-popup>
+    
+    <!-- 推送信息 -->
+    <van-dialog
+      v-model:show="showPushDialog"
+      title="发送信息"
+      :show-confirm-button="false"
+      class="push-dialog"
+    >
+      <div class="dialog-content">
+        <p class="dialog-desc">发送给：{{ studentsSelected?.join("，") }}</p>
+
+        <!-- 快捷按钮 -->
+        <div class="quick-btns">
+          <van-button
+            v-for="(item, index) in quickMessages"
+            :key="index"
+            size="small"
+            plain
+            type="primary"
+            @click="selectQuickMessage(item)"
+          >
+            {{ item }}
+          </van-button>
+        </div>
+
+        <!-- 输入框 -->
+        <van-field
+          v-model="pushContent"
+          type="textarea"
+          placeholder="请输入推送内容..."
+          rows="4"
+          autosize
+          show-word-limit
+          maxlength="200"
+          class="push-input"
+        />
+
+        <van-field
+          v-model="pushImage"
+          label="附带图片"
+          placeholder="选填: 输入图片URL"
+          clearable
+          class="push-image-input"
+        />
+
+        <!-- 定时发送 -->
+        <div class="schedule-section">
+          <div class="schedule-header">
+            <span class="schedule-label">发送模式</span>
+          </div>
+          <van-radio-group v-model="sendMode" direction="horizontal">
+            <van-radio name="immediate">立即发送</van-radio>
+            <van-radio name="once">单次定时</van-radio>
+            <van-radio name="recurring">每周循环</van-radio>
+          </van-radio-group>
+
+          <transition name="fade">
+            <div v-if="sendMode === 'once'" class="schedule-pickers">
+              <van-field
+                v-model="scheduleDate"
+                label="日期"
+                placeholder="选择日期"
+                readonly
+                is-link
+                @click="showDatePicker = true"
+              />
+              <van-field
+                v-model="scheduleHourLabel"
+                label="时间"
+                placeholder="选择时间"
+                readonly
+                is-link
+                @click="showHourPicker = true"
+              />
+            </div>
+          </transition>
+
+          <transition name="fade">
+            <div v-if="sendMode === 'recurring'" class="schedule-pickers">
+              <van-field label="重复周期">
+                <template #input>
+                  <van-checkbox-group
+                    v-model="recurringDays"
+                    direction="horizontal"
+                  >
+                    <van-checkbox :name="1" shape="square">周一</van-checkbox>
+                    <van-checkbox :name="2" shape="square">周二</van-checkbox>
+                    <van-checkbox :name="3" shape="square">周三</van-checkbox>
+                    <van-checkbox :name="4" shape="square">周四</van-checkbox>
+                    <van-checkbox :name="5" shape="square">周五</van-checkbox>
+                    <van-checkbox :name="6" shape="square">周六</van-checkbox>
+                    <van-checkbox :name="7" shape="square">周日</van-checkbox>
+                  </van-checkbox-group>
+                </template>
+              </van-field>
+
+              <van-field
+                v-model="recurringTime"
+                label="发送时间"
+                placeholder="选择每天发送时间"
+                readonly
+                is-link
+                @click="showTimePicker = true"
+              />
+              <van-field
+                v-model="recurrenceEndDate"
+                label="循环截止至"
+                placeholder="选择截止日期"
+                readonly
+                is-link
+                @click="showEndDatePicker = true"
+              />
+            </div>
+          </transition>
+        </div>
+
+        <!-- 推送级别 -->
+        <div class="schedule-section">
+          <div class="schedule-header">
+            <span class="schedule-label">推送级别</span>
+          </div>
+          <van-radio-group
+            v-model="pushLevel"
+            direction="horizontal"
+            class="push-level-group"
+          >
+            <van-radio name="0">普通推送</van-radio>
+            <van-radio name="1">时效推送</van-radio>
+            <van-radio name="2" icon-color="#ee0a24">
+              <span :style="pushLevel === '2' ? 'color:#ee0a24' : ''"
+                >紧急推送</span
+              >
+            </van-radio>
+            <van-radio name="3">赞美推送</van-radio>
+          </van-radio-group>
+          <p
+            class="schedule-tip"
+            :style="
+              pushLevel === '2'
+                ? 'color:#ee0a24'
+                : pushLevel === '1'
+                ? 'color:#ff976a'
+                : ''
+            "
+          >
+            {{ pushLevelTip }}
+          </p>
+        </div>
+
+        <!-- 日期选择弹出层 -->
+        <van-calendar
+          v-model:show="showDatePicker"
+          title="选择发送日期"
+          :min-date="minDate"
+          :max-date="maxDate"
+          :formatter="pushCalendarFormatter"
+          @select="onCalendarSelect"
+          @confirm="onDateConfirm"
+        />
+
+        <!-- 小时选择弹出层 -->
+        <van-popup v-model:show="showHourPicker" position="bottom" round>
+          <van-picker
+            v-model="selectedHour"
+            title="选择小时"
+            :columns="hourColumns"
+            @confirm="onHourConfirm"
+            @cancel="showHourPicker = false"
+          />
+        </van-popup>
+
+        <!-- 每周循环弹出层 -->
+        <van-popup v-model:show="showTimePicker" position="bottom" round>
+          <van-picker
+            v-model="selectedRecurringTime"
+            title="选择每天发送时间"
+            :columns="recurringTimeColumns"
+            @confirm="onRecurringTimeConfirm"
+            @cancel="showTimePicker = false"
+          />
+        </van-popup>
+
+        <van-popup v-model:show="showEndDatePicker" position="bottom" round>
+          <van-date-picker
+            v-model="selectedEndDate"
+            title="选择循环截止日期"
+            :min-date="minDate"
+            @confirm="onEndDateConfirm"
+            @cancel="showEndDatePicker = false"
+          />
+        </van-popup>
+
+        <!-- 操作按钮 -->
+        <div class="dialog-actions">
+          <van-button block plain @click="showPushDialog = false"
+            >取消</van-button
+          >
+          <van-button block type="primary" @click="confirmPush"
+            >确认发送</van-button
+          >
+        </div>
+      </div>
+    </van-dialog>
   </div>
 </template>
 
@@ -2146,6 +3212,22 @@ const viewersConfirm = () => {
 }
 .van-checkbox {
   margin-left: 0px;
+}
+
+.nav-left-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px; /* 两个按钮之间的间距，可根据需要调整 */
+}
+
+.nav-text-btn {
+  color: #1989fa; /* Vant 默认的蓝色，你可以换成你的主题色 */
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.nav-text-btn:active {
+  opacity: 0.7; /* 增加点击时的反馈感 */
 }
 
 .selected-cell2 {
@@ -2176,5 +3258,102 @@ const viewersConfirm = () => {
     rgba(128, 0, 128, 0.1) 5px,
     rgba(128, 0, 128, 0.1) 10px
   );
+}
+
+/* 推送信息 */
+.dialog-content {
+  padding: 12px 3px 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* iOS 惯性滚动 */
+}
+
+.dialog-desc {
+  font-size: 13px;
+  color: #646566;
+  margin-bottom: 10px;
+  word-break: break-all;
+}
+
+.quick-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.push-input {
+  border: 1px solid #ebedf0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.schedule-section {
+  padding: 8px 0 4px;
+  border-top: 1px solid #f5f5f5;
+  margin-top: 4px;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0 8px;
+}
+
+.schedule-label {
+  font-size: 14px;
+  color: #323233;
+}
+
+.schedule-tip {
+  font-size: 12px;
+  color: #969799;
+  margin: 6px 0 0;
+  padding-left: 2px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+.push-level-group {
+  padding: 4px 0 6px;
+  gap: 12px;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+  background-color: #fff;
+}
+
+.popup-header .title {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.list-container {
+  flex: 1;
+  overflow-y: auto; /* 列表过长时允许滚动 */
+  padding-bottom: 20px;
+}
+
+/* 突出显示天数比较多的情况(可选) */
+:deep(.van-cell__value) {
+  color: #ee0a24;
 }
 </style>

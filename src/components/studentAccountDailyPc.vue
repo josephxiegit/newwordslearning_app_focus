@@ -551,7 +551,7 @@ const goToNext = async () => {
         isCheckboxDisabled.value = false;
         answerShow.value = false;
         buttonText.value = "显示答案";
-        console.log("resultDataTempt: ", resultDataTempt.value);
+        // console.log("resultDataTempt: ", resultDataTempt.value);
         if (
           synonymsOptions.value[currentIndex.value + 1]["排除"] !== "试题" &&
           synonymsOptions.value[currentIndex.value + 1]["排除"] !== "手写"
@@ -624,11 +624,13 @@ const goToNext = async () => {
           } finally {
             isLoading.value = false;
           }
+
+          const addCount = isBroken.value ? 0.5 : 1;
           const message =
             reviewRequired.value === 1
-              ? "恭喜！💎数量增加+1"
-              : "恭喜！💎数量增加+2";
-
+              ? `恭喜！💎数量增加+${addCount}`
+              : `恭喜！💎数量增加+${addCount * 2}`;
+              
           setTimeout(() => {
             showSuccessToast(message);
           }, 1000);
@@ -688,6 +690,7 @@ const goToNext = async () => {
 };
 
 // 购物车
+const isBroken = ref(false);
 const mistakesList = ref([]);
 const submitList = ref([]);
 const cartIcon = ref(null);
@@ -875,6 +878,7 @@ async function updateAccountLog() {
   params.append("method", "updateAccountLog");
   params.append("username", username.value);
   params.append("submittoken", submittoken.value);
+  params.append("isBroken", isBroken.value);
   params.append("account_id_list", account_id_list.value);
   params.append("flagReview", "复习任务");
   params.append("reviewRequired", reviewRequired.value);
@@ -1032,6 +1036,8 @@ onMounted(async () => {
     navTitle.value = history.state.navTitle || "一起来复习";
     account_id_list.value = history.state.account_id_list;
 
+    isBroken.value = history.state.isBroken;
+    console.log("isBroken.value: ", isBroken.value);
     synonymsOptions.value.forEach((item, index) => {
       item.序号 = index + 1;
     });
@@ -1092,7 +1098,7 @@ onMounted(async () => {
       <div class="nav-left-content">{{ username }}</div>
       <div class="nav-center-content">{{ navTitle }}</div>
       <div class="nav-right-placeholder"></div>
-      </div>
+    </div>
 
     <div class="parent-container layout-container">
       <div class="control-panel">
@@ -1400,7 +1406,7 @@ onMounted(async () => {
       <dailyAnimation ref="preExamAnimationRef" />
       <preExamAnimation ref="preExamAnimationRef2" :flagChoose="flagChoose2" />
       <loading v-if="isLoading" />
-      <WinningStreakPopup
+      <WinningStreakPopupPc
         v-model:show="shoWinningStreak"
         :active-step="activeWinningStreak"
         :daily-step="dailyWinningStreak"
@@ -1589,7 +1595,6 @@ body {
     flex-direction: row;
     height: 100%; /* 占满 flex: 1 的高度 */
     overflow: hidden; /* **关键：防止 layout-container 出现滚动条** */
-
   }
 
   /* --- 左侧面板 --- */
@@ -1761,14 +1766,14 @@ body {
   display: flex;
   justify-content: space-between; /* 关键：左右两端对齐，中间留白 */
   align-items: center;
-  width: 85%;       /* 占满父容器宽度 */
-  height: 40px;      /* 给一个合适的高度 */
+  width: 85%; /* 占满父容器宽度 */
+  height: 40px; /* 给一个合适的高度 */
   margin-bottom: 10px;
   font-size: 16px;
 }
 
 .info-left-text {
-  color: #1989fa;    /* 保持 Vant 风格的蓝色 */
+  color: #1989fa; /* 保持 Vant 风格的蓝色 */
   font-weight: 500;
   white-space: nowrap; /* 防止数字换行 */
 }

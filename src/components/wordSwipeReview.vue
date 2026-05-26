@@ -19,7 +19,6 @@
     <!-- 完成页面 -->
     <div v-if="currentIndex >= cards.length" class="completion-screen">
       <div class="completion-card">
-
         <div class="unknown-count">
           <p class="count-label">需要复习的单词</p>
           <div class="count-number">{{ unknownWords.length }}</div>
@@ -36,7 +35,12 @@
           </div>
         </div>
 
-        <van-button type="primary" block round @click="finishCards" :disabled="isSubmitting"
+        <van-button
+          type="primary"
+          block
+          round
+          @click="finishCards"
+          :disabled="isSubmitting"
           >完成复习</van-button
         >
       </div>
@@ -51,7 +55,7 @@
       <div
         ref="cardRef"
         class="card"
-        :class="{ dragging: isDragging && showChinese, locked: isLocked || !showChinese }"
+        :class="{ dragging: isDragging && showChinese, locked: isLocked }"
         :style="cardStyle"
         @mousedown="handleDragStart"
         @mousemove="handleDragMove"
@@ -198,7 +202,12 @@
 
 <script setup>
 import { ref, computed, onMounted, inject, onUnmounted } from "vue";
-import { showLoadingToast, showConfirmDialog, showFailToast, showToast } from "vant";
+import {
+  showLoadingToast,
+  showConfirmDialog,
+  showFailToast,
+  showToast,
+} from "vant";
 import axios from "axios";
 import turnpage from "../assets/sound/turnpage.mp3";
 import halfencouragement from "../assets/sound/goodjob.mp3";
@@ -263,8 +272,9 @@ const revealChinese = () => {
   showChinese.value = true;
 };
 
+// ===== 改动关键部分：删除了 !showChinese.value 的检查 =====
 const handleDragStart = (e) => {
-  if (isLocked.value || !showChinese.value) return;
+  if (isLocked.value) return;
 
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
@@ -273,7 +283,7 @@ const handleDragStart = (e) => {
 };
 
 const handleDragMove = (e) => {
-  if (!isDragging.value || isLocked.value || !showChinese.value) return;
+  if (!isDragging.value || isLocked.value) return;
   e.preventDefault();
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
@@ -286,9 +296,9 @@ const handleDragEnd = () => {
   if (!isDragging.value || isLocked.value) return;
   isDragging.value = false;
 
+  // 检查是否未显示中文 - 如果未显示就提示并重置
   if (!showChinese.value) {
     dragOffset.value = { x: 0, y: 0 };
-    // 只有滑动距离超过一定值才提示，避免误触
     triggerRevealHint();
     return;
   }
@@ -305,68 +315,75 @@ const handleDragEnd = () => {
     dragOffset.value = { x: 0, y: 0 };
   }
 };
+// ===== 改动结束 =====
 
 const handleKnow = () => {
   if (isLocked.value) return;
-  if (!showChinese.value) { triggerRevealHint(); return; }
+  if (!showChinese.value) {
+    triggerRevealHint();
+    return;
+  }
   const audio = new Audio(turnpage);
   audio.play().catch((err) => console.warn("播放失败：", err));
   isLocked.value = true;
   dragOffset.value = { x: 1000, y: 0 };
-  
+
   setTimeout(() => {
     currentIndex.value++;
     dragOffset.value = { x: 0, y: 0 };
     showChinese.value = false; // 下一张重置为隐藏
-    
+
     const halfPoint = Math.floor(cards.value.length / 2);
     const isHalfway = currentIndex.value === halfPoint;
-    
+
     if (isHalfway) {
       showEncouragement.value = true;
       const audio = new Audio(halfencouragement);
       audio.play().catch((err) => console.warn("播放失败：", err));
-      setTimeout(() => showEncouragement.value = false, 2000);
+      setTimeout(() => (showEncouragement.value = false), 2000);
     }
-    
+
     if (currentIndex.value < cards.value.length) {
       speakWord(cards.value[currentIndex.value]["英文"]);
     }
-    
-    setTimeout(() => isLocked.value = false, 1200);
+
+    setTimeout(() => (isLocked.value = false), 1200);
   }, 300);
 };
 
 const handleUnknown = () => {
   if (isLocked.value) return;
-  if (!showChinese.value) { triggerRevealHint(); return; }
+  if (!showChinese.value) {
+    triggerRevealHint();
+    return;
+  }
   const audio = new Audio(turnpage);
   audio.play().catch((err) => console.warn("播放失败：", err));
   isLocked.value = true;
   const current = cards.value[currentIndex.value];
   unknownWords.value.push(current);
   dragOffset.value = { x: -1000, y: 0 };
-  
+
   setTimeout(() => {
     currentIndex.value++;
     dragOffset.value = { x: 0, y: 0 };
     showChinese.value = false; // 下一张重置为隐藏
-    
+
     const halfPoint = Math.floor(cards.value.length / 2);
     const isHalfway = currentIndex.value === halfPoint;
-    
+
     if (isHalfway) {
       showEncouragement.value = true;
       const audio = new Audio(halfencouragement);
       audio.play().catch((err) => console.warn("播放失败：", err));
-      setTimeout(() => showEncouragement.value = false, 2000);
+      setTimeout(() => (showEncouragement.value = false), 2000);
     }
-    
+
     if (currentIndex.value < cards.value.length) {
       speakWord(cards.value[currentIndex.value]["英文"]);
     }
-    
-    setTimeout(() => isLocked.value = false, 1200);
+
+    setTimeout(() => (isLocked.value = false), 1200);
   }, 300);
 };
 
@@ -405,13 +422,13 @@ const isSubmitting = ref(false);
 
 const finishCards = async () => {
   if (isSubmitting.value) return;
-  
+
   if (startTime.value) {
     const currentTime = Date.now();
     timeDiff.value = currentTime - startTime.value;
     console.log("timeDiff: ", timeDiff);
   }
-  
+
   cards.value.forEach((card) => {
     const isUnknown = unknownWords.value.some(
       (unknown) => unknown.英文 === card.英文 && unknown.序号 === card.序号
@@ -423,7 +440,7 @@ const finishCards = async () => {
 
     card.用户选择 = isUnknown ? ["false"] : [card.中文];
   });
-  
+
   const params = new URLSearchParams();
   params.append("method", "updateWordSwipeReview");
   params.append("username", username.value);
@@ -433,7 +450,7 @@ const finishCards = async () => {
   params.append("teacher_mark", timeDiff.value);
   params.append("submittoken", startTime.value);
   params.append("data", JSON.stringify(cards.value));
-  
+
   isSubmitting.value = true;
   const toast = showLoadingToast({
     duration: 0,
@@ -441,16 +458,16 @@ const finishCards = async () => {
     message: "提交中...",
     loadingType: "spinner",
   });
-  
+
   try {
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('请求超时')), 8000);
+      setTimeout(() => reject(new Error("请求超时")), 8000);
     });
-    
+
     const axiosPromise = axios.post("words/", params);
-    
+
     const response = await Promise.race([axiosPromise, timeoutPromise]);
-    
+
     // console.log('提交成功:', response.data);
     router.push({
       path: "/studentAccountList",
@@ -460,36 +477,38 @@ const finishCards = async () => {
         reviewRequired: reviewRequired.value,
       },
     });
-
   } catch (error) {
-    console.error('提交失败:', error);
-    
+    console.error("提交失败:", error);
+
     showFailToast({
-      message: error.message === '请求超时' ? '网络请求超时，重新提交' : '网络请求超时，重新提交',
+      message:
+        error.message === "请求超时"
+          ? "网络请求超时，重新提交"
+          : "网络请求超时，重新提交",
       duration: 3000,
     });
-    
+
     setTimeout(() => {
       showConfirmDialog({
-        title: '操作失败',
-        message: '是否重试提交？',
-        confirmButtonText: '重试',
-        cancelButtonText: '返回',
-        theme: 'round-button',
+        title: "操作失败",
+        message: "是否重试提交？",
+        confirmButtonText: "重试",
+        cancelButtonText: "返回",
+        theme: "round-button",
       })
-      .then(() => {
-        finishCards();
-      })
-      .catch(() => {
-        router.push({
-          path: "/studentAccountList",
-          state: {
-            username: username.value,
-            data: basicPreExam.value,
-            reviewRequired: reviewRequired.value,
-          },
+        .then(() => {
+          finishCards();
+        })
+        .catch(() => {
+          router.push({
+            path: "/studentAccountList",
+            state: {
+              username: username.value,
+              data: basicPreExam.value,
+              reviewRequired: reviewRequired.value,
+            },
+          });
         });
-      });
     }, 1000);
   } finally {
     toast.close();
@@ -516,11 +535,11 @@ const speakWord = (english) => {
     const audio = new Audio(audioUrl);
     audio.currentTime = 0;
     audio.play().catch((err) => {
-      console.warn('播放被拒（缓存 Blob），回退 TTS：', err);
+      console.warn("播放被拒（缓存 Blob），回退 TTS：", err);
       fallbackSpeech(english);
     });
-    audio.addEventListener('ended', () => URL.revokeObjectURL(audioUrl));
-    audio.addEventListener('error', () => {
+    audio.addEventListener("ended", () => URL.revokeObjectURL(audioUrl));
+    audio.addEventListener("error", () => {
       URL.revokeObjectURL(audioUrl);
       fallbackSpeech(english);
     });
@@ -530,31 +549,33 @@ const speakWord = (english) => {
   if (cached instanceof Audio) {
     cached.currentTime = 0;
     cached.play().catch((err) => {
-      console.warn('播放失败（Audio cache），回退 TTS：', err);
+      console.warn("播放失败（Audio cache），回退 TTS：", err);
       fallbackSpeech(english);
     });
     return;
   }
 
-  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(english)}&type=1`;
+  const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(
+    english
+  )}&type=1`;
   const audio = new Audio(url);
   audio.play().catch((err) => {
-    console.warn('远程音频播放失败，回退 TTS：', err);
+    console.warn("远程音频播放失败，回退 TTS：", err);
     fallbackSpeech(english);
   });
-  audio.addEventListener('error', () => fallbackSpeech(english));
+  audio.addEventListener("error", () => fallbackSpeech(english));
 };
 
 const fallbackSpeech = (english) => {
   if (window.speechSynthesis.paused) {
     window.speechSynthesis.resume();
   }
-  
+
   let utterance;
   utterance = new SpeechSynthesisUtterance(english);
   utterance.lang = "en-US";
   utterance.pitch = 0.5;
-  
+
   if (document.hasFocus()) {
     window.speechSynthesis.speak(utterance);
   } else {
@@ -577,9 +598,9 @@ const basicPreExam = ref(null);
 const reviewRequired = ref(null);
 
 const setVH = () => {
-  const vh = window.innerHeight * 0.01
-  document.documentElement.style.setProperty('--vh', `${vh}px`)
-}
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty("--vh", `${vh}px`);
+};
 
 const audioCtx = ref(null);
 const unlockAudio = () => {
@@ -588,42 +609,51 @@ const unlockAudio = () => {
     audioCtx.value.resume && audioCtx.value.resume().catch(() => {});
   }
   if (window.speechSynthesis && window.speechSynthesis.paused) {
-    try { window.speechSynthesis.resume(); } catch(e){ }
+    try {
+      window.speechSynthesis.resume();
+    } catch (e) {}
   }
-  window.removeEventListener('touchstart', unlockAudio);
-  window.removeEventListener('mousedown', unlockAudio);
+  window.removeEventListener("touchstart", unlockAudio);
+  window.removeEventListener("mousedown", unlockAudio);
 };
 
 onMounted(async () => {
-  window.addEventListener('touchstart', unlockAudio, { once: true });
-  window.addEventListener('mousedown', unlockAudio, { once: true });
+  window.addEventListener("touchstart", unlockAudio, { once: true });
+  window.addEventListener("mousedown", unlockAudio, { once: true });
 
-  setVH()
-  window.addEventListener('resize', setVH)
-  window.addEventListener('orientationchange', () => setTimeout(setVH, 100))
+  setVH();
+  window.addEventListener("resize", setVH);
+  window.addEventListener("orientationchange", () => setTimeout(setVH, 100));
 
-  document.body.style.overflow = 'hidden'
-  
+  document.body.style.overflow = "hidden";
+
   const preventSwipeGesture = (e) => {
     if (e.touches && e.touches.length === 1) {
       const touch = e.touches[0];
       const startX = touch.clientX;
-      
+
       if (startX < 30 || startX > window.innerWidth - 30) {
         e.preventDefault();
       }
     }
   };
-  
+
   const preventHorizontalScroll = (e) => {
     if (e.touches && e.touches.length === 1) {
+      const scrollable = e.target.closest(".unknown-list");
+      if (scrollable) return;
+
       e.preventDefault();
     }
   };
-  
-  document.addEventListener('touchstart', preventSwipeGesture, { passive: false });
-  document.addEventListener('touchmove', preventHorizontalScroll, { passive: false });
-  
+
+  document.addEventListener("touchstart", preventSwipeGesture, {
+    passive: false,
+  });
+  document.addEventListener("touchmove", preventHorizontalScroll, {
+    passive: false,
+  });
+
   window._preventSwipeGesture = preventSwipeGesture;
   window._preventHorizontalScroll = preventHorizontalScroll;
 
@@ -635,7 +665,7 @@ onMounted(async () => {
   basicPreExam.value = history.state.basicPreExam;
   reviewRequired.value = history.state.reviewRequired;
   startTime.value = Date.now();
-  console.log('submittoken: ', startTime.value);
+  console.log("submittoken: ", startTime.value);
 
   if (flagTheme.value == 1) {
     srcswipeEncouragement.value = goodjob1;
@@ -707,22 +737,23 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  document.body.style.overflow = ''
-  window.removeEventListener('resize', setVH)
-  
+  document.body.style.overflow = "";
+  window.removeEventListener("resize", setVH);
+
   if (window._preventSwipeGesture) {
-    document.removeEventListener('touchstart', window._preventSwipeGesture);
+    document.removeEventListener("touchstart", window._preventSwipeGesture);
     delete window._preventSwipeGesture;
   }
   if (window._preventHorizontalScroll) {
-    document.removeEventListener('touchmove', window._preventHorizontalScroll);
+    document.removeEventListener("touchmove", window._preventHorizontalScroll);
     delete window._preventHorizontalScroll;
   }
-})
+});
 </script>
 
 <style scoped>
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -810,6 +841,7 @@ html, body {
   padding: 32px;
   touch-action: none;
   transition: opacity 0.2s ease;
+  overflow: hidden;
 }
 
 .card.locked {
@@ -847,13 +879,24 @@ html, body {
 
 .card-content {
   text-align: center;
+    width: 100%;
+  /* ↓ 新增：留出上下 swipe-hint / tap-hint 的空间，超出时可滚动 */
+  max-height: calc(100% - 60px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .english-text {
-  font-size: 48px;
+  font-size: clamp(22px, 9vw, 48px); /* ← 字号随单词长度自适应收缩 */
   font-weight: bold;
   color: #1f2937;
   margin-bottom: 32px;
+  word-break: break-word;    /* ← 超长单词强制换行 */
+  overflow-wrap: break-word; /* ← 兼容性补充 */
+  max-width: 100%;
 }
 
 .answer-text {

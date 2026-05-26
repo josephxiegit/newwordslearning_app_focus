@@ -25,12 +25,15 @@ import submitloading from "./submitloading.vue";
 import passiveMagic from "./passiveMagic.vue";
 import passiveMagic2 from "./passiveMagic2.vue";
 import WinningStreakPopup from "./WinningStreakPopup.vue";
+import LightningStrike from "./lighteningStrike.vue";
+import HandwriteKeyboard from "./HandwriteKeyboard.vue";
 
 import shouxieSrcGoatAndWolf from "../assets/test.gif";
 import shouxieBears from "../assets/Boonie Bears/test.gif";
 import woohooSound from "../assets/sound/woohoo.mp3";
 
 import surpriseSound from "../assets/sound/surprise.mp3";
+import thunderSound from "../assets/sound/thunder.mp3";
 import swipeEncouragementSrcGoatAndWolf from "../assets/swipeEncouragement.gif";
 import swipeEncouragementSrcGoatAndWolf2 from "../assets/swipeEncouragement2.gif";
 import swipeEncouragementBears from "../assets/Boonie Bears/swipeEncouragement.gif";
@@ -48,6 +51,10 @@ const synonymsSelected = ref([]);
 const answers = ref([]);
 const checkboxRefs = ref([]);
 const nid = ref("");
+const writingwords_number = ref(0);
+const dictationModeIndices = ref(new Set());
+const dictationItems = ref([]);
+const dictationInputs = ref({});
 
 // 拼写tag
 const selectedItems = ref([]);
@@ -109,10 +116,91 @@ const mergeAnswerAndSynonym = () => {
     obj["答案"] = answers.value[i].中文;
     obj["正确答案"] = answers.value[i].正确答案;
     obj["排除"] = synonymsOptions.value[i].排除;
+    obj["默写"] = dictationModeIndices.value.has(i);
     newList.push(obj);
   }
   // console.log("newList: ", newList);
   return newList;
+};
+
+const splitAnswers = (value) =>
+  String(value || "")
+    .split(/[；;，,、/|]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const normalizeText = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[，。；！？、,.!?]/g, "");
+
+const isPureEnglishWord = (value) =>
+  /^[A-Za-z][A-Za-z\s'-]*$/.test(String(value || "").trim());
+
+const hasOnlyChineseAnswers = (value) => {
+  const parts = splitAnswers(value);
+  return (
+    parts.length > 0 &&
+    parts.every(
+      (part) => /[\u4e00-\u9fa5]/.test(part) && !/[a-zA-Z]/.test(part)
+    )
+  );
+};
+
+const isDictationItem = (index) => dictationModeIndices.value.has(index);
+
+const getDictationExtraSeconds = (index) => {
+  if (!isDictationItem(index)) return 0;
+  const answerText = answers.value[index]?.正确答案 || answers.value[index]?.中文;
+  const answerCount = Math.max(splitAnswers(answerText).length, 1);
+  return 7 + Math.max(answerCount - 1, 0) * 3;
+};
+
+const getTotalDictationExtraSeconds = () =>
+  Array.from(dictationModeIndices.value).reduce(
+    (total, index) => total + getDictationExtraSeconds(index),
+    0
+  );
+
+const buildDictationItems = () => {
+  if (writingwords_number.value <= 0) {
+    dictationModeIndices.value = new Set();
+    dictationItems.value = [];
+    dictationInputs.value = {};
+    return;
+  }
+
+  const pool = answers.value
+    .map((item, index) => ({
+      index,
+      序号: item?.序号 ?? index + 1,
+      英文: item?.英文 || "",
+      正确答案: item?.正确答案 || item?.中文 || "",
+      中文: item?.中文 || "",
+    }))
+    .filter((item) => {
+      const isEngWord = isPureEnglishWord(item.英文);
+      const isChineseAnswer = hasOnlyChineseAnswers(item.正确答案);
+      const isNotHandwrite = synonymsOptions.value[item.index]?.排除 !== "手写";
+      const isNotListening = !listeningModeIndices.value.has(item.index);
+      return isEngWord && isChineseAnswer && isNotHandwrite && isNotListening;
+    });
+
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  dictationItems.value = shuffled.slice(
+    0,
+    Math.min(writingwords_number.value, shuffled.length)
+  );
+  dictationModeIndices.value = new Set(
+    dictationItems.value.map((item) => item.index)
+  );
+  dictationInputs.value = Object.fromEntries(
+    dictationItems.value.map((item) => [
+      item.序号,
+      [""],
+    ])
+  );
 };
 const convertSelections = (synonymsSelected, synonymsOptions) => {
   const resultMap = new Map();
@@ -134,6 +222,14 @@ const convertSelections = (synonymsSelected, synonymsOptions) => {
     }
   });
 
+  dictationItems.value.forEach((item) => {
+    const inputs = dictationInputs.value[item.序号] || [];
+    const validInputs = inputs.map((value) => value.trim()).filter(Boolean);
+    if (validInputs.length > 0) {
+      resultMap.set(item.序号, validInputs);
+    }
+  });
+
   // 将Map转换为所需的数组格式
   return Array.from(resultMap, ([序号, 中文]) => ({ 序号, 中文 })).sort(
     (a, b) => a.序号 - b.序号
@@ -144,6 +240,29 @@ const compareAndAddFlag = (dictArray) => {
   // console.log("dictArray: ", dictArray);
   return dictArray.map((item) => {
     const { 答案, 用户选择, 正确答案, is_spell, 排除, 英文, 序号 } = item;
+    if (item.默写 === true) {
+      const userInput = Array.isArray(用户选择) ? 用户选择 : [用户选择];
+      const normalizedUser = userInput
+        .flatMap((value) => splitAnswers(value))
+        .map((v) => normalizeText(v))
+        .filter(Boolean);
+      const normalizedCorrect = splitAnswers(正确答案).map((v) =>
+        normalizeText(v)
+      );
+      let flag = "false";
+      if (
+        normalizedUser.length > 0 &&
+        normalizedCorrect.length > 0 &&
+        normalizedUser.some((answer) => normalizedCorrect.includes(answer))
+      ) {
+        flag = "true";
+      }
+      return {
+        ...item,
+        用户选择: userInput,
+        flag,
+      };
+    }
 
     // 统一处理分隔符，将所有中文分号和逗号替换为英文逗号，然后进行分割和修整
     const normalize = (str) =>
@@ -229,8 +348,147 @@ const compareAndAddFlag = (dictArray) => {
   });
 };
 
+const AI_JUDGE_TIMEOUT_MS = 8000;
+const NETWORK_BUSY_TOAST_DURATION = 3000;
+
+const fetchSemanticJudge = async (payload) => {
+  const apiKey = "sk-b6b5d72093844ae4a244b285e246c115";
+  const url = "https://api.deepseek.com/v1/chat/completions";
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AI_JUDGE_TIMEOUT_MS);
+
+  const systemPrompt = `你是一个严谨的英语老师。请判断学生的中文答案在语义上是否与标准答案一致，或者是否也是该英文单词合理的近义词/中文释义。
+要求：
+1. 允许合理的同义词、近义词。
+2. 多字、漏字但核心意思不变，算正确。
+3. 词性完全错误或意思跑偏，算错误。
+必须输出纯 JSON 格式：{"correct": true} 或 {"correct": false}，不要包含任何其他字符。`;
+
+  const userContent = `单词: ${payload.word}
+语境提示: ${payload.sourceChinese}
+标准答案: ${payload.correctAnswers.join(", ")}
+学生输入的答案: ${payload.userAnswers.join(", ")}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        temperature: 0.1,
+        max_tokens: 15,
+        response_format: { type: "json_object" },
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    return JSON.parse(data.choices[0].message.content);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error.name === "AbortError") {
+      throw new Error("AI_TIMEOUT");
+    }
+    console.error("前端直连大模型报错:", error);
+    throw new Error("AI_NETWORK_ERROR");
+  }
+};
+
+const judgeWithAI = async (item, userInput) => {
+  try {
+    const res = await fetchSemanticJudge({
+      word: item.英文,
+      userAnswers: Array.isArray(userInput) ? userInput : [userInput],
+      correctAnswers: splitAnswers(item.正确答案),
+      sourceChinese: item.中文,
+    });
+
+    if (typeof res === "boolean") return res;
+    if (typeof res?.correct === "boolean") return res.correct;
+    if (typeof res?.result === "boolean") return res.result;
+    return false;
+  } catch (error) {
+    if (
+      error.message === "AI_TIMEOUT" ||
+      error.message === "AI_NETWORK_ERROR"
+    ) {
+      throw error;
+    }
+    return false;
+  }
+};
+
+const runWithTimeout = (promise, timeoutMs) => {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("AI_TIMEOUT")), timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+};
+
+const showNetworkBusyToast = () => {
+  setTimeout(() => {
+    showFailToast({
+      message: "网络拥堵，判分超时，请重试",
+      duration: NETWORK_BUSY_TOAST_DURATION,
+    });
+  }, 0);
+};
+
+const applyAiJudgeResult = async (compareResult) => {
+  for (const item of compareResult) {
+    if (item.默写 !== true || item.用户选择[0] === "无") {
+      continue;
+    }
+    const semanticMatched = await judgeWithAI(item, item.用户选择);
+    if (semanticMatched) {
+      item.flag = "true";
+    }
+  }
+};
+
+const applyAiJudgeWithToast = async (compareResult) => {
+  const needAiJudge = compareResult.some(
+    (item) =>
+      item.默写 === true &&
+      item.用户选择[0] !== "无"
+  );
+  if (!needAiJudge) return true;
+
+  const aiToast = showLoadingToast({
+    message: "AI阅卷中...",
+    duration: 0,
+    forbidClick: true,
+  });
+
+  try {
+    await runWithTimeout(
+      applyAiJudgeResult(compareResult),
+      AI_JUDGE_TIMEOUT_MS
+    );
+    aiToast.close();
+    return true;
+  } catch (error) {
+    aiToast.close();
+    showNetworkBusyToast();
+    return false;
+  }
+};
+
 const swipeFlag = ref(0);
 const totalCoins = ref(0);
+const isBroken = ref(false);
 const clickSubmitUser = async (action, done) => {
   // 直接提交
   showDialogSubmit.value = false;
@@ -248,7 +506,17 @@ const clickSubmitUser = async (action, done) => {
   );
 
   // 比对结果给出flag
-  const compareResult = compareAndAddFlag(synonymAndSelections);
+  let compareResult = compareAndAddFlag(synonymAndSelections);
+  compareResult = compareResult.map((item) => ({
+    ...item,
+    听力: listeningModeIndices.value.has(item.序号 - 1),
+    默写: dictationModeIndices.value.has(item.序号 - 1),
+  }));
+  if (!(await applyAiJudgeWithToast(compareResult))) {
+    isLoading.value = false;
+    stopAnimation();
+    return;
+  }
   console.log("compareResult: ", compareResult);
 
   // 处理迟疑库
@@ -405,17 +673,44 @@ const clickSubmitUser = async (action, done) => {
     const correct = compareResult.filter((item) => item.flag === "true").length;
     return ((correct / total) * 100).toFixed(2);
   }
+  const rateAccuracy = calculateAccuracy(compareResult);
   if (isRewardEligible.value) {
-    if (calculateAccuracy(compareResult) < 70) {
+    if (rateAccuracy < 70) {
       totalCoins.value = 0;
     } else {
       totalCoins.value = compareResult.reduce((coins, item) => {
         return item.flag === "true" ? coins + 10 : coins;
       }, 0);
+      if (isBroken.value) {
+        totalCoins.value = Math.floor(totalCoins.value * 0.5);
+      }
     }
   } else {
     totalCoins.value = 0;
   }
+
+  // 计算swipe_status
+  let swipe_status;
+  if (complete_status.value == 1) {
+    swipe_status = rateAccuracy < 83 ? 0 : 1;
+  } else {
+    swipe_status = rateAccuracy < 81 ? 0 : 1;
+  }
+
+  // 删除4天闪电
+  // 提交成功后标记今天已完成（覆盖 flag 为 false）
+  // if (complete_status.value == 1) {
+  //   const storageKey = `flagMissingThunder_${username.value}`;
+
+  //   sessionStorage.setItem(
+  //     storageKey,
+  //     JSON.stringify({
+  //       date: new Date().toDateString(),
+  //       flag: false,
+  //       username: username.value,
+  //     })
+  //   );
+  // }
 
   function checkFlags(compareResult) {
     let halfCount = 0;
@@ -440,14 +735,23 @@ const clickSubmitUser = async (action, done) => {
     }
     return halfCount <= 3 ? 0.5 : false;
   }
-  const rate = checkFlags(compareResult);
-  const type = Number(remainingSeconds.value) == 8 ? 0 : 1;
+  let rate = checkFlags(compareResult);
+  if(typeMode.value == 2 && rate == 1.5) {
+    rate = 3;
+  }
+  // const type = Number(remainingSeconds.value) == 8 ? 0 : 1;
   // console.log('type', type);
 
   compareResult2.value = compareResult;
   rate2.value = rate;
 
   const timeDiff = submittoken.value ? Date.now() - submittoken.value : 0;
+
+  // 简单模式
+  if(typeMode.value == 2) {
+    swipe_status = 1;
+  }
+  
   async function updateAccountData() {
     // 更新AccountData
     let params = new URLSearchParams();
@@ -456,11 +760,14 @@ const clickSubmitUser = async (action, done) => {
     params.append("nid", nid.value);
     params.append("rate", rate);
     params.append("swipe", 1);
-    params.append("type", type);
+    params.append("type", typeMode.value);
     params.append("coins", totalCoins.value);
+    params.append("swipe_status", swipe_status);
 
     // 更新Accountlog
     params.append("log", JSON.stringify(compareResult));
+
+    // params.append("log", JSON.stringify(compareResult));
     params.append("title", titleData.value);
     params.append("username", username.value);
     params.append("alias", alias.value);
@@ -471,6 +778,10 @@ const clickSubmitUser = async (action, done) => {
     params.append("checkedNoneOfAbove", checkedNoneOfAbove.value);
     params.append("checkedSpell", checkedSpell.value);
     params.append("teacher_mark", timeDiff);
+    params.append("complete_status", complete_status.value);
+    params.append("earning_half", isBroken.value);
+    params.append("listening_number", listening_number.value);
+    params.append("writingwords_number", dictationModeIndices.value.size);
 
     // 更新spell vocabulary
     params.append("data_words", JSON.stringify(spellVocabulary.value));
@@ -520,7 +831,7 @@ const clickSubmitUser = async (action, done) => {
       timeoutPromise,
     ]);
     accountDataResult2.value = accountDataResult;
-    console.log('accountDataResult: ', accountDataResult);
+    console.log("accountDataResult: ", accountDataResult);
     new_final_rate.value = accountDataResult.rate;
     if (accountDataResult["message"] === "不能提交相同内容") {
       // 如果账户数据已提交，显示对话框并跳转
@@ -580,6 +891,8 @@ const clickSubmitUser = async (action, done) => {
     sessionStorage.removeItem("numberShowAnswer");
     sessionStorage.removeItem("numberTransparent");
     sessionStorage.removeItem("numberPrev");
+    sessionStorage.removeItem("numberPauseBlackOverlay");
+
     changeOverlayColor("rgba(128, 128, 128, 0.6)");
 
     // 跳转（只有在没有超时的情况下才执行）
@@ -607,9 +920,6 @@ const clickSubmitUser = async (action, done) => {
 // 手写模式
 const handwriteInputs = ref({});
 const handwriteAnswers = ref([]);
-const onEnter = (event) => {
-  event.target.blur(); // 收起移动端输入法
-};
 // 点击选项
 const resultDataTempt = ref([]);
 const selectedIndexes = ref({});
@@ -873,6 +1183,20 @@ function isSelected(index, index2) {
 
 const submitFlag = ref(false);
 function isSelectionTrue(currentSlideIndex) {
+  if (isDictationItem(currentSlideIndex)) {
+    const item = mergedData.value[currentSlideIndex];
+    const userAnswers = (dictationInputs.value[item.序号] || [])
+      .flatMap((value) => splitAnswers(value))
+      .map((value) => normalizeText(value))
+      .filter(Boolean);
+    const correctAnswers = splitAnswers(item.正确答案).map((value) =>
+      normalizeText(value)
+    );
+    if (userAnswers.length === 0 || correctAnswers.length === 0) {
+      return false;
+    }
+    return userAnswers.some((answer) => correctAnswers.includes(answer));
+  }
   if (mergedData.value[currentSlideIndex]["is_spell"]) {
     const userSelection = resultDataTempt.value[currentSlideIndex]["用户选择"];
     const correctAnswer = mergedData.value[currentSlideIndex]["正确答案"];
@@ -947,6 +1271,11 @@ const goToNext = () => {
     console.log("handwriteAnswers: ", handwriteAnswers.value);
     // console.log("mergedData.value: ", mergedData.value);
     hasSelection = true;
+  } else if (isDictationItem(currentSlideIndex)) {
+    const item = mergedData.value[currentSlideIndex];
+    const inputs = dictationInputs.value[item.序号] || [];
+    hasSelection =
+      inputs.length > 0 && inputs.every((value) => value.trim() !== "");
   } else {
     hasSelection = currentSlideSelections.some(
       (key) => selectedIndexes.value[key]
@@ -960,7 +1289,7 @@ const goToNext = () => {
   // 判断对错
   const areEqual = isSelectionTrue(currentSlideIndex);
   // console.log("areEqual: ", areEqual);
-  if (!areEqual && flagPassiveMagic.value) {
+  if (!areEqual && flagPassiveMagic.value && !isDictationItem(currentSlideIndex)) {
     const randomChance = Math.random();
     if (randomChance < 0.7) {
       // if (randomChance < 2) {
@@ -1168,7 +1497,7 @@ const pauseSwipe = () => {
   if (pauseBlackOverlay.value <= 0) {
     showToast("场外支援已达上限");
     return;
-  };
+  }
   pauseBlackOverlay.value -= 1;
 
   showAnswerButton.value = true;
@@ -1268,6 +1597,10 @@ const purchaseMagic = (buttonStyle) => {
 
   // 赠送答案
   if (buttonStyle == "autoSelect") {
+    if (complete_status.value == 1) {
+      showToast("闪电⚡️模式下，无法赠送答案");
+      return;
+    }
     if (numberShowAnswer.value > 0) {
       showToast("剩余0，才可购买");
       return;
@@ -1382,7 +1715,27 @@ const numberShowAnswer = ref(2);
 const disabledShowAnswer = ref(false);
 const showAnswerButton = ref(true);
 const showAnswerIsSpell = ref("");
-const autoSelectAnswer = (index, flag) => {
+
+const useShowAnswerOnce = (flag) => {
+  numberShowAnswer.value -= 1;
+  if (flag == false && numberShowAnswer.value <= 0) {
+    disabledShowAnswer.value = true;
+  }
+  handleButtonClick("autoSelectAnswer");
+  showAnswerButton.value = false;
+  changeOverlayColor("rgba(128, 128, 128, 0.6)");
+};
+
+const applyDictationHelp = async (index, flag, answerItem) => {
+  const serialNumber = synonymsOptions.value[index].序号;
+  const correctAnswers = splitAnswers(answerItem?.正确答案 || answerItem?.中文);
+  if (correctAnswers.length === 0) return;
+
+  dictationInputs.value[serialNumber] = [correctAnswers.join("；")];
+  useShowAnswerOnce(flag);
+};
+
+const autoSelectAnswer = async (index, flag) => {
   if (synonymsOptions.value[index].排除 == "手写") {
     showToast("拼写无法点金");
     return;
@@ -1401,6 +1754,10 @@ const autoSelectAnswer = (index, flag) => {
     showMagicStart.value = false; // 隐藏魔法启动，变小字体
     swipeHelpRef.value.hide();
     const correctAnswers = answerItem.中文.split("；");
+    if (isDictationItem(index)) {
+      await applyDictationHelp(index, flag, answerItem);
+      return;
+    }
     if (synonymsOptions.value[index]["is_spell"]) {
       // 拼写题提示答案
       function getRandomLetters(word) {
@@ -1616,15 +1973,27 @@ const totalSlides = ref(25); // 假设总共有5个轮播图项
 const isButtonDisabled = ref(false);
 const remainingSeconds = ref(0);
 const circleColor = ref("#1989fa");
-// const circleColor = computed(() => {
-//   if (remainingCount.value <= 5) {
-//     return '#ee0a24'; // 红色 - 当剩余5个时
-//   } else if (timerRate.value <= 50) {
-//     return '#ffd21e'; // 黄色 - 当进度过半时
-//   } else {
-//     return '#1989fa'; // 蓝色 - 默认状态
-//   }
-// });
+const isHandwriteKeyboardVisible = computed(() => {
+  return (
+    synonymsOptions.value[currentIndex.value]?.排除 === "手写" &&
+    !showOverlay.value
+  );
+});
+const handwriteActionsRef = ref(null);
+const handwriteActionsHeight = ref(128);
+let handwriteActionsResizeObserver = null;
+const updateHandwriteActionsHeight = () => {
+  const el = handwriteActionsRef.value?.$el || handwriteActionsRef.value;
+  if (!el) {
+    return;
+  }
+  handwriteActionsHeight.value =
+    Math.ceil(el.getBoundingClientRect().height) + 8;
+};
+watch(isHandwriteKeyboardVisible, () => {
+  nextTick(updateHandwriteActionsHeight);
+});
+
 // 使用computed计算属性来确定按钮的文本
 const textButtonNext = computed(() => {
   if (currentIndex.value === 0) {
@@ -1651,6 +2020,9 @@ const buttonColor = computed(() => {
   }
 });
 function getSingeOrMultiChoice(currentIndex) {
+  if (isDictationItem(currentIndex)) {
+    return "默写";
+  }
   if (synonymsOptions.value[currentIndex]["is_spell"]) {
     return "多选";
   }
@@ -1683,7 +2055,7 @@ const resetTimer = () => {
   setTimeout(() => {
     // 判断对错
     const areEqual = isSelectionTrue(currentIndex.value);
-    if (!areEqual && flagPassiveMagic.value) {
+    if (!areEqual && flagPassiveMagic.value && !isDictationItem(currentIndex.value)) {
       const randomChance = Math.random();
       if (randomChance < 0.7) {
         const audiosurpriseSound = new Audio(surpriseSound);
@@ -1854,17 +2226,20 @@ const resetExecutionForNewWord = () => {
 const { pause, resume } = useIntervalFn(
   () => {
     if (currentRate.value > 0) {
-      // console.log(totalSlides.value);
       timerRate.value -= 100 / (autoplay2.value / 70);
       handleTimerRate();
       if (
         timerRate.value <= 20 &&
         currentIndex.value != totalSlides.value - 1
       ) {
-        isButtonDisabled.value = true; // 禁用按钮
+        isButtonDisabled.value = true;
       }
     } else {
-      resetTimer();
+      pause(); // 先暂停计时器
+      // 关键优化：给主线程喘息的 100ms，让积压的 click 事件先跑完
+      setTimeout(() => {
+        resetTimer();
+      }, 100);
     }
   },
   70,
@@ -1886,6 +2261,8 @@ const handleSwipeChange = (index) => {
   if (!isExtended.value) {
     if (synonymsOptions.value[index].is_spell) {
       autoplay2.value = autoplayInit.value + 17000;
+    } else if (isDictationItem(index)) {
+      autoplay2.value = autoplayInit.value + getDictationExtraSeconds(index) * 1000;
     } else if (
       synonymsOptions.value[index].排除 === "试题" ||
       synonymsOptions.value[index].排除 === "手写"
@@ -1899,6 +2276,8 @@ const handleSwipeChange = (index) => {
     // woohoo后增加2秒
     if (synonymsOptions.value[index].is_spell) {
       autoplay2.value = autoplayInit.value + 19000;
+    } else if (isDictationItem(index)) {
+      autoplay2.value = autoplayInit.value + (getDictationExtraSeconds(index) + 2) * 1000;
     } else if (
       synonymsOptions.value[index].排除 === "试题" ||
       synonymsOptions.value[index].排除 === "手写"
@@ -1945,7 +2324,7 @@ watch(overlayColor, (newColor) => {
     newColor
   );
 });
-// const handleBeforeUnload = (event) => {
+
 const handlePageHide = (event) => {
   sessionStorage.setItem(
     "numberShowAnswer",
@@ -1956,7 +2335,17 @@ const handlePageHide = (event) => {
     JSON.stringify(numberTransparent.value)
   );
   sessionStorage.setItem("numberPrev", JSON.stringify(numberPrev.value));
+  sessionStorage.setItem(
+    "numberPauseBlackOverlay",
+    JSON.stringify(pauseBlackOverlay.value)
+  );
 };
+
+// 简单模式
+const typeMode = ref(0);
+
+
+
 
 // 连胜奖励
 const shoWinningStreak = ref(false);
@@ -1993,6 +2382,8 @@ const redirect = (accountDataResult) => {
       lock_spell: lock_spell.value,
       complement: 1.5 - rate2.value, // 注意这里需要用 .value
       RateOrigin: RateOrigin.value,
+      swipe_status: accountDataResult.swipe_status,
+      isBroken: isBroken.value,
     },
   });
 };
@@ -2009,7 +2400,7 @@ const handleVisibilityChange = () => {
       message: "中途退出，重新背诵",
       theme: "round-button",
     }).then(() => {
-            router.push({
+      router.push({
         path: "/homepage",
       });
     });
@@ -2040,12 +2431,25 @@ const spellVocabulary = ref([]);
 const checkedNoneOfAbove = ref(false);
 const checkedSpell = ref(false);
 const RateOrigin = ref(0);
+
+// 地狱模式
+const complete_status = ref(0);
+const lightningRef = ref(null);
+
+// 听力模式
+const listening_number = ref(0);
+const listeningModeIndices = ref(new Set()); // 新增：保存被抽中听力模式单词的索引
+
 onBeforeUnmount(() => {
   window.removeEventListener("pagehide", handlePageHide);
 });
 onUnmounted(() => {
   window.removeEventListener("beforeunload", handleBeforeUnload);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
+  if (handwriteActionsResizeObserver) {
+    handwriteActionsResizeObserver.disconnect();
+    handwriteActionsResizeObserver = null;
+  }
 });
 function handleBeforeUnload(event) {
   event.preventDefault();
@@ -2054,6 +2458,17 @@ function handleBeforeUnload(event) {
 onMounted(async () => {
   document.addEventListener("visibilitychange", handleVisibilityChange);
   window.addEventListener("beforeunload", handleBeforeUnload);
+  
+  nextTick(() => {
+    updateHandwriteActionsHeight();
+    const el = handwriteActionsRef.value?.$el || handwriteActionsRef.value;
+    if (el && window.ResizeObserver) {
+      handwriteActionsResizeObserver = new ResizeObserver(() => {
+        updateHandwriteActionsHeight();
+      });
+      handwriteActionsResizeObserver.observe(el);
+    }
+  });
   if (flagTheme.value == 1) {
     srcTheme.value = shouxieSrcGoatAndWolf;
     srcswipeEncouragement.value = swipeEncouragementSrcGoatAndWolf;
@@ -2074,6 +2489,7 @@ onMounted(async () => {
     }
   });
   RateOrigin.value = history.state.RateOrigin;
+
   // 被动技能
   flagPassiveMagic.value = passive_magic.value;
   // flagPassiveMagic.value = true;
@@ -2081,36 +2497,41 @@ onMounted(async () => {
 
   // 监测恶意刷新
   window.addEventListener("pagehide", handlePageHide);
-  // 监测恶意刷新
-  numberShowAnswer.value = JSON.parse(
-    sessionStorage.getItem("numberShowAnswer")
+  pauseBlackOverlay.value = JSON.parse(
+    sessionStorage.getItem("numberPauseBlackOverlay")
   );
-  if (numberShowAnswer.value == null) numberShowAnswer.value = 2;
+  if (pauseBlackOverlay.value == null) {
+    pauseBlackOverlay.value = 5;
+  }
+  console.log("pauseBlackOverlay.value: ", pauseBlackOverlay.value);
 
-  numberTransparent.value = JSON.parse(
-    sessionStorage.getItem("numberTransparent")
-  );
-  if (numberTransparent.value == null) numberTransparent.value = 2;
+  // 判断是否有刷新（地狱模式 < 3,正常模式 < 5）
+  complete_status.value = history.state.complete_status;
 
-  numberPrev.value = JSON.parse(sessionStorage.getItem("numberPrev"));
-  if (numberPrev.value == null) {
-    numberPrev.value = 2;
+  console.log("complete_status: ", complete_status.value);
+
+
+  // 判断是否为简单模式
+  typeMode.value = history.state?.type ?? 0;
+  console.log("type.value: ", typeMode.value);
+
+
+
+  let flagRefresh = false;
+  if (pauseBlackOverlay.value) {
+    if (complete_status.value == 1) {
+      if (pauseBlackOverlay.value < 3) {
+        flagRefresh = true;
+      }
+    } else if (complete_status.value == 0) {
+      if (pauseBlackOverlay.value < 5) {
+        flagRefresh = true;
+      }
+    }
   }
 
-  if (
-    numberShowAnswer.value != 2 ||
-    numberTransparent.value != 2 ||
-    numberPrev.value != 2
-  ) {
-    showDialog({
-      title: "警告",
-      theme: "round-button",
-      message: "监测到可能的恶意刷新\n场外支援被重置到刷新前状态",
-    });
-  }
-  if (numberShowAnswer.value == 0) {
-    disabledShowAnswer.value = true;
-  }
+  console.log("flagRefresh: ", flagRefresh);
+
   currentRate.value = 100;
   timerRate.value = 100;
   const toast = showLoadingToast({
@@ -2167,6 +2588,9 @@ onMounted(async () => {
     if (data.coins >= 2000) {
       isRewardEligible.value = false;
     }
+    isBroken.value = history.state.isBroken;
+    priceMagic.value = isBroken.value ? 800 : priceMagic.value;
+
     nid.value = history.state.nid;
     synonymsOptions.value = data.synonyms;
 
@@ -2203,6 +2627,10 @@ onMounted(async () => {
     console.log("answers: ", answers.value);
 
     titleData.value = data.title;
+    listening_number.value = history.state.listening_number || 0;
+    writingwords_number.value = history.state.writingwords_number || 0;
+    // listening_number.value = 20;
+    console.log("listening_number: ", listening_number.value);
 
     // console.log("titleData: ", titleData.value);
 
@@ -2215,16 +2643,56 @@ onMounted(async () => {
       "小升初",
       "六年级",
     ];
-    if (keywords.some((keyword) => titleData.value.includes(keyword))) {
-      numberShowAnswer.value = 1;
-      numberTransparent.value = 1;
-      numberPrev.value = 1;
+
+    if (flagRefresh) {
+      showDialog({
+        title: "警告",
+        theme: "round-button",
+        message: "监测到可能的恶意刷新\n场外支援被重置到刷新前状态",
+      });
+      // 刷新进入
+      numberShowAnswer.value = JSON.parse(
+        sessionStorage.getItem("numberShowAnswer")
+      );
+      numberTransparent.value = JSON.parse(
+        sessionStorage.getItem("numberTransparent")
+      );
+      numberPrev.value = JSON.parse(sessionStorage.getItem("numberPrev"));
+      pauseBlackOverlay.value = JSON.parse(
+        sessionStorage.getItem("numberPauseBlackOverlay")
+      );
+      if (pauseBlackOverlay.value < 3) {
+        pauseBlackOverlay.value = 3;
+      }
+    } else {
+      // 正常进入
+      if (complete_status.value) {
+        console.log("正常进入，地狱模式");
+        // 地狱模式
+        pauseBlackOverlay.value = 3;
+        numberShowAnswer.value = 0;
+        numberPrev.value = 1;
+        numberTransparent.value = 1;
+      } else {
+        console.log("正常进入，普通模式");
+        if (keywords.some((keyword) => titleData.value.includes(keyword))) {
+          // 初中
+          numberShowAnswer.value = 1;
+          numberTransparent.value = 1;
+          numberPrev.value = 1;
+        }
+
+        if (titleData.value.length <= 20) {
+          // 高中<=20
+          numberShowAnswer.value = 1;
+        }
+      }
+    }
+    if (numberShowAnswer.value == 0) {
+      disabledShowAnswer.value = true;
     }
 
-    if (titleData.value.length <= 20) {
-      numberShowAnswer.value = 1;
-    }
-
+    // numberShowAnswer.value = 20;
     username.value = data.username;
 
     submittoken.value = new Date().getTime();
@@ -2233,13 +2701,6 @@ onMounted(async () => {
     const trueCount_is_spell =
       synonymsOptions.value.filter((item) => item.is_spell === true).length ||
       0;
-    standardTimeInterval.value =
-      (totalSlides.value - 1) * (autoplay2.value / 1000) +
-      0.2 * totalSlides.value +
-      trueCount_is_spell * 17000 +
-      3;
-    // console.log("standardTimeInterval: ", standardTimeInterval.value);
-
     flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
 
     // 获取用户金币
@@ -2295,6 +2756,54 @@ onMounted(async () => {
       }
     }
 
+    // ================= [新增代码开始] 处理听力模式随机池 =================
+    if (listening_number.value > 0) {
+      const eligibleIndices = [];
+      synonymsOptions.value.forEach((item, idx) => {
+        // 排除 手写、拼写
+        if (item.排除 !== "手写" && !item.is_spell) {
+          // 确保音频缓存中有该单词
+          const hasAudio =
+            audioCache.has(item.英文) ||
+            (window.preloadedAudioData && window.preloadedAudioData[item.英文]);
+          if (hasAudio) {
+            eligibleIndices.push(idx);
+          }
+        }
+      });
+
+      // 随机打乱 eligibleIndices (Fisher-Yates 洗牌)
+      for (let i = eligibleIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [eligibleIndices[i], eligibleIndices[j]] = [
+          eligibleIndices[j],
+          eligibleIndices[i],
+        ];
+      }
+
+      // 截取所需数量（如果需要的数量超过了可变范围，截取最大可用范围）
+      const countToSelect = Math.min(
+        listening_number.value,
+        eligibleIndices.length
+      );
+      const selectedIndices = eligibleIndices.slice(0, countToSelect);
+      listeningModeIndices.value = new Set(selectedIndices);
+    }
+    buildDictationItems();
+    flagSingleOrMultiChoice.value = getSingeOrMultiChoice(0);
+    if (isDictationItem(0)) {
+      autoplay2.value = autoplayInit.value + getDictationExtraSeconds(0) * 1000;
+      remainingSeconds.value = (autoplay2.value / 1000).toString();
+    }
+    standardTimeInterval.value =
+      (totalSlides.value - 1) * (autoplayInit.value / 1000) +
+      0.2 * totalSlides.value +
+      trueCount_is_spell * 17000 +
+      getTotalDictationExtraSeconds() +
+      3;
+    // console.log("standardTimeInterval: ", standardTimeInterval.value);
+    // ================= [新增代码结束] =================
+
     toast.close();
 
     // 启动滚动文字动画
@@ -2302,6 +2811,14 @@ onMounted(async () => {
     rollingTextRef.value.start();
 
     // 在动画启动后隐藏覆盖层
+    if (complete_status.value) {
+      lightningRef.value?.strike();
+      const audiothunderSound = new Audio(thunderSound);
+      audiothunderSound.play().catch((err) => {
+        console.warn("播放失败：", err);
+      });
+    }
+
     setTimeout(() => {
       showOverlay.value = false;
     }, 1500);
@@ -2315,11 +2832,7 @@ onMounted(async () => {
 <template>
   <div class="parent-container">
     <div class="nav-bar-container">
-      <van-nav-bar
-        title="学生题目"
-        left-text=""
-      >
-      </van-nav-bar>
+      <van-nav-bar title="学生题目" left-text=""> </van-nav-bar>
     </div>
 
     <van-overlay
@@ -2334,22 +2847,45 @@ onMounted(async () => {
       </div>
       <div class="space">
         <div class="space-buttons">
-          <div style="color: gray; font-size: 12px; margin-left: 10px">
-            剩余
-            <van-rolling-text
-              ref="rollingTextRef"
-              :start-num="usercoinsStart"
-              :target-num="usercoinsEnd"
-              :auto-start="false"
-              :duration="durationRolling"
-              style="
-                --van-rolling-text-color: gray;
-                --van-rolling-text-item-width: 10px;
-                --van-rolling-text-font-size: 12px;
-                --van-rolling-text-gap: -2px;
-              "
-            />
-            金币：每次消费 {{ priceMagic }}
+          <div
+            style="
+              display: flex;
+              justify-content: flex-end;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 8px;
+              color: gray;
+              font-size: 12px;
+              margin-left: 10px;
+            "
+          >
+            <div
+              style="display: flex; align-items: center; white-space: nowrap"
+            >
+              剩余
+              <van-rolling-text
+                ref="rollingTextRef"
+                :start-num="usercoinsStart"
+                :target-num="usercoinsEnd"
+                :auto-start="false"
+                :duration="durationRolling"
+                style="
+                  --van-rolling-text-color: gray;
+                  --van-rolling-text-item-width: 10px;
+                  --van-rolling-text-font-size: 12px;
+                  --van-rolling-text-gap: -2px;
+                  margin: 0 4px;
+                "
+              />
+              金币：每次消费 {{ priceMagic }}
+            </div>
+
+            <div
+              v-if="isBroken"
+              style="display: flex; align-items: center; white-space: nowrap"
+            >
+              💔 消费增加
+            </div>
           </div>
           <div
             v-show="showAnswerButton"
@@ -2489,7 +3025,34 @@ onMounted(async () => {
                           "
                         >
                           <div v-if="item.排除 !== '手写'">
-                            {{ item.序号 + ". " + item.英文 }}
+                            {{ item.序号 + ". " }}
+                            <span
+                              v-if="listeningModeIndices.has(index)"
+                              @click.stop="speakWord(item.英文)"
+                              style="
+                                display: inline-block;
+                                padding: 2px 8px;
+                                background: #f0f0f0;
+                                border-radius: 12px;
+                                cursor: pointer;
+                                user-select: none;
+                              "
+                            >
+                              🔊
+                              <span
+                                style="
+                                  font-size: 16px;
+                                  font-weight: normal;
+                                  color: gray;
+                                "
+                                >听音盲猜</span
+                              >
+                            </span>
+                            <span v-else-if="isDictationItem(index)">
+                              {{ item.英文
+                              }}
+                            </span>
+                            <span v-else>{{ item.英文 }}</span>
                           </div>
                           <div v-else>
                             {{ item.序号 + ". " + answers[index].中文 }}
@@ -2512,7 +3075,26 @@ onMounted(async () => {
                           "
                         >
                           <div style="font-weight: 400; font-size: 14px">
-                            {{ item.序号 + ". " + item.英文 }}
+                            {{ item.序号 + ". " }}
+                            <span
+                              v-if="listeningModeIndices.has(index)"
+                              @click.stop="speakWord(item.英文)"
+                              style="
+                                display: inline-block;
+                                padding: 2px 8px;
+                                background: #f0f0f0;
+                                border-radius: 12px;
+                                cursor: pointer;
+                                user-select: none;
+                              "
+                            >
+                              🔊 <span style="color: gray">听音盲猜</span>
+                            </span>
+                            <span v-else-if="isDictationItem(index)">
+                              {{ item.英文
+                              }}
+                            </span>
+                            <span v-else>{{ item.英文 }}</span>
                           </div>
                           <!-- <div style="font-size: 10px; color: red">
                             {{ flagSingleOrMultiChoice }}
@@ -2541,13 +3123,26 @@ onMounted(async () => {
                       </template>
                     </van-cell>
 
-                    <div v-if="item.排除 !== '手写'">
+                    <div v-if="isDictationItem(index)">
+                      <div class="dictation-card">
+                        <div class="dictation-line">
+                          <span class="dictation-underline-label"></span>
+                          <input
+                            v-model="dictationInputs[item.序号][0]"
+                            class="dictation-input"
+                            type="text"
+                            placeholder="请输入中文"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div v-else-if="item.排除 !== '手写'">
                       <van-cell-group>
                         <van-cell
                           v-for="(chinese, index2) in item.中文"
                           :key="index2"
                           clickable
-                          @click="toggleCheckChinese(index, index2)"
+                          @click.stop="toggleCheckChinese(index, index2)"
                           :class="
                             isSelected(index, index2) ? 'selected-cell' : ''
                           "
@@ -2577,13 +3172,11 @@ onMounted(async () => {
                       class="handwrite-area"
                       style="padding: 0.5rem 1rem"
                     >
-                      <van-field
+                      <HandwriteKeyboard
                         v-model="handwriteInputs[index]"
                         placeholder="请拼写对应的英文"
-                        input-align="left"
-                        clearable
-                        style="border-bottom: 1px solid #ccc"
-                        @keydown.enter.prevent="onEnter"
+                        :active="index === currentIndex"
+                        :bottom-offset="handwriteActionsHeight"
                       />
                     </div>
                   </div>
@@ -2596,7 +3189,9 @@ onMounted(async () => {
     </van-row>
 
     <van-row
+      ref="handwriteActionsRef"
       class="my-swipe-container"
+      :class="{ 'handwrite-actions-fixed': isHandwriteKeyboardVisible }"
       justify="space-between"
       :style="{ marginTop: currentHeight - rowMarginTop + 'px' }"
     >
@@ -2642,11 +3237,16 @@ onMounted(async () => {
             </van-circle>
           </van-col>
         </van-row>
-        <van-row style="margin-top: px">
+        <van-row style="margin-top: px; align-items: center">
           <van-col span="9" offset="">
-            <van-button type="warning" @click="pauseSwipe" size="normal"
-              >场外支援: {{ pauseBlackOverlay }}</van-button
-            >
+            <van-button type="warning" @click="pauseSwipe" size="normal">
+              场外支援: {{ pauseBlackOverlay }}
+            </van-button>
+          </van-col>
+          <van-col>
+            <div v-if="isBroken" style="font-size: small; color: red">
+              💔 消费增加 收益减半
+            </div>
           </van-col>
         </van-row>
       </van-col>
@@ -2672,6 +3272,7 @@ onMounted(async () => {
       @continue="handleContinue"
       @auto-close="handleAutoClose"
     />
+    <LightningStrike ref="lightningRef" />
   </div>
 </template>
 
@@ -2797,6 +3398,45 @@ html {
   border-bottom: none; /* 移除最后一个中文选项的分割线 */
 }
 
+.dictation-card {
+  background: #fff;
+  padding: 18px 18px 24px;
+}
+
+.dictation-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.dictation-line:last-child {
+  margin-bottom: 0;
+}
+
+.dictation-underline-label {
+  width: 30px;
+  height: 1px;
+  background: #d9d9d9;
+  flex: 0 0 auto;
+}
+
+.dictation-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-bottom: 1px solid #dcdfe6;
+  outline: none;
+  padding: 9px 2px 10px;
+  font-size: 16px;
+  background: transparent;
+  color: #222;
+}
+
+.dictation-input:focus {
+  border-bottom-color: #1989fa;
+}
+
 .colon {
   display: inline-block;
   margin: 0 4px;
@@ -2834,6 +3474,19 @@ html {
   margin-right: auto;
   display: flex;
   justify-content: center;
+}
+
+.my-swipe-container.handwrite-actions-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  width: 100%;
+  margin: 0;
+  padding: 8px 0 calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .time-circle {

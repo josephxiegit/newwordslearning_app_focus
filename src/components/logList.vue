@@ -89,6 +89,8 @@ function processData(res) {
         complement,
         diamondConsume,
         teacher_mark,
+        complete_status,
+        earning_half,
       } = item;
       const formattedCreateTime = formatDateString(create_time); // 使用新变量存储格式化后的日期
 
@@ -108,11 +110,13 @@ function processData(res) {
         .replace(/must"t/g, "mustn't")
         .replace(/nustn"t/g, "nustn't")
         .replace(/needn"t/g, "needn't")
+        .replace(/need"t/g, "need't")
         .replace(/o"clock/g, "o'clock")
         .replace(/won"t/g, "won't")
         .replace(/it"s/g, "it's")
         .replace(/we"re/gi, "we're'")
         .replace(/You"re/gi, "you're'")
+        .replace(/You"ve/gi, "you've'")
         .replace(/they"re/gi, "they're'")
         .replace(/doesn"t/gi, "doesn't")
         .replace(/don"t/gi, "don't")
@@ -121,6 +125,9 @@ function processData(res) {
         .replace(/you"d/gi, "you'd")
         .replace(/one"s/gi, "one's")
         .replace(/let"s/gi, "let's")
+        .replace(/who"s/gi, "who's")
+        .replace(/weren"t/gi, "weren't")
+        .replace(/daren"t/gi, "daren't")
         .replace(/it" hard/gi, "it' hard")
         .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
@@ -130,13 +137,26 @@ function processData(res) {
         .replace(/\bTrue\b/g, "true")
         .replace(/\bNone\b/g, "null");
 
-      try {
-        parsedLog = JSON.parse(dataString);
-      } catch (error) {
-        console.error("JSON parsing error:", error);
-        console.log("原始log数据:", log);
-        parsedLog = log;
+      // try {
+      parsedLog = JSON.parse(dataString);
+      // }
+      // catch (error) {
+      //   console.error("JSON parsing error:", error);
+      //   console.log("原始log数据:", log);
+      //   parsedLog = log;
+      // }
+
+      // ================= [新增代码开始] 统计听力盲猜的词汇数量 =================
+      let listening_number = 0;
+      if (Array.isArray(parsedLog)) {
+        listening_number = parsedLog.filter(logItem => logItem.听力 === true).length;
       }
+      let writingwords_number = 0;
+      if (Array.isArray(parsedLog)) {
+        writingwords_number = parsedLog.filter(logItem => logItem.默写 === true).length;
+      }
+      // ================= [新增代码结束] =================
+
       if (swipe !== "投票") {
         const hasFlagField = parsedLog.every((logItem) => "flag" in logItem);
         // console.log('parsedLog: ', parsedLog);
@@ -200,17 +220,338 @@ function processData(res) {
         complement,
         diamondConsume,
         teacher_mark,
+        complete_status,
+        earning_half,
+        listening_number,
+        writingwords_number,
       };
     })
     .filter((item) => item !== null); // 过滤掉任何因错误而生成的 null 项
 }
-
 function getListData() {
   filteredFiles.value = [];
   pageIndex.value = 0;
   finished.value = false;
   loading.value = false;
   onLoad();
+}
+
+// 下拉菜单按钮
+const valueDropdown1 = ref(0);
+const optionDropdown1 = [
+  { text: "功能按钮", value: 0 },
+  { text: "多选", value: 1 },
+];
+const navRightText = computed(() => (isMultiMode.value ? "确认" : "刷新"));
+
+const isMultiMode = computed(() => valueDropdown1.value === 1);
+const selectedKeys = ref(new Set());
+
+const userLogCountMap = computed(() => {
+  const map = new Map();
+
+  selectedItemsRef.value.forEach((item) => {
+    const u = item?.username;
+    const len = Array.isArray(item?.log) ? item.log.length : 0;
+    if (!u) return;
+
+    map.set(u, (map.get(u) || 0) + len);
+  });
+
+  return map;
+});
+
+const filteredItems = computed(() =>
+  selectedItemsRef.value.filter((item) =>
+    selectedUsers.value.has(item?.username)
+  )
+);
+
+const filteredSelectedItemsCount = computed(() => filteredItems.value.length);
+
+function getItemKey(item) {
+  return (
+    item.id ??
+    `${item.create_time || ""}__${item.username || ""}__${item.title || ""}`
+  );
+}
+
+function isSelected(item) {
+  return selectedKeys.value.has(getItemKey(item));
+}
+
+function toggleSelect(item) {
+  const key = getItemKey(item);
+  if (selectedKeys.value.has(key)) {
+    selectedKeys.value.delete(key);
+  } else {
+    selectedKeys.value.add(key);
+  }
+  // 触发响应式（Set 需要重新赋值一次更稳）
+  selectedKeys.value = new Set(selectedKeys.value);
+}
+function onNavRightClick() {
+  if (isMultiMode.value) {
+    confirmMultiSelect();
+  } else {
+    reloadPage();
+  }
+}
+function confirmMultiSelect() {
+  if (selectedKeys.value.size === 0) {
+    showToast("请先选择日志");
+    return;
+  }
+
+  // 从当前列表中筛出被选中的完整 item
+  const selectedItems = filteredFiles.value.filter((item) =>
+    selectedKeys.value.has(getItemKey(item))
+  );
+
+  console.log("选中的完整数据：", selectedItems);
+
+  // 如果你想逐条看
+  selectedItems.forEach((item, idx) => {
+    console.log(`第 ${idx + 1} 条：`, item);
+  });
+
+  // 汇总数据
+  const wordMap = new Map();
+  selectedItems.forEach((item) => {
+    const username = item.username;
+
+    if (Array.isArray(item.log)) {
+      item.log.forEach((word) => {
+        if (!wordMap.has(word)) {
+          wordMap.set(word, {
+            count: 0,
+            users: new Set(),
+          });
+        }
+
+        const record = wordMap.get(word);
+        record.count += 1;
+        record.users.add(username);
+      });
+    }
+  });
+
+  // 转成可打印的数组，并加自增序号
+  let index = 1;
+  const summaryList = [];
+
+  wordMap.forEach((value, word) => {
+    summaryList.push({
+      序号: index++,
+      单词: word,
+      出现次数: value.count,
+      用户名: [...value.users].join("、"),
+    });
+  });
+  // 按出现次数从大到小排序
+  summaryList.sort((a, b) => b.出现次数 - a.出现次数);
+
+  // 排序后重新生成序号
+  summaryList.forEach((item, idx) => {
+    item.序号 = idx + 1;
+  });
+
+  selectedItemsRef.value = selectedItems; // 保存数据源（用于弹窗内二次筛选）
+  selectedUsers.value = new Set(
+    selectedItems.map((x) => x.username).filter(Boolean)
+  ); // 默认全选所有用户名
+  selectedUsers.value = new Set(selectedUsers.value); // 稳一下响应式
+
+  // 打印结果（推荐 table，最好看）
+  console.table(summaryList);
+  summaryListRef.value = summaryList;
+  tsvText.value = toTSV(summaryList);
+  selectedItemsCount.value = selectedItems.length;
+  showSummaryPopup.value = true;
+
+  // 示例：退出多选模式
+  valueDropdown1.value = 0;
+}
+
+function onCellClick(item, index) {
+  if (isMultiMode.value) {
+    toggleSelect(item);
+    return;
+  }
+  // 正常模式才触发你原来的逻辑
+  toggleDetail(index);
+}
+
+// 投票复制汇总
+// 1) Popup 相关状态
+const showSummaryPopup = ref(false); // 控制弹窗显示
+const summaryListRef = ref([]); // 弹窗里用于“预览表格”的数据（用户名截断）
+const tsvText = ref(""); // 弹窗里用于“复制到Excel”的完整 TSV
+const tsvTextarea = ref(null); // template 里 <textarea ref="tsvTextarea" ... />
+const selectedItemsRef = ref([]); // 保存 confirmMultiSelect 得到的 selectedItems（完整 item）
+
+// 选中日志中涉及到的所有用户名（完整、不重复）
+const allUsernames = computed(() => {
+  const set = new Set();
+  selectedItemsRef.value.forEach((item) => {
+    if (item?.username) set.add(item.username);
+  });
+  return Array.from(set);
+});
+const allUsernamesText = computed(() => allUsernames.value.join("、"));
+const selectedUsers = ref(new Set());
+function isUserSelected(u) {
+  return selectedUsers.value.has(u);
+}
+
+function toggleUser(u) {
+  if (selectedUsers.value.has(u)) selectedUsers.value.delete(u);
+  else selectedUsers.value.add(u);
+
+  selectedUsers.value = new Set(selectedUsers.value); // 触发响应式
+  refreshSummaryByUsers(); // 切换后立刻刷新汇总
+}
+
+// 便捷：全选 / 全不选
+function selectAllUsers() {
+  selectedUsers.value = new Set(allUsernames.value);
+  refreshSummaryByUsers();
+}
+function clearAllUsers() {
+  selectedUsers.value = new Set();
+  refreshSummaryByUsers();
+}
+function buildSummaryListFromItems(items) {
+  const wordMap = new Map();
+
+  items.forEach((item) => {
+    const username = item?.username;
+    if (!Array.isArray(item?.log)) return;
+
+    item.log.forEach((w) => {
+      const word = String(w ?? "").trim();
+      if (!word) return;
+
+      if (!wordMap.has(word)) {
+        wordMap.set(word, { count: 0, users: new Set() });
+      }
+      const record = wordMap.get(word);
+      record.count += 1;
+      if (username) record.users.add(username);
+    });
+  });
+
+  const summaryList = [];
+  wordMap.forEach((value, word) => {
+    summaryList.push({
+      单词: word,
+      出现次数: value.count,
+      用户名: [...value.users].join("、"),
+    });
+  });
+
+  summaryList.sort((a, b) => b.出现次数 - a.出现次数);
+  summaryList.forEach((row, idx) => (row.序号 = idx + 1));
+
+  return summaryList;
+}
+function refreshSummaryByUsers() {
+  // 1) 如果一个用户名都没选中，就展示空汇总（你也可以选择展示全部）
+  if (selectedUsers.value.size === 0) {
+    summaryListRef.value = [];
+    tsvText.value = toTSV([]);
+    return;
+  }
+
+  // 2) 过滤 selectedItemsRef
+  const filteredItems = selectedItemsRef.value.filter((item) =>
+    selectedUsers.value.has(item?.username)
+  );
+
+  // 3) 重新生成汇总
+  const summaryList = buildSummaryListFromItems(filteredItems);
+
+  // 4) 更新弹窗展示 + 复制内容 + 合计（你顶部的 totalWords/totalCount 已经是 computed）
+  summaryListRef.value = summaryList;
+  tsvText.value = toTSV(summaryList);
+}
+
+// 2) 合计信息（顶部显示）
+const selectedItemsCount = ref(0); // 选中日志条数（你 confirmMultiSelect 里已赋值）
+const totalWords = computed(() => summaryListRef.value.length);
+const totalCount = computed(() =>
+  summaryListRef.value.reduce((sum, r) => sum + (Number(r?.出现次数) || 0), 0)
+);
+
+// 3) TSV 生成：Excel 直接粘贴自动分列
+function toTSV(summaryList, withHeader = false) {
+  const lines = [];
+
+  if (withHeader) {
+    const headers = ["序号", "单词", "出现次数", "用户名"];
+    lines.push(headers.join("\t"));
+  }
+
+  summaryList.forEach((row) => {
+    lines.push(
+      [
+        row?.序号 ?? "",
+        row?.单词 ?? "",
+        row?.出现次数 ?? "",
+        row?.用户名 ?? "",
+      ].join("\t")
+    );
+  });
+
+  return lines.join("\n");
+}
+
+// 4) 用户名预览：窄屏只显示部分，但复制仍是完整用户名
+function makeUsersPreview(fullUsersString, maxShow = 2) {
+  if (!fullUsersString) return "";
+  const arr = fullUsersString
+    .split("、")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (arr.length <= maxShow) return arr.join("、");
+  return `${arr.slice(0, maxShow).join("、")}…（共${arr.length}人）`;
+}
+
+// 5) 弹窗预览表格用的数据：增加 “用户名预览” 字段
+const previewRows = computed(() =>
+  summaryListRef.value.map((r) => ({
+    ...r,
+    用户名预览: makeUsersPreview(r?.用户名, 2), // 这里 2 表示最多显示 2 个用户名
+  }))
+);
+
+// 6) 一键复制：始终复制完整 TSV（tsvText）
+async function copySummaryToClipboard() {
+  const text = tsvText.value || "";
+  if (!text.trim()) {
+    showToast("没有可复制的数据");
+    return;
+  }
+
+  // 优先 Clipboard API
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast("已复制（完整），可直接粘贴到 Excel");
+    return;
+  } catch (e) {
+    // fallback：选中隐藏 textarea
+    try {
+      const el = tsvTextarea.value;
+      if (!el) throw new Error("no textarea");
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      showToast("已复制（完整），可直接粘贴到 Excel");
+    } catch (err) {
+      showToast("复制失败：请手动复制");
+    }
+  }
 }
 
 // 筛选日志
@@ -249,6 +590,7 @@ const columnsVarieties = [
   { text: "游戏", value: "游戏" },
   { text: "滑动", value: "滑动" },
   { text: "复习", value: "复习" },
+  { text: "回顾", value: "回顾" },
 ];
 const onConfirmVariety = ({ selectedValues }) => {
   showVarietyPicker.value = false;
@@ -307,7 +649,7 @@ const filteredStudent = () => {
     return;
   }
   filterData().then((res) => {
-    // console.log("res: ", res);
+    console.log("res: ", res);
     let data = processData(res.data);
     filteredFiles.value = [...data];
     showFliterBox.value = false;
@@ -385,8 +727,23 @@ const getUncertainVocabulary = () => {
   });
 };
 
+
+// 回顾详情
+const showDetailPopup = ref(false);
+const currentDetail = ref(null);
+const openDetail = (detail) => {
+  currentDetail.value = detail;
+  showDetailPopup.value = true;
+};
+
 const toggleDetail = async (index) => {
   const detail = filteredFiles.value[index];
+  console.log("detail: ", detail);
+  console.log("title: ", detail["title"]);
+  if(detail["title"] == "回顾词汇"){
+    openDetail(detail);
+    return
+  }
   detailPopup.value = detail;
   detailMode.value = detail["swipe"];
   detailName.value = detail["username"];
@@ -641,11 +998,19 @@ const reloadPage = () => {
     <div class="nav-bar-container">
       <van-nav-bar
         title="账户日志"
-        right-text="刷新"
+        :right-text="navRightText"
         left-text="筛选"
-        @click-right="reloadPage()"
+        @click-right="onNavRightClick"
         @click-left="showFliterBox = true"
       />
+    </div>
+    <div class="dropdown-container">
+      <van-dropdown-menu>
+        <van-dropdown-item
+          v-model="valueDropdown1"
+          :options="optionDropdown1"
+        />
+      </van-dropdown-menu>
     </div>
 
     <router-view />
@@ -667,6 +1032,9 @@ const reloadPage = () => {
       >
       <van-tabbar-item icon="shopping-cart-o" replace to="/purchaseLog"
         >消费</van-tabbar-item
+      >
+      <van-tabbar-item icon="envelop-o" replace to="/notificationLog"
+        >通知</van-tabbar-item
       >
     </van-tabbar>
 
@@ -732,17 +1100,115 @@ const reloadPage = () => {
       </van-cell-group>
     </van-popup>
 
+    <!-- 复制汇总投票 -->
+    <van-popup
+      v-model:show="showSummaryPopup"
+      :position="popupPosition"
+      round
+      :style="{ height: popupHeight, width: popupWidth }"
+      closeable
+    >
+      <!-- 顶部栏：标题 + 合计 + 按钮（置顶） -->
+      <div class="summary-header">
+        <div class="summary-title">单词汇总</div>
+
+        <div class="summary-stats">
+          <span>选中日志：{{ filteredSelectedItemsCount }}</span>
+          <span>汇总单词：{{ totalWords }}</span>
+          <span>总出现：{{ totalCount }}</span>
+          <div class="summary-users">
+            <div class="summary-users-title">
+              <van-button
+                size="mini"
+                type="primary"
+                plain
+                @click="selectAllUsers"
+                >全选</van-button
+              >
+              <van-button
+                size="mini"
+                type="default"
+                plain
+                @click="clearAllUsers"
+                >清空</van-button
+              >
+            </div>
+
+            <div class="summary-users-buttons">
+              <van-tag
+                v-for="u in allUsernames"
+                :key="u"
+                :type="isUserSelected(u) ? 'primary' : 'default'"
+                :plain="!isUserSelected(u)"
+                round
+                @click="toggleUser(u)"
+              >
+                {{ u }}
+                <span style="margin-left: 4px; opacity: 0.7">
+                  ({{ userLogCountMap.get(u) || 0 }})
+                </span>
+              </van-tag>
+            </div>
+          </div>
+        </div>
+
+        <div class="summary-actions">
+          <van-button
+            size="small"
+            type="primary"
+            @click="copySummaryToClipboard"
+          >
+            复制（完整）
+          </van-button>
+          <van-button
+            size="small"
+            type="default"
+            @click="showSummaryPopup = false"
+          >
+            关闭
+          </van-button>
+        </div>
+      </div>
+
+      <!-- 表头（置顶） -->
+      <div class="summary-table-head">
+        <div class="c1">序号</div>
+        <div class="c2">单词</div>
+        <div class="c3">次数</div>
+        <div class="c4">用户名（预览）</div>
+      </div>
+
+      <!-- 表体：可滚动 -->
+      <div class="summary-table-body">
+        <div class="summary-row" v-for="row in previewRows" :key="row.序号">
+          <div class="c1">{{ row.序号 }}</div>
+          <div class="c2">{{ row.单词 }}</div>
+          <div class="c3">{{ row.出现次数 }}</div>
+          <div class="c4">{{ row.用户名预览 }}</div>
+        </div>
+      </div>
+
+      <!-- 隐藏：用于复制的完整 TSV（不展示，但复制用它） -->
+      <textarea
+        ref="tsvTextarea"
+        class="summary-hidden-ta"
+        :value="tsvText"
+        readonly
+      />
+    </van-popup>
+
     <!-- 日志列表 -->
     <van-list
       v-model="loading"
       :finished="finished"
       finished-text="没有更多了"
       @load="onLoad"
-      style="margin-bottom: 80px"
+      style="margin-bottom: 80px; padding-top: 0px"
     >
       <van-swipe-cell
         v-for="(item, index) in filteredFiles"
-        :key="index"
+        :key="getItemKey(item)"
+        :disabled="isMultiMode"
         stop-propagation
       >
         <template #right>
@@ -763,12 +1229,17 @@ const reloadPage = () => {
         </template>
         <van-cell
           :title="generateTitle(item)"
-          is-link
-          @click="toggleDetail(index)"
+          :is-link="!isMultiMode"
+          :clickable="!isMultiMode"
+          @click.stop="onCellClick(item, index)"
         >
           <template #label>
             <div class="label-line">{{ item.create_time.slice(2) }}</div>
-            <div v-if="item.teacher_mark != ''">{{ item.teacher_mark }}</div>
+            <div v-if="item.teacher_mark != ''" style="display: flex">
+              {{ item.teacher_mark }}
+              <div v-if="item.complete_status">⚡️</div>
+              <div v-if="item.earning_half">💔</div>
+            </div>
           </template>
           <template #title>
             <div v-if="item.title == '多组复习'">
@@ -784,48 +1255,64 @@ const reloadPage = () => {
             <div v-else>{{ generateTitle(item) }}</div>
           </template>
           <template #value>
-            <div>
-              <div style="color: black">
-                <div
-                  v-if="item.complement == 1"
-                  style="display: flex; justify-content: flex-end"
-                >
-                  <van-tag type="primary" plain mark size="medium"
-                    >{{ item.log.length - item.falseCount }} /
+            <div
+              style="display: flex; align-items: center; justify-content: right"
+            >
+              <div>
+                <div style="color: black">
+                  <div
+                    v-if="item.complement == 1"
+                    style="display: flex; justify-content: flex-end"
+                  >
+                    <van-tag type="primary" plain mark size="medium">
+                      {{ item.log.length - item.falseCount }} /
+                      {{ item.log.length }}
+                    </van-tag>
+                    <div
+                      v-if="
+                        item.diamondConsume != null && item.diamondConsume != ''
+                      "
+                      style="margin-top: 0.2rem"
+                    >
+                      &nbsp;💎
+                    </div>
+                  </div>
+                  <div
+                    v-if="item.complement == 0 && item.swipe == '投票'"
+                    style="display: flex; justify-content: flex-end"
+                  >
                     {{ item.log.length }}
-                  </van-tag>
-                  <div
-                    v-if="
-                      item.diamondConsume != null && item.diamondConsume != ''
-                    "
-                    style="margin-top: 0.2rem"
-                  >
-                    &nbsp;💎
+                  </div>
+                  <div v-else style="display: flex; justify-content: flex-end">
+                    {{ item.log.length - item.falseCount }} /
+                    {{ item.log.length }}
+                    <div
+                      v-if="
+                        item.diamondConsume != null &&
+                        item.diamondConsume != '' &&
+                        item.swipe != '滑动'
+                      "
+                    >
+                      &nbsp;💎
+                    </div>
                   </div>
                 </div>
-                <div
-                  v-if="item.complement == 0 && item.swipe == '投票'"
-                  style="display: flex; justify-content: flex-end"
-                >
-                  {{ item.log.length }}
-                </div>
-                <div v-else style="display: flex; justify-content: flex-end">
-                  {{ item.log.length - item.falseCount }} /
-                  {{ item.log.length }}
-                  <div
-                    v-if="
-                      item.diamondConsume != null &&
-                      item.diamondConsume != '' &&
-                      item.swipe != '滑动'
-                    "
-                  >
-                    &nbsp;💎
-                  </div>
-                </div>
+                <div style="color: red">{{ item.username }}</div>
               </div>
-              <div style="color: red">{{ item.username }}</div>
+              <van-checkbox
+                v-if="isMultiMode"
+                :model-value="isSelected(item)"
+                @click.stop="toggleSelect(item)"
+              />
             </div>
           </template>
+          <!-- <template #icon>
+            <van-checkbox
+              v-if="isMultiMode"
+              :model-value="isSelected(item)"
+              @click.stop="toggleSelect(item)"
+            />
+          </template> -->
         </van-cell>
       </van-swipe-cell>
     </van-list>
@@ -1034,6 +1521,8 @@ const reloadPage = () => {
                 {{ item.排除 === "手写" ? item.答案 : item.英文 }}
 
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
+                <van-tag v-if="item.听力" type="warning" mark>听</van-tag>
+                <van-tag v-if="item.默写" type="danger" mark>默</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>
@@ -1086,6 +1575,42 @@ const reloadPage = () => {
       </van-cell-group>
     </van-popup>
 
+    <!-- 回顾详情 -->
+    <van-popup
+      v-model:show="showDetailPopup"
+      position="bottom"
+      round
+      closeable
+      :style="{ height: '90%', display: 'flex', flexDirection: 'column' }"
+    >
+      <div v-if="currentDetail" class="popup-container">
+        <div class="popup-header">
+          <h2 class="popup-title">{{ currentDetail.title }}</h2>
+          <div class="popup-info">
+            <span>🧑‍🎓 学生：{{ currentDetail.username }}</span>
+            <span>🕒 时间：{{ currentDetail.create_time }}</span>
+          </div>
+        </div>
+
+        <div class="popup-list-wrap">
+          <div
+            v-for="(item, index) in currentDetail.log"
+            :key="index"
+            class="log-card"
+            :class="{ 'highlight-red': item.flag === false }"
+          >
+            <div class="word-main">
+              <span class="word-en">{{ item.英文 }}</span>
+              <span class="word-cn">{{ item.中文 }}</span>
+            </div>
+            <div class="word-stats">
+              <span class="times-badge">次数: {{ item.次数 }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
     <!-- 投票详情 -->
     <van-popup
       v-model:show="showVote"
@@ -1100,7 +1625,7 @@ const reloadPage = () => {
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
               用户名：{{ detailName }}
             </div>
-            
+
             <div
               style="
                 margin-right: 2.5rem;
@@ -1127,9 +1652,7 @@ const reloadPage = () => {
                 display: flex;
               "
             >
-              <div style="margin-top: 0rem">
-                选择{{ detailList.length }}个
-              </div>
+              <div style="margin-top: 0rem">选择{{ detailList.length }}个</div>
             </div>
 
             <div style="margin-top: 0.1rem; color: gray">
@@ -1216,8 +1739,21 @@ const reloadPage = () => {
 .nav-bar-container {
   position: sticky;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: #fff;
 }
+.dropdown-container {
+  position: sticky;
+  top: 40px;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  background: #fff;
+  padding-bottom: 10px;
+}
+
 .van-cell {
   display: flex;
   align-items: center; /* 这会使所有子元素垂直居中 */
@@ -1231,5 +1767,203 @@ const reloadPage = () => {
 .selected-cell {
   background-color: #f0f8ff; /* 浅蓝色背景 */
   border-left: 3px solid #1989fa; /* 左侧蓝色边框 */
+}
+
+/* 投票 */
+.summary-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.summary-stats {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.summary-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.summary-table-head {
+  position: sticky;
+  top: 94px; /* 头部高度大概值；如果你头部更高/更矮，调整这里 */
+  z-index: 9;
+  background: #fff;
+  display: flex;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summary-table-body {
+  height: calc(
+    78vh - 94px - 36px
+  ); /* 78vh - header(约94) - 表头(约36)，可按实际微调 */
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+
+.summary-row {
+  display: flex;
+  padding: 8px 0;
+  border-bottom: 1px dashed #f0f0f0;
+  font-size: 12px;
+}
+
+/* 列宽：窄屏友好 */
+.c1 {
+  width: 44px;
+  flex: 0 0 44px;
+}
+.c2 {
+  width: 110px;
+  flex: 0 0 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c3 {
+  width: 50px;
+  flex: 0 0 50px;
+  text-align: right;
+  padding-right: 6px;
+}
+.c4 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #333;
+}
+
+.summary-hidden-ta {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.summary-users {
+  display: block; /* 单独一行 */
+  margin-top: 4px;
+  font-size: 12px;
+  color: #555;
+  word-break: break-all; /* 防止超长 */
+}
+
+.summary-users-title {
+  margin-bottom: 10px;
+  margin-top: -6px;
+}
+
+/* 回顾详情 */
+.popup-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f7f8fa; /* 浅灰色背景让卡片更立体 */
+}
+
+/* 顶部信息区 */
+.popup-header {
+  padding: 24px 20px 16px;
+  background-color: #fff;
+  flex-shrink: 0;
+  border-bottom: 1px solid #ebedf0;
+}
+
+.popup-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #323233;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.popup-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #969799;
+}
+
+/* 列表滚动区 */
+.popup-list-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 单个词汇卡片 */
+.log-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+}
+
+/* 左侧中英文 */
+.word-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.word-en {
+  font-size: 16px;
+  font-weight: bold;
+  color: #323233;
+}
+
+.word-cn {
+  font-size: 13px;
+  color: #646566;
+}
+
+/* 右侧次数标签 */
+.times-badge {
+  background-color: #f2f3f5;
+  color: #969799;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* 🔥 核心要求：flag 为 false 的加红 */
+.highlight-red .word-en,
+.highlight-red .word-cn {
+  color: #ee0a24 !important; /* Vant 的标准红色 */
+}
+
+.highlight-red .times-badge {
+  background-color: #fef0f0;
+  color: #ee0a24;
 }
 </style>

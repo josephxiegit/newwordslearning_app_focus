@@ -605,7 +605,7 @@ const goToNext = async () => {
         isCheckboxDisabled.value = false;
         answerShow.value = false;
         buttonText.value = "显示答案";
-        console.log("resultDataTempt: ", resultDataTempt.value);
+        // console.log("resultDataTempt: ", resultDataTempt.value);
         if (
           synonymsOptions.value[currentIndex.value + 1]["排除"] !== "试题" &&
           synonymsOptions.value[currentIndex.value + 1]["排除"] !== "手写"
@@ -690,13 +690,12 @@ const goToNext = async () => {
           } finally {
             isLoading.value = false;
           }
-          // console.log("reviewRequired.value: ", reviewRequired.value);
-          // console.log("activeWinningStreak.value: ", activeWinningStreak.value);
+
+          const addCount = isBroken.value ? 0.5 : 1;
           const message =
             reviewRequired.value === 1
-              ? "恭喜！💎数量增加+1"
-              : "恭喜！💎数量增加+2";
-          // console.log(reviewRequired.value === 1 ? 111 : 222);
+              ? `恭喜！💎数量增加+${addCount}`
+              : `恭喜！💎数量增加+${addCount * 2}`;
 
           setTimeout(() => {
             showSuccessToast(message);
@@ -757,6 +756,7 @@ const goToNext = async () => {
 };
 
 // 购物车
+const isBroken = ref(false);
 const mistakesList = ref([]);
 const submitList = ref([]);
 const cartIcon = ref(null); // 购物车图标的引用
@@ -962,6 +962,7 @@ async function updateAccountLog() {
   params.append("method", "updateAccountLog");
   params.append("username", username.value);
   params.append("submittoken", submittoken.value);
+  params.append("isBroken", isBroken.value);
   params.append("account_id_list", account_id_list.value);
   params.append("flagReview", "复习任务");
   params.append("reviewRequired", reviewRequired.value);
@@ -1130,6 +1131,9 @@ onMounted(async () => {
 
     username.value = history.state.username;
     account_id_list.value = history.state.account_id_list;
+
+    isBroken.value = history.state.isBroken;
+    console.log("isBroken: ", isBroken.value);
 
     synonymsOptions.value.forEach((item, index) => {
       item.序号 = index + 1;
@@ -1451,6 +1455,18 @@ onMounted(async () => {
         >
       </van-col>
       <van-col span="2"></van-col>
+    </van-row>
+    <van-row
+      style="
+        margin-top: 0.5rem;
+        color: red;
+        font-size: small;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      "
+    >
+      💔 收益减半
     </van-row>
 
     <!-- vocabulary meaning -->

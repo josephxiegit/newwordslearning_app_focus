@@ -71,8 +71,8 @@ const searchAnswer = (item, index) => {
         answerLogResult.value = [];
       } else {
         // answerLogResult.value = res.filter((item) => item.type === "预习");
-        answerLogResult.value = res.filter((item) =>
-          item.type?.includes("预习") || item.type?.includes("滑动")
+        answerLogResult.value = res.filter(
+          (item) => item.type?.includes("预习") || item.type?.includes("滑动")
         );
         console.log("answerLogResult: ", answerLogResult.value);
         reviewLogResult.value = res.filter((item) => item.type == "检查");
@@ -194,23 +194,30 @@ const searchLog = (item, index) => {
             .replace(/"t /g, "'t ")
             .replace(/"m /g, "'m ")
             .replace(/can"t/g, "can't")
+            .replace(/couldn"t/g, "could't")
             .replace(/mustn"t/g, "mustn't")
             .replace(/must"t/g, "mustn't")
             .replace(/nustn"t/g, "nustn't")
             .replace(/o"clock/g, "o'clock")
             .replace(/needn"t/g, "needn't")
+            .replace(/need"t/g, "need't")
             .replace(/o"clock/g, "o'clock")
             .replace(/won"t/g, "won't")
             .replace(/it"s/g, "it's")
             .replace(/we"re/gi, "we're'")
             .replace(/You"re/gi, "you're'")
+            .replace(/You"ve/gi, "you've'")
             .replace(/they"re/gi, "they're'")
             .replace(/doesn"t/gi, "doesn't")
             .replace(/don"t/gi, "don't")
             .replace(/I"ll/gi, "I'll")
             .replace(/you"ll/gi, "you'll")
+            .replace(/you"d/gi, "you'd")
             .replace(/one"s/gi, "one's")
             .replace(/let"s/gi, "let's")
+            .replace(/who"s/gi, "who's")
+            .replace(/weren"t/gi, "weren't")
+            .replace(/daren"t/gi, "daren't")
             .replace(/it" hard/gi, "it' hard")
             .replace(/days"(?:,(?=[\u4e00-\u9fa5])|(?![,\]]))/gi, "days'");
 
@@ -247,8 +254,15 @@ const searchLog = (item, index) => {
           }
 
           item.true_length = trueCount;
+
+          // ================= [新增代码开始] 统计日志中的听力题数量 =================
+          item.listening_number =
+            item.log.filter((entry) => entry.听力 === true).length || 0;
+          item.writingwords_number =
+            item.log.filter((entry) => entry.默写 === true).length || 0;
+          // ================= [新增代码结束] =================
         });
-        console.log("log:", res);
+
         // 计算场外支援总次数
         totalHelp.value = res.reduce((acc, log) => {
           return (
@@ -259,8 +273,6 @@ const searchLog = (item, index) => {
           );
         }, 0);
 
-        // console.log("totalHelp:", totalHelp.value);
-
         // 计算熬夜问题
         isLateNight.value = res.some((log) => {
           const date = new Date(log.create_time);
@@ -270,9 +282,10 @@ const searchLog = (item, index) => {
           // 检查时间是否在晚上 11:30 到早上 6:00 之间
           return (hours === 23 && minutes >= 30) || hours === 0 || hours < 6;
         });
-        // console.log("isLateNight:", isLateNight.value);
 
-        answerLogList.value = res.filter((item) => item.swipe !== "复习" && item.swipe !== "滑动");
+        answerLogList.value = res.filter(
+          (item) => item.swipe !== "复习" && item.swipe !== "滑动"
+        );
         reviewLogList.value = res.filter((item) => item.swipe == "复习");
       }
       resolve();
@@ -563,7 +576,7 @@ const onLoadOriginalData = async (title = "全部") => {
     return;
   }
   loadingOriginalData.value = true;
-  isLoading.value = true;
+  // isLoading.value = true;
   const params = new URLSearchParams();
   params.append("method", "getViewerAccountDataPage");
   params.append("grade", title);
@@ -1056,7 +1069,7 @@ onMounted(async () => {
   // console.log("tabsName: ", tabsName.value);
 
   usersData.value = data.users;
-  console.log('usersData.value: ', usersData.value)
+  console.log("usersData.value: ", usersData.value);
   let users = data.users.map((item) => item.username);
   users.unshift("全部");
   sidesName.value = await getSidesNameReviews(users);
@@ -1182,7 +1195,17 @@ const reloadPage = () => {
               <template #title>
                 <div style="display: flex; align-items: center; gap: 0.5rem">
                   <span style="font-weight: 400; margin-bottom: 0rem">
-                    十五天：复习 {{ LastDaysReview.filter(r => r.swipe === '复习').length }} 次 · 滑动 {{ LastDaysReview.filter(r => r.swipe === '滑动').length }} 次
+                    十五天：复习
+                    {{
+                      LastDaysReview.filter((r) => r.swipe === "复习").length
+                    }}
+                    次 · 滑动回顾
+                    {{
+                      LastDaysReview.filter(
+                        (r) => r.swipe === "滑动" || r.title === "回顾词汇"
+                      ).length
+                    }}
+                    次
                   </span>
                   <van-button
                     round
@@ -1321,7 +1344,15 @@ const reloadPage = () => {
                           font-size: 10px;
                         "
                       >
-                        {{ processedTitle(item.title) }}
+                        <div>
+                          <template v-if="item.complete_status == 1"
+                            >⚡️
+                          </template>
+
+                          <template v-if="item.earning_half == 1">💔 </template>
+
+                          {{ processedTitle(item.title) }}
+                        </div>
                       </div>
                     </template>
 
@@ -1375,12 +1406,6 @@ const reloadPage = () => {
                         style="width: 27px; height: auto; margin-right: 0.5rem"
                         alt="Item List Complete"
                       />
-                      <img
-                        v-if="item.type == 2"
-                        src="../assets/item_list.png"
-                        style="width: 27px; height: auto; margin-right: 0.5rem"
-                        alt="Item List"
-                      />
                     </template>
 
                     <template #title>
@@ -1430,6 +1455,9 @@ const reloadPage = () => {
                             <div style="font-size: smaller; color: lightgray">
                               背诵时间：
                             </div>
+                            <div style="margin-top: 0.3rem">
+                              {{ item.create_time }}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1440,6 +1468,9 @@ const reloadPage = () => {
                         <div style="margin-bottom: 0.5rem">
                           {{ item.username }}
                         </div>
+                        <div style="margin-bottom: 0.5rem">
+                          {{ item.attempt }}次
+                        </div>
                         <div style="margin-top: 0rem">
                           {{ item.answers.length }}词
                         </div>
@@ -1447,16 +1478,17 @@ const reloadPage = () => {
                     </template>
 
                     <template #label>
-                      <van-rate
-                        v-model="item.rate"
-                        :size="50"
-                        color="#ffd21e"
-                        void-icon="chart-trending-o"
-                        icon="chart-trending-o"
-                        void-color="#eee"
-                        :count="1"
-                        readonly
-                        allow-half
+                      <img
+                        v-if="item.rate < 3"
+                        src="../assets/cry_emoji.png"
+                        style="width: 50px; height: auto"
+                        alt="Cry"
+                      />
+                      <img
+                        v-else
+                        src="../assets/smile_emoji.png"
+                        style="width: 50px; height: auto"
+                        alt="Smile"
                       />
                       <div
                         style="
@@ -1467,7 +1499,15 @@ const reloadPage = () => {
                           font-size: 10px;
                         "
                       >
-                        <div>{{ processedTitle(item.title) }}</div>
+                        <div>
+                          <template v-if="item.complete_status == 1"
+                            >⚡️
+                          </template>
+
+                          <template v-if="item.earning_half == 1">💔 </template>
+
+                          {{ processedTitle(item.title) }}
+                        </div>
                       </div>
                     </template>
                   </van-cell>
@@ -1512,7 +1552,17 @@ const reloadPage = () => {
                 <template #title>
                   <div style="display: flex; align-items: center; gap: 0.5rem">
                     <span style="font-weight: 400; margin-bottom: 0rem">
-                      十五天：复习 {{ LastDaysReview.filter(r => r.swipe === '复习').length }} 次 · 滑动 {{ LastDaysReview.filter(r => r.swipe === '滑动').length }} 次
+                      十五天：复习
+                      {{
+                        LastDaysReview.filter((r) => r.swipe === "复习").length
+                      }}
+                      次 · 滑动回顾
+                      {{
+                        LastDaysReview.filter(
+                          (r) => r.swipe === "滑动" || r.title === "回顾词汇"
+                        ).length
+                      }}
+                      次
                     </span>
                     <van-button
                       round
@@ -1649,7 +1699,17 @@ const reloadPage = () => {
                             font-size: 10px;
                           "
                         >
-                          <div>{{ processedTitle(item.title) }}</div>
+                          <div>
+                            <template v-if="item.complete_status == 1"
+                              >⚡️
+                            </template>
+
+                            <template v-if="item.earning_half == 1"
+                              >💔
+                            </template>
+
+                            {{ processedTitle(item.title) }}
+                          </div>
                         </div>
                       </template>
 
@@ -1714,16 +1774,6 @@ const reloadPage = () => {
                             margin-right: 0.5rem;
                           "
                           alt="Item List Complete"
-                        />
-                        <img
-                          v-if="item.type == 2"
-                          src="../assets/item_list.png"
-                          style="
-                            width: 27px;
-                            height: auto;
-                            margin-right: 0.5rem;
-                          "
-                          alt="Item List"
                         />
                       </template>
 
@@ -1794,16 +1844,17 @@ const reloadPage = () => {
                       </template>
 
                       <template #label>
-                        <van-rate
-                          v-model="item.rate"
-                          :size="50"
-                          color="#ffd21e"
-                          void-icon="chart-trending-o"
-                          icon="chart-trending-o"
-                          void-color="#eee"
-                          :count="1"
-                          readonly
-                          allow-half
+                        <img
+                          v-if="item.rate < 3"
+                          src="../assets/cry_emoji.png"
+                          style="width: 50px; height: auto"
+                          alt="Cry"
+                        />
+                        <img
+                          v-else
+                          src="../assets/smile_emoji.png"
+                          style="width: 50px; height: auto"
+                          alt="Smile"
                         />
                         <div
                           style="
@@ -1814,7 +1865,17 @@ const reloadPage = () => {
                             font-size: 10px;
                           "
                         >
-                          <div>{{ processedTitle(item.title) }}</div>
+                          <div>
+                            <template v-if="item.complete_status == 1"
+                              >⚡️
+                            </template>
+
+                            <template v-if="item.earning_half == 1"
+                              >💔
+                            </template>
+
+                            {{ processedTitle(item.title) }}
+                          </div>
                         </div>
                       </template>
                     </van-cell>
@@ -1895,7 +1956,11 @@ const reloadPage = () => {
         <div v-for="(item, index) in listDailyAndReview" :key="index">
           <van-cell :label="processedTitle(item.title)">
             <template #label>
-              <div class="label-line">{{ processedTitle(item.title) }}&nbsp;&nbsp;&nbsp;{{ item.teacher_mark }}</div>
+              <div class="label-line">
+                {{ processedTitle(item.title) }}&nbsp;&nbsp;&nbsp;{{
+                  item.teacher_mark
+                }}
+              </div>
             </template>
             <template #title>
               <div style="width: 120%">
@@ -1904,6 +1969,9 @@ const reloadPage = () => {
             </template>
             <template #value>
               <div v-if="item.swipe == '滑动'" style="color: red">滑动</div>
+              <div v-if="item.title == '回顾词汇'" style="color: blueviolet">
+                回顾
+              </div>
               <div v-if="item.swipe == '复习'" style="color: red">
                 {{ item.swipe }}
               </div>
@@ -2104,7 +2172,9 @@ const reloadPage = () => {
                   style="display: flex; justify-content: flex-start"
                 >
                   <van-tag type="primary" plain mark size="medium">
-                    正确率{{ item.true_length }} / {{ item.log.length }} &nbsp;&nbsp;&nbsp; {{ item.teacher_mark }}
+                    正确率{{ item.true_length }} /
+                    {{ item.log.length }} &nbsp;&nbsp;&nbsp;
+                    {{ item.teacher_mark }}
                   </van-tag>
                   <div
                     v-if="
@@ -2116,7 +2186,9 @@ const reloadPage = () => {
                   </div>
                 </div>
                 <div v-else style="display: flex; justify-content: flex-start">
-                  正确率{{ item.true_length }} / {{ item.log.length }} &nbsp;&nbsp;&nbsp; {{ item.teacher_mark }}
+                  正确率{{ item.true_length }} /
+                  {{ item.log.length }} &nbsp;&nbsp;&nbsp;
+                  {{ item.teacher_mark }}
                   <div
                     v-if="
                       item.diamondConsume != null && item.diamondConsume != ''
@@ -2128,7 +2200,11 @@ const reloadPage = () => {
               </template>
               <template #title>
                 <div style="font-size: smaller; font-weight: 700">
-                  <div>背诵时间:</div>
+                  <div style="display: flex">
+                    背诵时间:
+                    <div v-if="item.complete_status">⚡️</div>
+                    <div v-if="item.earning_half">💔</div>
+                  </div>
                   <div style="margin-top: 0.3rem">
                     {{ formatDate_log(item.create_time) }}
                   </div>
@@ -2222,7 +2298,9 @@ const reloadPage = () => {
             <div style="font-size: 18px; font-weight: 700; margin: 1rem">
               {{ detailName }} | {{ detailMode }}
               <div style="font-size: 10px; color: gray; margin-bottom: -0.5rem">
-                ID: {{ detailNid }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{ detailTeacherMmark }}
+                ID: {{ detailNid }}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{
+                  detailTeacherMmark
+                }}
               </div>
             </div>
 
@@ -2316,6 +2394,8 @@ const reloadPage = () => {
               <div style="font-size: larger; font-weight: 700">
                 {{ item.排除 === "手写" ? item.答案 : item.英文 }}
                 <van-tag v-if="item.is_spell" type="danger" mark>拼</van-tag>
+                <van-tag v-if="item.听力" type="warning" mark>听</van-tag>
+                <van-tag v-if="item.默写" type="danger" mark>默</van-tag>
                 <van-tag mark v-if="item.排除 === '手写'" type="warning">
                   写
                 </van-tag>

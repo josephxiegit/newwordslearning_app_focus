@@ -939,7 +939,7 @@ onMounted(async () => {
     console.log("totalSlides: ", totalSlides.value);
 
     submittoken.value = new Date().getTime();
-    console.log("submittoken: ", submittoken.value);
+    // console.log("submittoken: ", submittoken.value);
 
     username.value = history.state.username;
     account_id_list.value = history.state.account_id_list;

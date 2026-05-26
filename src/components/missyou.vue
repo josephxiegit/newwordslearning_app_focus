@@ -5,6 +5,7 @@
       <img :src="srcTheme" alt="miss you">
       <!-- 添加艺术字体的文字 -->
       <div class="miss-text">已经 {{ days }} 天没学习了？好想你啊！</div>
+      <div v-if="flagMissingThunder" class="thunder-text">⚡️首次背诵闪电模式触发</div>
       <!-- 关闭按钮 -->
       <button class="close-button" @click="hide">×</button>
     </div>
@@ -23,6 +24,11 @@ const props = defineProps({
   days: {
     type: Number,
     required: true
+  },
+  flagMissingThunder: {
+    type: Boolean,
+    required: true,
+    default: false
   }
 });
 
@@ -184,5 +190,14 @@ defineExpose(methods);
     top: 8px !important;
     right: 8px !important;
   }
+}
+.thunder-text {
+  margin-top: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  color: red;
+  text-align: center;
+  line-height: 1.4;
+  font-weight: bold;
 }
 </style>

@@ -116,7 +116,7 @@
         <div
           ref="cardRef"
           class="card"
-          :class="{ dragging: isDragging && showChinese, locked: isLocked || !showChinese }"
+          :class="{ dragging: isDragging && showChinese, locked: isLocked }"
           :style="cardStyle"
           @mousedown="handleDragStart"
           @mousemove="handleDragMove"
@@ -289,8 +289,10 @@ const rightHintOpacity = computed(() => {
   return dragOffset.value.x > 50 ? Math.min(1, dragOffset.value.x / 100) : 0;
 });
 
+// ===== 改动关键部分：删除了 !showChinese.value 的检查 =====
 const handleDragStart = (e) => {
-  if (isLocked.value || !showChinese.value) return; // 未显示中文直接拦截
+  if (isLocked.value) return;
+
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
   dragStart.value = { x: clientX, y: clientY };
@@ -299,7 +301,6 @@ const handleDragStart = (e) => {
 
 const handleDragMove = (e) => {
   if (!isDragging.value || isLocked.value) return;
-  if (!showChinese.value) return; // 未显示中文时不跟随拖动
   e.preventDefault();
   const clientX = e.type.includes("mouse") ? e.clientX : e.touches[0].clientX;
   const clientY = e.type.includes("mouse") ? e.clientY : e.touches[0].clientY;
@@ -312,6 +313,7 @@ const handleDragEnd = () => {
   if (!isDragging.value || isLocked.value) return;
   isDragging.value = false;
 
+  // 检查是否未显示中文 - 如果未显示就提示并重置
   if (!showChinese.value) {
     dragOffset.value = { x: 0, y: 0 };
     triggerRevealHint();
@@ -329,6 +331,7 @@ const handleDragEnd = () => {
     dragOffset.value = { x: 0, y: 0 };
   }
 };
+// ===== 改动结束 =====
 
 const handleKnow = () => {
   if (isLocked.value) return;
@@ -645,6 +648,9 @@ onMounted(async () => {
   
   const preventHorizontalScroll = (e) => {
     if (e.touches && e.touches.length === 1) {
+      const scrollable = e.target.closest(".unknown-list");
+      if (scrollable) return;
+
       e.preventDefault();
     }
   };

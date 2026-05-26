@@ -1,6 +1,32 @@
 import { createApp, reactive, provide, ref } from 'vue'
 // import './style.css'
 import App from './App.vue'
+
+// 防止localStorage损坏导致的应用崩溃，尝试读写localStorage，如果失败则清理并重载页面
+function checkAndRepairStorage() {
+    try {
+        localStorage.setItem('__health_check__', '1');
+        var val = localStorage.getItem('__health_check__');
+        if (val !== '1') throw new Error('read mismatch');
+        localStorage.removeItem('__health_check__');
+    } catch (e) {
+        console.warn('localStorage 损坏，执行清理', e);
+        var hasReloaded = false;
+        try {
+            localStorage.clear();
+        } catch (e2) {
+            if (window.cordova && window.cordova.plugins) {
+                cordova.exec(null, null, 'CacheCleaner', 'clear', []);
+            }
+        }
+        if (!hasReloaded) {
+            hasReloaded = true;
+            window.location.reload();
+        }
+    }
+}
+checkAndRepairStorage();
+
 import { createRouter, createWebHashHistory } from 'vue-router';
 import axiosPlugin from './plugins/axios';
 import HomePage from './components/homepage.vue';
@@ -42,6 +68,8 @@ import WordSwipeReview from './components/wordSwipeReview.vue';
 import WordSwipeReviewPc from './components/wordSwipeReviewPc.vue';
 import 'vant/lib/index.css';
 import Global from "./components/Global.vue";
+import WordMatchGame from "./components/wordMatchGame.vue";
+import WordMatchGamePc from "./components/wordMatchGamePc.vue";
 
 
 // 定义你的路由配置
@@ -99,6 +127,24 @@ const routes = [
         path: '/studentAccountSwipePc',
         name: 'studentAccountSwipePc',
         component: StudentAccountSwipePc,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/wordMatchGame',
+        name: 'wordMatchGame',
+        component: WordMatchGame,
+        meta: {
+            index: 1,
+            preventBack: true
+        }
+    },
+    {
+        path: '/wordMatchGamePc',
+        name: 'wordMatchGamePc',
+        component: WordMatchGamePc,
         meta: {
             index: 1,
             preventBack: true
@@ -519,7 +565,7 @@ import {
     Button, Checkbox, CheckboxGroup, NavBar, Cell, CellGroup, Overlay, Swipe, SwipeItem, Card, Progress, Step, Steps, Divider, ActionSheet,
     Loading, Dialog, Field, Notify, Toast, FloatingBubble, Badge, Circle, Grid, GridItem, Col, Row, ConfigProvider, BackTop, DropdownMenu, DropdownItem,
     Image as VanImage, Popup, Rate, Tabbar, TabbarItem, Picker, Tag, RollingText, RadioGroup, Radio, Space, Sidebar, SidebarItem, NoticeBar, Barrage,
-    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover, ImagePreview
+    SwipeCell, Icon, Highlight, FloatingPanel, Sticky, Collapse, CollapseItem, Search, Tab, Tabs, List, Calendar, Switch, CountDown, Stepper, Popover, ImagePreview, DatePicker
 } from 'vant';
 import 'vant/lib/index.css';
 
@@ -596,6 +642,7 @@ app.use(Button)
     .use(RollingText)
     .use(CollapseItem)
     .use(Calendar)
+    .use(DatePicker)
     .use(ImagePreview);
 // 使用vue-router
 app.use(router);
@@ -603,3 +650,9 @@ app.use(axiosPlugin);
 
 // 挂载Vue应用实例
 app.mount('#app');
+
+// 代办的
+window.__APP_ALIVE__ = true
+router.afterEach((to) => {
+    localStorage.setItem('lastRoute', to.fullPath)
+})

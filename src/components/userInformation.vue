@@ -109,6 +109,7 @@ const clickOrderList = () => {
 
 // 购买列表
 const isLoading = ref(false);
+const isBroken = ref(false);
 const priceBears = ref(20000);
 const pricePassiveMagic = ref(25000);
 const priceRemoveBarrage = ref(1200);
@@ -135,10 +136,14 @@ const getPurchaseList = (method) => {
 };
 const confirmPurchase = (index) => {
   let rate = originalData.value[index]["rate"];
-  // priceStar.value = rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
-  priceStar.value = rate >= 2.5 ? 1000 : 
-                  rate >= 2 ? 4500 : 
-                  rate >= 1.5 ? 8000 : 0;
+  if (isBroken.value) {
+    priceStar.value =
+      rate >= 2.5 ? 3000 : rate >= 2 ? 6000 : rate >= 1.5 ? 10000 : 0;
+  } else {
+    priceStar.value =
+      rate >= 2.5 ? 1000 : rate >= 2 ? 4500 : rate >= 1.5 ? 8000 : 0;
+  }
+
   // console.log("priceStar: ", priceStar.value);
   if (originalData.value[index]["rate"] < 1.5) {
     showToast("至少拥有1.5颗星星");
@@ -612,7 +617,6 @@ const purchasePreviewPro = () => {
     usercoins.value = userCoinsResponse["data_coins"][0]["coins"];
     isLoading.value = false;
 
-
     showToast("购买成功");
   });
 };
@@ -668,7 +672,14 @@ onMounted(async () => {
     userdiamonds.value = res["data_coins"][0]["diamonds"];
     userflowers.value = res["data_coins"][0]["flowers"];
     userPassiveMagic.value = res["passive_magic"];
+    isBroken.value = res["isBroken"];
+    if (isBroken.value) {
+      priceStar.value = 3000;
+    } else {
+      priceStar.value = 1000;
+    }
 
+    // console.log("isBroken: ", isBroken.value);
     console.log("user已经拥有的主题：", res["theme_name_list"]);
     console.log("user被动技能：", userPassiveMagic.value);
 
@@ -807,7 +818,11 @@ onMounted(async () => {
       </template>
       <template #price>
         <div class="price-container">
-          <span>价格：{{ priceStar }} ～ 8000 金币</span>
+          <span v-if="!isBroken">价格：{{ priceStar }} ～ 8000 金币</span>
+          <span v-else>
+            <div>价格：{{ priceStar }} ～ 10000 金币</div>
+            <div>💔 消费提高</div>
+          </span>
         </div>
       </template>
       <template #footer>
@@ -1027,7 +1042,12 @@ onMounted(async () => {
       </template>
     </van-card>
 
-    <van-card desc="查看答案减少一次" title="消除查看答案" class="custom-cell" style="margin-bottom: 4rem">
+    <van-card
+      desc="查看答案减少一次"
+      title="消除查看答案"
+      class="custom-cell"
+      style="margin-bottom: 4rem"
+    >
       <template #thumb>
         <img :src="viewPurchase" class="custom-thumb-image" alt="thumbnail" />
       </template>

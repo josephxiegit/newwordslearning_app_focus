@@ -18,6 +18,8 @@ import tutorial1 from "../assets/tutorial1.jpg";
 import tutorial2 from "../assets/tutorial2.jpg";
 import eyeImg from "../assets/eyePc.png";
 import cover3500Image from "../assets/3500_cover_2025.png";
+import cryEmoji from "../assets/cry_emoji.png";
+import smileEmoji from "../assets/smile_emoji.png";
 import angryWolf from "./angryWolf.vue";
 import missyou from "./missyou.vue";
 import challengeConfirm from "./challengeConfirm.vue";
@@ -28,7 +30,7 @@ import getPassive from "./getPassive.vue";
 import bearWarmup from "./bearWarmup.vue";
 import { checkApkUpdate, openDirectDownload } from "./useUpdateCheck.js";
 import { APP_VERSION_INFO } from "../version.js";
-import { goToNextPage } from './goToNextPage.js'
+import { goToNextPage } from "./goToNextPage.js";
 import {
   showFailToast,
   showToast,
@@ -158,7 +160,11 @@ const goToTutorial = () => {
 const gobackHomepage = () => {
   localStorage.removeItem("userData");
   localStorage.removeItem("expirationDate");
-  sessionStorage.removeItem("missyouAnimationShown");
+  Object.keys(sessionStorage).forEach((key) => {
+    if (key.startsWith("missyouAnimationShown")) {
+      sessionStorage.removeItem(key);
+    }
+  });
   sessionStorage.removeItem("shineThreeStarShown");
   localStorage.removeItem("theme_name");
   router.push({
@@ -168,7 +174,7 @@ const gobackHomepage = () => {
 
 // 刷新页面方法
 const reloadPage = () => {
-  window.location.replace(window.location.href);
+  window.location.reload();
 };
 
 // 显示答案
@@ -599,1883 +605,7 @@ async function getSpellVocabulary(account_data_id) {
   });
 }
 const lock_spell = ref(false);
-// const goToNextPage = (
-//   index,
-//   data,
-//   mode,
-//   reversd_number = 0,
-//   none_of_above = 0,
-//   type = 0,
-//   is_spell_number = 3
-// ) => {
-//   // 删除并备份试题
-//   const shiti_backup = [];
-//   for (let i = data.synonyms.length - 1; i >= 0; i--) {
-//     const synonym = data.synonyms[i];
-//     if (synonym["排除"] === "试题" || synonym["排除"] === "手写") {
-//       // 备份
-//       shiti_backup.push({
-//         synonym: synonym,
-//         answer: data.answers[i],
-//       });
-//       // 删除对应的项
-//       data.synonyms.splice(i, 1);
-//       data.answers.splice(i, 1);
-//     }
-//   }
 
-//   console.log("处理后 data:", data);
-//   console.log("备份的 shiti_backup:", shiti_backup);
-
-//   // console.log("data", data);
-//   isInChooseMode.value = false;
-//   // 判断6个还是7个选项
-//   let numberOption;
-//   if (none_of_above && !checkedNoneOfAbove.value) {
-//     numberOption = 7;
-//   } else {
-//     numberOption = 6;
-//   }
-
-//   // 为真多选作准备
-//   const excludedChineseSet2 = new Set(
-//     data.synonyms
-//       .filter((s) => s.排除 === "无")
-//       .flatMap((s) => {
-//         const answerObj = data.answers.find((a) => a.英文 === s.英文);
-//         if (!answerObj) return [];
-//         return answerObj.中文.includes("；")
-//           ? answerObj.中文.split("；").map((w) => w.trim())
-//           : [answerObj.中文.trim()];
-//       })
-//   );
-//   // console.log("excludedChineseSet2:", excludedChineseSet2);
-
-//   let allChineseSet2 = new Set(
-//     data.answers
-//       .flatMap((answer) => {
-//         const chinese = answer?.中文;
-//         if (!chinese) return []; // 如果中文不存在，返回空数组
-
-//         // 按分号拆分并去除两端空格
-//         return chinese.split("；").map((word) => word.trim());
-//       })
-//       .filter(
-//         (word) =>
-//           word && // 过滤掉空字符串
-//           !excludedChineseSet2.has(word) // 检查是否在排除集中
-//       )
-//   );
-//   // console.log("allChineseSet2: ", allChineseSet2);
-
-//   function shuffle(array) {
-//     let currentIndex = array.length,
-//       temporaryValue,
-//       randomIndex;
-
-//     // While there remain elements to shuffle...
-//     while (0 !== currentIndex) {
-//       // Pick a remaining element...
-//       randomIndex = Math.floor(Math.random() * currentIndex);
-//       currentIndex -= 1;
-
-//       // And swap it with the current element.
-//       temporaryValue = array[currentIndex];
-//       array[currentIndex] = array[randomIndex];
-//       array[randomIndex] = temporaryValue;
-//     }
-
-//     return array;
-//   }
-//   // 不拼接选项
-//   function processData2(data, numberOption) {
-//     // 1. 乱序 synonyms
-//     const shuffledSynonyms = shuffle([...data.synonyms]);
-
-//     // 生成排除词集合
-//     const excludedChineseSet = new Set(
-//       data.synonyms
-//         .filter((s) => s.排除 === "无")
-//         .flatMap((s) => {
-//           const answerObj = data.answers.find((a) => a.英文 === s.英文);
-//           if (!answerObj) return [];
-//           return answerObj.中文.includes("；")
-//             ? answerObj.中文.split("；").map((w) => w.trim())
-//             : [answerObj.中文.trim()];
-//         })
-//     );
-//     // console.log("excludedChineseSet:", excludedChineseSet);
-
-//     let allChineseSet = new Set(
-//       data.answers
-//         .flatMap((answer) => {
-//           const chinese = answer?.中文;
-//           if (!chinese) return []; // 如果中文不存在，返回空数组
-
-//           // 按分号拆分并去除两端空格
-//           return chinese.split("；").map((word) => word.trim());
-//         })
-//         .filter(
-//           (word) =>
-//             word && // 过滤掉空字符串
-//             !excludedChineseSet.has(word) // 检查是否在排除集中
-//         )
-//     );
-//     // console.log("allChineseSet: ", allChineseSet);
-
-//     // 遍历 synonyms
-//     shuffledSynonyms.forEach((synonym) => {
-//       // 获取正确答案
-//       const answerObj = data.answers.find((a) => a.英文 === synonym.英文);
-//       if (!answerObj) return;
-
-//       let correctChineseAnswers = answerObj.中文.includes("；")
-//         ? answerObj.中文.split("；").map((w) => w.trim())
-//         : [answerObj.中文.trim()];
-
-//       // 移除当前 synonym 的 `选项` 及其相关内容
-//       correctChineseAnswers.forEach((answer) => allChineseSet.delete(answer));
-//       if (synonym.选项) {
-//         allChineseSet.delete(synonym.选项.trim());
-//       }
-//       // console.log('correctChineseAnswers', correctChineseAnswers);
-//       // 处理带 ; 的选项
-//       if (synonym.选项) {
-//         // 拆分 ; 并移除每个部分
-//         synonym.选项.split("；").forEach((opt) => {
-//           const trimmedOpt = opt.trim();
-//           if (trimmedOpt) {
-//             allChineseSet.delete(trimmedOpt);
-//           }
-//         });
-//       }
-//       // // 构建当前 synonym 可用的选项
-//       // let finalOptions = new Set(correctChineseAnswers);
-//       // if (synonym.选项) {
-//       //   synonym.选项.split("；").forEach((option) => {
-//       //     const trimmedOption = option.trim();
-//       //     if (trimmedOption) {
-//       //       finalOptions.add(trimmedOption);
-//       //     }
-//       //   });
-//       // }
-
-//       // // 随机填充选项，确保 `选项` 不会错位
-//       // let remainingChinese = shuffle(Array.from(allChineseSet));
-//       // remainingChinese.forEach((word) => {
-//       //   if (finalOptions.size < numberOption) {
-//       //     finalOptions.add(word);
-//       //   }
-//       // });
-
-//       // 构建当前 synonym 可用的选项
-//       let finalOptions = new Set(correctChineseAnswers);
-
-//       // 计算还能添加多少个选项
-//       const remainingSlots = numberOption - finalOptions.size;
-
-//       // 只有在还有空位时才添加额外选项
-//       if (synonym.选项 && remainingSlots > 0) {
-//         const extraOptions = synonym.选项
-//           .split("；")
-//           .map((opt) => opt.trim())
-//           .filter((opt) => opt && !finalOptions.has(opt))
-//           .slice(0, remainingSlots); // 限制数量
-
-//         extraOptions.forEach((option) => {
-//           finalOptions.add(option);
-//         });
-//       }
-
-//       // 随机填充选项，确保不超过 numberOption
-//       let remainingChinese = shuffle(Array.from(allChineseSet));
-//       remainingChinese.forEach((word) => {
-//         if (finalOptions.size < numberOption) {
-//           finalOptions.add(word);
-//         }
-//       });
-
-//       // 最终乱序
-//       synonym.中文 = shuffle(Array.from(finalOptions));
-
-//       // 恢复correctChineseAnswers，但不恢复synonym.选项
-//       correctChineseAnswers.forEach((answer) => {
-//         if (!excludedChineseSet.has(answer)) {
-//           allChineseSet.add(answer);
-//         }
-//       });
-//     });
-
-//     // 重新调整 `answers` 顺序，使其与 `synonyms` 一致
-//     data.answers.sort((a, b) => {
-//       const indexA = shuffledSynonyms.findIndex((s) => s.英文 === a.英文);
-//       const indexB = shuffledSynonyms.findIndex((s) => s.英文 === b.英文);
-//       return indexA - indexB;
-//     });
-
-//     // 更新 `data.synonyms`
-//     data.synonyms = shuffledSynonyms;
-
-//     // 重新编号
-//     data.synonyms.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-//     data.answers.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-
-//     return data;
-//   }
-
-//   function processData(data, numberOption) {
-//     // Helper function to shuffle an array
-//     function shuffle(array) {
-//       for (let i = array.length - 1; i > 0; i--) {
-//         const j = Math.floor(Math.random() * (i + 1));
-//         [array[i], array[j]] = [array[j], array[i]];
-//       }
-//       return array;
-//     }
-
-//     function generateDistractors(
-//       allChineseSet,
-//       num,
-//       correctChineseAnswers,
-//       allowCorrectAndIncorrectMix = false
-//     ) {
-//       const remainingChinese = Array.from(allChineseSet);
-//       const distractors = [];
-
-//       function getNonRepeatingPair() {
-//         let first, second;
-//         let attempts = 0;
-
-//         // Ensure first and second are not repeating with correctChineseAnswers
-//         while (attempts < remainingChinese.length) {
-//           const [candidateFirst, candidateSecond] = shuffle(
-//             remainingChinese.slice(0, 2)
-//           );
-
-//           if (
-//             !correctChineseAnswers.includes(candidateFirst) &&
-//             !correctChineseAnswers.includes(candidateSecond)
-//           ) {
-//             first = candidateFirst;
-//             second = candidateSecond;
-//             remainingChinese.splice(remainingChinese.indexOf(first), 1);
-//             remainingChinese.splice(remainingChinese.indexOf(second), 1);
-//             break;
-//           }
-//           attempts++;
-//         }
-
-//         return [first, second];
-//       }
-
-//       for (let i = 0; i < num; i++) {
-//         if (Math.random() < 0.2 && remainingChinese.length > 1) {
-//           const [first, second] = getNonRepeatingPair();
-//           if (first && second) {
-//             distractors.push(`${first},${second}`);
-//           }
-//         } else if (
-//           allowCorrectAndIncorrectMix &&
-//           Math.random() < 0.8 &&
-//           correctChineseAnswers.length > 0 &&
-//           remainingChinese.length > 0
-//         ) {
-//           const correctAnswer = correctChineseAnswers.pop();
-//           const incorrectAnswer = remainingChinese.shift();
-//           distractors.push(`${correctAnswer},${incorrectAnswer}`);
-//         } else {
-//           distractors.push(remainingChinese.shift());
-//         }
-//       }
-
-//       return shuffle(distractors);
-//     }
-
-//     const shuffledSynonyms = shuffle([...data.synonyms]);
-
-//     // Generate excluded words set
-//     const excludedChineseSet = new Set(
-//       data.synonyms
-//         .filter((s) => s.排除 === "无")
-//         .flatMap((s) => {
-//           const answerObj = data.answers.find((a) => a.英文 === s.英文);
-//           if (!answerObj) return [];
-//           return answerObj.中文.includes("；")
-//             ? answerObj.中文.split("；").map((w) => w.trim())
-//             : [answerObj.中文.trim()];
-//         })
-//     );
-//     console.log("excludedChineseSet: ", excludedChineseSet);
-
-//     // Collect all Chinese options excluding those marked "无"
-//     let allChineseSet = new Set(
-//       data.answers
-//         .flatMap((answer) => {
-//           const chinese = answer?.中文;
-//           if (!chinese) return []; // 如果中文不存在，返回空数组
-
-//           const splitWords = chinese.split("；").map((word) => word.trim());
-//           return splitWords;
-//         })
-//         .filter((word) => {
-//           const shouldKeep = word && !excludedChineseSet.has(word);
-//           return shouldKeep;
-//         })
-//     );
-
-//     data.synonyms.forEach((synonym) => {
-//       if (synonym.选项) {
-//         if (synonym.选项.includes("；")) {
-//           synonym.选项.split("；").forEach((opt) => {
-//             allChineseSet.delete(opt.trim());
-//           });
-//         } else {
-//           allChineseSet.delete(synonym.选项.trim());
-//         }
-//       }
-//     });
-
-//     shuffledSynonyms.forEach((synonym) => {
-//       const answerObj = data.answers.find((a) => a.英文 === synonym.英文);
-//       const correctChineseAnswers = answerObj.中文.includes("；")
-//         ? answerObj.中文.split("；")
-//         : [answerObj.中文];
-
-//       correctChineseAnswers.forEach((answer) => allChineseSet.delete(answer));
-//       // console.log("allChineseSet", allChineseSet);
-//       let mixedChinese;
-//       if (correctChineseAnswers.length === 5) {
-//         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
-//         const randomOption = Math.random();
-//         if (randomOption < 0.33) {
-//           mixedChinese = shuffle([
-//             ...shuffledCorrectAnswers,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 5,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = shuffledCorrectAnswers.join("；");
-//         } else if (randomOption < 0.66) {
-//           const mergedAnswer1 = `${shuffledCorrectAnswers[0]},${shuffledCorrectAnswers[1]}`;
-//           const mergedAnswer2 = `${shuffledCorrectAnswers[2]},${shuffledCorrectAnswers[3]},${shuffledCorrectAnswers[4]}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer1,
-//             mergedAnswer2,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 2,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer1}；${mergedAnswer2}`;
-//         } else {
-//           const mergedAnswer1 = `${shuffledCorrectAnswers[0]},${shuffledCorrectAnswers[1]}`;
-//           const mergedAnswer2 = `${shuffledCorrectAnswers[2]},${shuffledCorrectAnswers[3]}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer1,
-//             mergedAnswer2,
-//             shuffledCorrectAnswers[4],
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 3,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer1}；${mergedAnswer2}；${shuffledCorrectAnswers[4]}`;
-//         }
-//       } else if (correctChineseAnswers.length === 4) {
-//         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
-//         const randomOption = Math.random();
-//         if (randomOption < 0.25) {
-//           mixedChinese = shuffle([
-//             ...shuffledCorrectAnswers,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 4,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = shuffledCorrectAnswers.join("；");
-//         } else if (randomOption < 0.5) {
-//           const mergedAnswer = `${shuffledCorrectAnswers[0]},${shuffledCorrectAnswers[1]},${shuffledCorrectAnswers[2]}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer,
-//             shuffledCorrectAnswers[3],
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 2,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer}；${shuffledCorrectAnswers[3]}`;
-//         } else if (randomOption < 0.75) {
-//           const mergedAnswer1 = `${shuffledCorrectAnswers[0]},${shuffledCorrectAnswers[1]}`;
-//           const mergedAnswer2 = `${shuffledCorrectAnswers[2]},${shuffledCorrectAnswers[3]}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer1,
-//             mergedAnswer2,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 2,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer1}；${mergedAnswer2}`;
-//         } else {
-//           const mergedAnswer = `${shuffledCorrectAnswers[0]},${shuffledCorrectAnswers[1]}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer,
-//             shuffledCorrectAnswers[2],
-//             shuffledCorrectAnswers[3],
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 3,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer}；${shuffledCorrectAnswers[2]}；${shuffledCorrectAnswers[3]}`;
-//         }
-//       } else if (correctChineseAnswers.length === 3) {
-//         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
-//         if (Math.random() < 0.4) {
-//           // if (Math.random() < 2) {
-//           const [first, second] = shuffle([
-//             shuffledCorrectAnswers[0],
-//             shuffledCorrectAnswers[1],
-//           ]);
-//           const mergedAnswer = `${first},${second}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer,
-//             shuffledCorrectAnswers[2],
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 2,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = `${mergedAnswer}；${shuffledCorrectAnswers[2]}`;
-//         } else {
-//           mixedChinese = shuffle([
-//             ...shuffledCorrectAnswers,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 3,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = shuffledCorrectAnswers.join("；");
-//         }
-//       } else if (correctChineseAnswers.length === 2) {
-//         const shuffledCorrectAnswers = shuffle([...correctChineseAnswers]);
-//         if (Math.random() < 0.2) {
-//           const [first, second] = shuffle([
-//             shuffledCorrectAnswers[0],
-//             shuffledCorrectAnswers[1],
-//           ]);
-//           const mergedAnswer = `${first},${second}`;
-//           mixedChinese = shuffle([
-//             mergedAnswer,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 1,
-//               correctChineseAnswers,
-//               true
-//             ),
-//           ]);
-//           answerObj.中文 = mergedAnswer;
-//         } else {
-//           mixedChinese = shuffle([
-//             ...shuffledCorrectAnswers,
-//             ...generateDistractors(
-//               allChineseSet,
-//               numberOption - 2,
-//               correctChineseAnswers
-//             ),
-//           ]);
-//           answerObj.中文 = shuffledCorrectAnswers.join("；");
-//         }
-//       } else {
-//         const remainingChinese = shuffle(Array.from(allChineseSet));
-//         mixedChinese = shuffle([
-//           ...correctChineseAnswers,
-//           ...generateDistractors(
-//             allChineseSet,
-//             numberOption - correctChineseAnswers.length,
-//             correctChineseAnswers,
-//             false
-//           ),
-//         ]);
-//       }
-
-//       mixedChinese = mixedChinese.filter((option) => option);
-//       while (mixedChinese.length < numberOption) {
-//         mixedChinese.push("无");
-//       }
-
-//       synonym.中文 = mixedChinese.slice(0, numberOption);
-
-//       correctChineseAnswers.forEach((answer) => {
-//         if (!excludedChineseSet.has(answer)) {
-//           allChineseSet.add(answer);
-//         }
-//       });
-//     });
-
-//     data.answers.sort((a, b) => {
-//       const indexA = shuffledSynonyms.findIndex((s) => s.英文 === a.英文);
-//       const indexB = shuffledSynonyms.findIndex((s) => s.英文 === b.英文);
-//       return indexA - indexB;
-//     });
-
-//     data.synonyms = shuffledSynonyms;
-
-//     data.synonyms.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-
-//     data.answers.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-
-//     return data;
-//   }
-
-//   if (data.merge_option) {
-//     console.log("processData");
-//     processData(data, numberOption);
-//   } else {
-//     console.log("processData2");
-//     processData2(data, numberOption);
-//   }
-//   console.log("data_pinjie: ", data);
-
-//   // 增加中译英选项
-//   // function processData3(data, reversd_number, numberOption) {
-//   //   // reversd_number = 10
-//   //   // 创建 data 的深拷贝
-//   //   const originalData = JSON.parse(JSON.stringify(data));
-
-//   //   // 交换 data.answers 中的中文和英文，并处理分号分割
-//   //   const processedAnswers = data.answers.map((item) => {
-//   //     let chineseOptions;
-//   //     if (item["中文"].includes("；")) {
-//   //       chineseOptions = item["中文"].split("；");
-//   //     } else if (item["中文"].includes(",")) {
-//   //       chineseOptions = item["中文"].split(",");
-//   //     } else {
-//   //       chineseOptions = [item["中文"]];
-//   //     }
-
-//   //     const randomChinese =
-//   //       chineseOptions[Math.floor(Math.random() * chineseOptions.length)];
-
-//   //     return {
-//   //       序号: item["序号"],
-//   //       英文: randomChinese,
-//   //       中文: item["英文"],
-//   //     };
-//   //   });
-//   //   // console.log("processedAnswers: ", processedAnswers);
-
-//   //   // 获取所有英文答案
-//   //   const allChinese = processedAnswers.map((item) => item["英文"]);
-//   //   const allEnglish = processedAnswers.map((item) => item["中文"]);
-
-//   //   const processedSynonyms = data.synonyms.map((synonym) => {
-//   //     // 获取正确答案的中文
-//   //     const correctAnswer = processedAnswers.find(
-//   //       (answer) => answer["中文"] === synonym["英文"]
-//   //     );
-
-//   //     const correctChinese = correctAnswer.英文;
-//   //     // console.log('correctChinese: ', correctChinese);
-
-//   //     // 生成一个包含正确答案的随机中文列表
-//   //     const englishOptions = [correctAnswer.中文];
-//   //     const addedAnswers = new Set(englishOptions);
-//   //     while (englishOptions.length < numberOption) {
-//   //       if (addedAnswers.size >= allEnglish.length) {
-//   //         englishOptions.push("无"); // 用“无”代替
-//   //       } else {
-//   //         const randomAnswer =
-//   //           allEnglish[Math.floor(Math.random() * allEnglish.length)];
-//   //         // console.log("randomAnswer: ", randomAnswer);
-//   //         if (
-//   //           randomAnswer !== null &&
-//   //           randomAnswer !== "" &&
-//   //           !addedAnswers.has(randomAnswer)
-//   //         ) {
-//   //           // 获取新添加的中文对应的英文
-//   //           const randomAnswerEnglish = processedAnswers.find(
-//   //             (answer) => answer["中文"] === randomAnswer
-//   //           )?.英文;
-//   //           // console.log("randomAnswerEnglish: ", randomAnswerEnglish);
-
-//   //           const isDuplicate = englishOptions.some((existingChinese) => {
-//   //             const existingAnswerEnglish = processedAnswers.find(
-//   //               (answer) => answer["中文"] === existingChinese
-//   //             )?.英文;
-
-//   //             // Split the existing answer by '；' and check if it contains randomAnswerEnglish
-//   //             if (existingAnswerEnglish) {
-//   //               const splitExistingAnswers = existingAnswerEnglish.split("；");
-//   //               return splitExistingAnswers.includes(randomAnswerEnglish);
-//   //             }
-//   //             return false;
-//   //           });
-
-//   //           if (!isDuplicate) {
-//   //             englishOptions.push(randomAnswer);
-//   //             addedAnswers.add(randomAnswer);
-//   //           }
-//   //         }
-//   //       }
-//   //     }
-
-//   //     // 随机打乱数组顺序
-//   //     for (let i = englishOptions.length - 1; i > 0; i--) {
-//   //       const j = Math.floor(Math.random() * (i + 1));
-//   //       [englishOptions[i], englishOptions[j]] = [
-//   //         englishOptions[j],
-//   //         englishOptions[i],
-//   //       ];
-//   //     }
-
-//   //     return {
-//   //       序号: synonym["序号"],
-//   //       英文: correctChinese,
-//   //       中文: englishOptions,
-//   //     };
-//   //   });
-
-//   //   // console.log("processedSynonyms: ", processedSynonyms);
-
-//   //   // 从 processedAnswers 和 processedSynonyms 中随机选取 reversd_number 个
-//   //   const selectedIndexes = new Set();
-//   //   while (selectedIndexes.size < reversd_number) {
-//   //     selectedIndexes.add(Math.floor(Math.random() * processedAnswers.length));
-//   //   }
-
-//   //   // console.log('selectedIndexes: ', selectedIndexes);
-
-//   //   const selectedAnswers = Array.from(selectedIndexes).map(
-//   //     (index) => processedAnswers[index]
-//   //   );
-//   //   // console.log('selectedAnswers: ', selectedAnswers);
-
-//   //   const selectedSynonyms = Array.from(selectedIndexes).map(
-//   //     (index) => processedSynonyms[index]
-//   //   );
-//   //   // console.log("selectedSynonyms: ", selectedSynonyms);
-
-//   //   // 在 originalData 中的 answers 和 synonyms 随机插入
-//   //   selectedAnswers.forEach((answer, index) => {
-//   //     const randomPosition = Math.floor(
-//   //       Math.random() * (originalData.answers.length + 1)
-//   //     );
-//   //     originalData.answers.splice(
-//   //       randomPosition,
-//   //       0,
-//   //       selectedAnswers.find((a) => a.序号 === answer.序号)
-//   //     );
-//   //     originalData.synonyms.splice(
-//   //       randomPosition,
-//   //       0,
-//   //       selectedSynonyms.find((s) => s.序号 === selectedSynonyms[index].序号)
-//   //     );
-//   //   });
-
-//   //   // 重新整理序号
-//   //   originalData.answers.forEach((item, index) => {
-//   //     item.序号 = index + 1;
-//   //   });
-//   //   originalData.synonyms.forEach((item, index) => {
-//   //     item.序号 = index + 1;
-//   //   });
-
-//   //   // 返回处理后的数据和原始数据
-//   //   return {
-//   //     processedData: { answers: processedAnswers, synonyms: processedSynonyms },
-//   //     NewData: originalData,
-//   //   };
-//   // }
-//   function processData3(data, reversd_number, numberOption) {
-//     // reversd_number = 10
-//     // 创建 data 的深拷贝（在原题库上插入“反转题”）
-//     const originalData = JSON.parse(JSON.stringify(data));
-
-//     // ===== 工具：拆分中文释义（兼容 ：；，,;）=====
-//     function splitMeanings(s) {
-//       if (!s) return [];
-//       return s
-//         .replace(/，/g, ",")
-//         .replace(/；/g, ";")
-//         .split(/[;,]/)
-//         .map((x) => x.trim())
-//         .filter(Boolean);
-//     }
-
-//     // ===== 建索引：英文 -> Set(中文释义) =====
-//     // 仅用于 B 方案：生成干扰项时，排除“也包含题干中文释义”的英文
-//     const englishToMeanings = new Map();
-//     data.answers.forEach((item) => {
-//       const eng = item["英文"]; // 英文词
-//       const meanings = splitMeanings(item["中文"]); // 中文释义列表
-//       if (!englishToMeanings.has(eng)) englishToMeanings.set(eng, new Set());
-//       meanings.forEach((m) => englishToMeanings.get(eng).add(m));
-//     });
-
-//     // ===== 1) 反转 answers：中文题干(随机选一个中文释义) + 正确答案(英文) =====
-//     const processedAnswers = data.answers.map((item) => {
-//       const meanings = splitMeanings(item["中文"]);
-//       const chosenChinese =
-//         meanings.length > 0
-//           ? meanings[Math.floor(Math.random() * meanings.length)]
-//           : "";
-
-//       // 注意：为最小改动，沿用你的字段名：
-//       //   英文字段承载“题干中文”，中文字段承载“正确英文”
-//       return {
-//         序号: item["序号"],
-//         英文: chosenChinese, // 题干中文
-//         中文: item["英文"], // 正确英文
-//       };
-//     });
-
-//     // 候选池
-//     const allPromptChinese = processedAnswers.map((x) => x["英文"]); // 所有题干中文（可能重复）
-//     const allOptionEnglish = processedAnswers.map((x) => x["中文"]); // 所有可选英文（英文词）
-
-//     // ===== 2) 生成 synonyms：题干中文 + 英文选项数组（唯一正确）=====
-//     const processedSynonyms = data.synonyms.map((synonym) => {
-//       // 找到该题的正确项（根据英文词匹配）
-//       const correctAnswer = processedAnswers.find(
-//         (a) => a["中文"] === synonym["英文"]
-//       );
-
-//       // 兜底：数据不一致时，给一个可运行的返回
-//       if (!correctAnswer) {
-//         return {
-//           序号: synonym["序号"],
-//           英文: "", // 题干中文
-//           中文: Array.from({ length: numberOption }, () => "无"),
-//         };
-//       }
-
-//       const promptChinese = correctAnswer["英文"]; // 题干中文
-//       const correctEnglish = correctAnswer["中文"]; // 正确英文
-
-//       // 选项数组（存英文）
-//       const options = [correctEnglish];
-//       const added = new Set(options);
-
-//       // === B 方案核心：干扰项英文必须排除“也包含 promptChinese”的英文 ===
-//       // 候选干扰英文池：不为空、不是正确英文、且该英文释义集合不含 promptChinese
-//       const candidatePool = allOptionEnglish.filter((eng) => {
-//         if (!eng || eng === correctEnglish) return false;
-//         const meaningsSet = englishToMeanings.get(eng);
-//         // 如果该英文有释义且包含题干中文 => 也算对，必须排除
-//         if (meaningsSet && meaningsSet.has(promptChinese)) return false;
-//         return true;
-//       });
-
-//       // 填充到 numberOption
-//       while (options.length < numberOption) {
-//         // 如果候选池不足，补“无”
-//         if (added.size >= 1 + candidatePool.length) {
-//           // added.size>=1 表示已有正确答案；candidatePool.length 表示最多可加入的干扰数
-//           options.push("无");
-//           continue;
-//         }
-
-//         const pick =
-//           candidatePool[Math.floor(Math.random() * candidatePool.length)];
-//         if (!pick || added.has(pick)) continue;
-
-//         options.push(pick);
-//         added.add(pick);
-//       }
-
-//       // 随机打乱
-//       for (let i = options.length - 1; i > 0; i--) {
-//         const j = Math.floor(Math.random() * (i + 1));
-//         [options[i], options[j]] = [options[j], options[i]];
-//       }
-
-//       return {
-//         序号: synonym["序号"],
-//         英文: promptChinese, // 题干中文
-//         中文: options, // 英文选项数组
-//       };
-//     });
-
-//     // ===== 3) 随机选择 reversd_number 个反转题插入 originalData =====
-//     const maxSelectable = Math.min(reversd_number, processedAnswers.length);
-//     const selectedIndexes = new Set();
-//     while (selectedIndexes.size < maxSelectable) {
-//       selectedIndexes.add(Math.floor(Math.random() * processedAnswers.length));
-//     }
-
-//     const selectedAnswers = Array.from(selectedIndexes).map(
-//       (index) => processedAnswers[index]
-//     );
-//     const selectedSynonyms = Array.from(selectedIndexes).map(
-//       (index) => processedSynonyms[index]
-//     );
-
-//     // 随机插入
-//     selectedAnswers.forEach((answer, idx) => {
-//       const randomPosition = Math.floor(
-//         Math.random() * (originalData.answers.length + 1)
-//       );
-
-//       originalData.answers.splice(
-//         randomPosition,
-//         0,
-//         selectedAnswers.find((a) => a.序号 === answer.序号)
-//       );
-
-//       originalData.synonyms.splice(
-//         randomPosition,
-//         0,
-//         selectedSynonyms.find((s) => s.序号 === selectedSynonyms[idx].序号)
-//       );
-//     });
-
-//     // ===== 4) 重新整理序号 =====
-//     originalData.answers.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-//     originalData.synonyms.forEach((item, index) => {
-//       item.序号 = index + 1;
-//     });
-
-//     return {
-//       processedData: { answers: processedAnswers, synonyms: processedSynonyms },
-//       NewData: originalData,
-//     };
-//   }
-
-//   let processedData, NewData;
-//   if (reversd_number > 0) {
-//     ({ processedData, NewData } = processData3(
-//       data,
-//       reversd_number,
-//       numberOption
-//     ));
-//     data = NewData;
-//   }
-
-//   console.log("data_zhongyiying: ", data);
-
-//   if (none_of_above && !checkedNoneOfAbove.value) {
-//     function replaceWithNoneOfTheAbove(data) {
-//       // console.log('data: ', data);
-//       const noneOfTheAbove = "以上都不对";
-
-//       // 保存替换前的正确答案
-//       const originalAnswers = data.answers.map((answer) => ({
-//         英文: answer.英文,
-//         中文: answer.中文,
-//       }));
-//       // console.log("originalAnswers: ", originalAnswers);
-
-//       data.synonyms.forEach((synonym) => {
-//         // 找到正确答案
-//         // console.log("synonym.英文", synonym.英文)
-//         let correctAnswer;
-//         let correctAnswerObj = data.answers.find(
-//           (answer) => answer.英文 === synonym.英文
-//         );
-
-//         if (!correctAnswerObj) {
-//           // 在没有找到对应答案的情况下，检查中文
-//           correctAnswerObj = data.answers.find((answer) => {
-//             // 检查中文是否包含分隔符
-//             if (answer.中文.includes("；")) {
-//               // 分割并逐个检查
-//               const options = answer.中文.split("；");
-//               return options.some((option) => option.trim() === synonym.英文);
-//             }
-//             return answer.中文 === synonym.英文;
-//           });
-//           // console.log('correctAnswerObj2: ', correctAnswerObj);
-//         }
-
-//         if (correctAnswerObj) {
-//           correctAnswer = correctAnswerObj.中文;
-//         }
-
-//         // 解析正确答案为数组
-//         const correctAnswers = correctAnswer.includes("；")
-//           ? correctAnswer.split("；")
-//           : [correctAnswer];
-
-//         // 决定是否替换正确答案，概率在10%-20%之间
-//         let replaceCorrectAnswer = false;
-//         if (Math.random() < 0.14) {
-//           // if (Math.random() < 1) {
-//           replaceCorrectAnswer = true;
-//         }
-
-//         let flattext = 0;
-//         // if (correctAnswerObj.英文 === "plant") {
-//         //   replaceCorrectAnswer = true;
-//         //   flattext = 1;
-//         // }
-//         function splitParts(text) {
-//           if (text === null || text === undefined) return [];
-//           return String(text)
-//             .split(/[；,，]/g)
-//             .map((s) => s.trim())
-//             .filter(Boolean);
-//         }
-
-//         // correctPartsFlat: 例如 ["种植","工厂","植物"]
-//         function isEquivalentToCorrect(option, correctPartsFlat) {
-//           if (!option) return false;
-//           const opt = String(option).trim();
-
-//           // 单项直接命中
-//           if (correctPartsFlat.includes(opt)) return true;
-
-//           // 拼接项：拆分后与 correctPartsFlat 集合相等（忽略顺序）
-//           const optParts = splitParts(opt);
-//           if (optParts.length <= 1) return false;
-
-//           const correctSet = new Set(correctPartsFlat);
-//           const optSet = new Set(optParts);
-
-//           if (optSet.size !== correctSet.size) return false;
-//           for (const p of correctSet) {
-//             if (!optSet.has(p)) return false;
-//           }
-//           return true;
-//         }
-
-//         if (replaceCorrectAnswer) {
-//           // 替换所有正确答案
-//           // synonym.中文 = synonym.中文.map((option) =>
-//           //   correctAnswers.includes(option) ? noneOfTheAbove : option
-//           // );
-//           synonym.中文 = synonym.中文.map((option) =>
-//             isEquivalentToCorrect(option, correctAnswers)
-//               ? noneOfTheAbove
-//               : option
-//           );
-//           correctAnswerObj.中文 = noneOfTheAbove;
-//         } else {
-//           // 处理选项数组
-//           const optionsArray = synonym.选项 ? synonym.选项.split("；") : [];
-//           // 替换一个错误答案
-//           let replaced = false;
-
-//           // 优先替换不在 correctAnswers 和 optionsArray 中的内容
-//           for (let i = 0; i < synonym.中文.length; i++) {
-//             if (
-//               !correctAnswers.includes(synonym.中文[i]) && // 不在正确答案中
-//               !optionsArray.includes(synonym.中文[i]) && // 不在选项数组中
-//               synonym.中文[i] !== null
-//             ) {
-//               synonym.中文[i] = noneOfTheAbove;
-//               replaced = true;
-//               break;
-//             }
-//           }
-//           // 如果没有替换成功，随机替换一个在 optionsArray 中的内容
-//           if (!replaced) {
-//             const possibleIndices = [];
-
-//             // 收集在 optionsArray 中的内容的索引
-//             for (let i = 0; i < synonym.中文.length; i++) {
-//               if (
-//                 optionsArray.includes(synonym.中文[i]) &&
-//                 synonym.中文[i] !== null
-//               ) {
-//                 possibleIndices.push(i);
-//               }
-//             }
-
-//             // 如果有可替换的索引，从中随机选择一个进行替换
-//             if (possibleIndices.length > 0) {
-//               const randomIndex =
-//                 possibleIndices[
-//                   Math.floor(Math.random() * possibleIndices.length)
-//                 ];
-//               synonym.中文[randomIndex] = noneOfTheAbove;
-//               replaced = true;
-//             }
-//           }
-
-//           // 如果所有内容都是正确答案或 synonym.选项中的内容，并且没有成功替换
-//           if (!replaced) {
-//             // 随机替换一个内容
-//             const randomIndex = Math.floor(Math.random() * synonym.中文.length);
-//             synonym.中文[randomIndex] = noneOfTheAbove;
-//           }
-//         }
-
-//         // 确保“以上都不对”在列表最后一个位置
-//         synonym.中文 = synonym.中文
-//           .filter((option) => option !== noneOfTheAbove)
-//           .concat(noneOfTheAbove);
-
-//         // while (synonym.中文.length < 7) {
-//         //   let randomAnswer = null;
-
-//         //   // 循环直到找到一个中文字符
-//         //   do {
-//         //     randomAnswer =
-//         //       originalAnswers[
-//         //         Math.floor(Math.random() * originalAnswers.length)
-//         //       ].中文;
-//         //   } while (randomAnswer && randomAnswer.charCodeAt(0) <= 255);
-
-//         //   // 检查随机答案是否在当前数组中且不为 null
-//         //   if (!synonym.中文.includes(randomAnswer) && randomAnswer !== null) {
-//         //     synonym.中文.splice(synonym.中文.length - 1, 0, randomAnswer);
-//         //   }
-//         // }
-//         const correctPartsFlat = correctAnswers.flatMap(splitParts);
-
-//         while (synonym.中文.length < 7) {
-//           const pool = originalAnswers.filter(
-//             (ans) =>
-//               ans.中文 &&
-//               ans.中文.charCodeAt(0) > 255 && // 是中文
-//               !isEquivalentToCorrect(ans.中文, correctPartsFlat) && // 不是正确答案
-//               !synonym.中文.includes(ans.中文) // 不重复
-//           );
-
-//           if (pool.length > 0) {
-//             // 可选：随机选一个，避免总是补同一个
-//             const candidate = pool[Math.floor(Math.random() * pool.length)];
-//             synonym.中文.splice(synonym.中文.length - 1, 0, candidate.中文);
-//           } else {
-//             // 兜底：用“无”补齐
-//             if (!synonym.中文.includes("无")) {
-//               synonym.中文.splice(synonym.中文.length - 1, 0, "无");
-//             } else {
-//               // 如果“无”已经存在，就继续插“无”（或 break，视你产品需求）
-//               synonym.中文.splice(synonym.中文.length - 1, 0, "无");
-//             }
-//           }
-//         }
-//       });
-
-//       // 更新 answers 数组并添加 "正确答案" 字段
-//       data.answers.forEach((answer) => {
-//         if (answer.中文 === noneOfTheAbove) {
-//           // 找到替换前的正确答案
-//           const originalCorrectAnswer = originalAnswers.find(
-//             (original) => original.英文 === answer.英文
-//           ).中文;
-//           answer.正确答案 = originalCorrectAnswer;
-//         } else {
-//           answer.正确答案 = answer.中文;
-//         }
-//       });
-
-//       return data;
-//     }
-
-//     data = replaceWithNoneOfTheAbove(data);
-//   }
-
-//   // 去掉可能的；
-//   function replaceSemicolon(data) {
-//     let isUpdated = false;
-
-//     // 深拷贝 data，以防止直接修改原数据
-//     const newData = JSON.parse(JSON.stringify(data));
-
-//     newData.synonyms.forEach((synonym) => {
-//       synonym.中文 = synonym.中文.map((item) => {
-//         if (item.includes("；")) {
-//           // console.log("item", item);
-//           isUpdated = true;
-//           return item.replace(/；/g, ",");
-//         }
-//         return item;
-//       });
-//     });
-
-//     return isUpdated ? newData : data;
-//   }
-//   data = replaceSemicolon(data);
-
-//   const newTabsName = ["全部", ...tabsName.value];
-//   const isRewardEligible = data["progressPercentage"] !== 100;
-//   // console.log("type", type);
-//   const autoplay2 = type === 1 ? 10000 : 8000;
-
-//   function redirect() {
-//     function getStatusMessage(checkedSpell, checkedNoneOfAbove) {
-//       if (checkedSpell && checkedNoneOfAbove) {
-//         return "拼写和以上都不对关闭，消费2💎";
-//       } else if (checkedSpell) {
-//         return "拼写关闭，提交后消费1💎";
-//       } else if (checkedNoneOfAbove) {
-//         return "以上都不对关闭，提交后消费1💎";
-//       } else {
-//         return "";
-//       }
-//     }
-
-//     if (mode == 0) {
-//       const message = getStatusMessage(
-//         checkedSpell.value,
-//         checkedNoneOfAbove.value
-//       );
-//       if (message) {
-//         showToast({
-//           duration: 3000,
-//           closeOnClick: true,
-//           closeOnClickOverlay: true,
-//           message: message,
-//         });
-//       }
-//       router.push({
-//         path: "/studentAccountItemPc",
-//         state: {
-//           data: JSON.stringify(data),
-//           nid: originalData.value[index].nid,
-//           title: data["title"],
-//           type: data["type"],
-//           username: data["username"],
-//           usercoins: usercoins.value,
-//           isRewardEligible: isRewardEligible,
-//           lock_spell: lock_spell.value,
-//           checkedNoneOfAbove: checkedNoneOfAbove.value,
-//           checkedSpell: checkedSpell.value,
-//           RateOrigin: data["rate"],
-//         },
-//       });
-//     }
-//     if (mode == 1) {
-//       const message = getStatusMessage(
-//         checkedSpell.value,
-//         checkedNoneOfAbove.value
-//       );
-//       if (message) {
-//         showToast({
-//           duration: 3000,
-//           closeOnClick: true,
-//           closeOnClickOverlay: true,
-//           message: message,
-//         });
-//       }
-//       // console.log('data', data);
-//       // console.log('nid', originalData.value[index].nid);
-//       // console.log('title', data["title"]);
-//       // console.log('type', data["type"]);
-//       // console.log('username', data["username"]);
-//       // console.log('usercoins', usercoins.value);
-//       // console.log('isRewardEligible', isRewardEligible);
-//       // console.log('autoplay2', autoplay2);
-//       // console.log('lock_spell', lock_spell.value);
-//       router.push({
-//         path: "/studentAccountSwipePc",
-//         state: {
-//           data: JSON.stringify(data),
-//           nid: originalData.value[index].nid,
-//           title: data["title"],
-//           type: data["type"],
-//           username: data["username"],
-//           usercoins: usercoins.value,
-//           isRewardEligible: isRewardEligible,
-//           autoplay2: autoplay2,
-//           lock_spell: lock_spell.value,
-//           checkedNoneOfAbove: checkedNoneOfAbove.value,
-//           checkedSpell: checkedSpell.value,
-//           RateOrigin: data["rate"],
-//         },
-//       });
-//     }
-//     if (mode == 2) {
-//       sessionStorage.setItem("testFreshFlag", false);
-//       router.push({
-//         path: "/studentAccountTest",
-//         state: {
-//           checkedNoneOfAbove: checkedNoneOfAbove.value,
-//           checkedSpell: checkedSpell.value,
-//           data: JSON.stringify(data),
-//           nid: originalData.value[index].nid,
-//           title: data["title"],
-//           type: data["type"],
-//           username: data["username"],
-//           usercoins: usercoins.value,
-//           isRewardEligible: isRewardEligible,
-//           lock_spell: lock_spell.value,
-//         },
-//       });
-//     }
-//     if (mode == 4) {
-//       const message = getStatusMessage(
-//         checkedSpell.value,
-//         checkedNoneOfAbove.value
-//       );
-//       if (message) {
-//         showToast({
-//           duration: 3000,
-//           closeOnClick: true,
-//           closeOnClickOverlay: true,
-//           message: message,
-//         });
-//       }
-//       router.push({
-//         path: "/studentAccountChallenge",
-//         state: {
-//           data: JSON.stringify(data),
-//           nid: originalData.value[index].nid,
-//           title: data["title"],
-//           type: data["type"],
-//           username: data["username"],
-//           usercoins: usercoins.value,
-//           isRewardEligible: isRewardEligible,
-//           autoplay2: autoplay2,
-//           lock_spell: lock_spell.value,
-//           checkedNoneOfAbove: checkedNoneOfAbove.value,
-//           checkedSpell: checkedSpell.value,
-//           RateOrigin: data["rate"],
-//         },
-//       });
-//     }
-//   }
-
-//   function getZhenduoxuan(data) {
-//     // 如果没有none_of_above, 添加正确答案
-//     if (!data.answers.every((answer) => "正确答案" in answer)) {
-//       data.answers.forEach((answer) => {
-//         if (!("正确答案" in answer)) {
-//           answer.正确答案 = answer.中文;
-//         }
-//       });
-//     }
-
-//     if (data.merge_option) {
-//       // 有拼接
-//       data.answers.forEach((answer, index) => {
-//         // 只有当 answer.中文 不为 "以上都不对"，且 answer.正确答案 中包含 "；" 时才处理
-//         if (
-//           (answer.中文 !== "以上都不对" &&
-//             answer.正确答案 &&
-//             answer.正确答案.includes("；")) ||
-//           (answer.中文 !== "以上都不对" && answer.中文.includes("；"))
-//         ) {
-//           // 同时处理中文分号和英文逗号作为分隔符的情况
-//           let parts = answer.中文
-//             .split(/[；,]/g)
-//             .map((s) => s.trim())
-//             .filter((s) => s);
-
-//           // 根据 parts 的数量随机确定 numToRemove（删除0个概率0.3，1个的概率0.3，2个的概率0.4）
-//           let probabilities = {
-//             2: [0.3, 0.7],
-//             // 3: [0.1, 0.5, 0.4],
-//             3: [0, 0.8, 0.2],
-//             4: [0.2, 0.2, 0.2, 0.4],
-//             5: [0.15, 0.15, 0.15, 0.15, 0.4],
-//           };
-//           let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
-//           let randomValue = Math.random();
-//           let cumulative = 0;
-//           let numToRemove = 0;
-
-//           for (let i = 0; i < distribution.length; i++) {
-//             cumulative += distribution[i];
-//             if (randomValue < cumulative) {
-//               numToRemove = i;
-//               break;
-//             }
-//           }
-//           numToRemove = Math.min(numToRemove, parts.length);
-
-//           // 随机删除 numToRemove 个部分
-//           for (let i = 0; i < numToRemove; i++) {
-//             if (parts.length === 0) break;
-//             let removeIndex = Math.floor(Math.random() * parts.length); // 随机删除的索引
-//             let removed = parts.splice(removeIndex, 1)[0]; // 随机删除的元素存储到removed
-//             console.log("removed: ", removed);
-
-//             // 使用相同的索引，在 data.synonyms 中找到对应的项
-//             let synonymItem = data.synonyms[index];
-//             // console.log('synonymItem: ', synonymItem);
-//             if (synonymItem) {
-//               // 找到 removed 在 synonyms 里对应的索引（比对时去除首尾空格）
-//               let synonymIndex = synonymItem.中文.findIndex(
-//                 (item) => item.trim() === removed
-//               );
-//               if (synonymIndex !== -1) {
-//                 let correctAnswers = answer.正确答案
-//                   .split("；")
-//                   .map((s) => s.trim());
-//                 // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文
-//                 let availableOptions = [...allChineseSet2]
-//                   .flatMap((ch) =>
-//                     /[,；]/.test(ch) // 检查是否包含英文逗号或中文分号
-//                       ? ch.split(/[,；]/).map((item) => item.trim()) // 按逗号或分号拆分，并去掉空格
-//                       : [ch]
-//                   )
-//                   .filter(
-//                     (ch) =>
-//                       !synonymItem.中文.some((item) =>
-//                         /[,；]/.test(item)
-//                           ? item
-//                               .split(/[,；]/)
-//                               .map((i) => i.trim())
-//                               .includes(ch)
-//                           : item.trim() === ch
-//                       ) &&
-//                       // 新增条件：不与正确答案重复
-//                       !correctAnswers.includes(ch.trim())
-//                   );
-
-//                 // 替换答案
-//                 // 更新答案的中文字段，将处理后的数组重新用 "；" 连接
-//                 if (answer.英文 == "for + 时间段") {
-//                   console.log(
-//                     "synonymItem.中文[synonymIndex]",
-//                     synonymItem.中文[synonymIndex]
-//                   );
-//                   console.log("answer.中文", answer.中文);
-//                   console.log("-------------------");
-//                 }
-//                 // answer.中文 = parts.join("；");
-
-//                 // const regex = new RegExp(
-//                 //   `[；,]?\\s*${synonymItem.中文[synonymIndex]}`,
-//                 //   "g"
-//                 // );
-//                 function escapeRegExp(string) {
-//                   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-//                 }
-
-//                 const rawKeyword = synonymItem.中文[synonymIndex];
-//                 const keyword = escapeRegExp(rawKeyword);
-//                 // const regex = new RegExp(`[；,]?\\s*${keyword}`, "g");
-//                 const regex = new RegExp(
-//                   `(?:^|[；,]\\s*)${keyword}(?=\\s*[；,]|$)`,
-//                   "g"
-//                 );
-//                 answer.中文 = answer.中文.replace(regex, "");
-
-//                 // 清理可能遗留的多余分隔符
-//                 answer.中文 = answer.中文
-//                   .replace(/^[；,]\s*|\s*[；,]$/g, "")
-//                   .replace(/[；,]\s*[；,]/g, "；");
-
-//                 if (answer.英文 == "for + 时间段") {
-//                   console.log("answer.中文2", answer.中文);
-//                 }
-
-//                 if (availableOptions.length > 0) {
-//                   let randomReplacement =
-//                     availableOptions[
-//                       Math.floor(Math.random() * availableOptions.length)
-//                     ];
-//                   console.log("randomReplacement", randomReplacement);
-//                   console.log("------------------------------------");
-//                   synonymItem.中文[synonymIndex] = randomReplacement;
-//                 }
-//               }
-//             }
-//           }
-//         }
-//       });
-//     } else {
-//       // 无拼接
-//       // console.log(111111111)
-//       data.answers.forEach((answer, index) => {
-//         // 只有当 answer.中文 不为 "以上都不对"，且 answer.正确答案 中包含 "；" 时才处理
-//         if (
-//           answer.中文 !== "以上都不对" &&
-//           answer.正确答案 &&
-//           answer.正确答案.includes("；")
-//         ) {
-//           // 以 "；" 拆分中文字段，并去除首尾空格
-//           let parts = answer.中文.split("；").map((s) => s.trim());
-
-//           // 根据 parts 的数量随机确定 numToRemove （删除0个概率0.3，1个的概率0.3，2个的概率0.4）
-//           let probabilities = {
-//             2: [0.3, 0.7],
-//             3: [0.3, 0.3, 0.4],
-//             // 3: [0, 1, 0],
-//             4: [0.2, 0.2, 0.2, 0.4],
-//             5: [0.15, 0.15, 0.15, 0.15, 0.4],
-//           };
-//           let distribution = probabilities[parts.length] || [1]; // 默认为 100% 选择 0
-//           let randomValue = Math.random();
-//           let cumulative = 0;
-//           let numToRemove = 0;
-
-//           for (let i = 0; i < distribution.length; i++) {
-//             cumulative += distribution[i];
-//             if (randomValue < cumulative) {
-//               numToRemove = i;
-//               break;
-//             }
-//           }
-//           numToRemove = Math.min(numToRemove, parts.length);
-
-//           // 随机删除 numToRemove 个部分
-//           for (let i = 0; i < numToRemove; i++) {
-//             if (parts.length === 0) break;
-//             let removeIndex = Math.floor(Math.random() * parts.length);
-//             let removed = parts.splice(removeIndex, 1)[0];
-//             console.log("removed: ", removed);
-
-//             // 使用相同的索引，在 data.synonyms 中找到对应的项
-//             let synonymItem = data.synonyms[index];
-//             if (synonymItem) {
-//               // 找到 removed 在 synonyms 里对应的索引（比对时去除首尾空格）
-//               let synonymIndex = synonymItem.中文.findIndex(
-//                 (item) => item.trim() === removed
-//               );
-//               if (synonymIndex !== -1) {
-//                 let correctAnswers = answer.正确答案
-//                   .split("；")
-//                   .map((s) => s.trim());
-//                 // 筛选出可用的替换项：allChineseSet2 中不包含当前 synonyms 里的中文和不与正确答案重复
-//                 let availableOptions = [...allChineseSet2].filter(
-//                   (ch) =>
-//                     !synonymItem.中文.includes(ch) &&
-//                     !correctAnswers.includes(ch.trim())
-//                 );
-//                 if (availableOptions.length > 0) {
-//                   let randomReplacement =
-//                     availableOptions[
-//                       Math.floor(Math.random() * availableOptions.length)
-//                     ];
-//                   console.log("randomReplacement", randomReplacement);
-//                   console.log("------------------------------------");
-//                   synonymItem.中文[synonymIndex] = randomReplacement;
-//                 }
-//               }
-//             }
-//           }
-
-//           // 更新答案的中文字段，将处理后的数组重新用 "；" 连接
-//           answer.中文 = parts.join("；");
-//         }
-//       });
-//     }
-//     return data;
-//   }
-
-//   function shuffleArray(arr) {
-//     const newArr = arr.slice(); // 拷贝一份数组
-//     for (let i = newArr.length - 1; i > 0; i--) {
-//       const j = Math.floor(Math.random() * (i + 1));
-//       [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
-//     }
-//     return newArr;
-//   }
-//   function insertBackupIntoData(data, shiti_backup) {
-//     // 随机插入
-//     shiti_backup.forEach((item) => {
-//       const insertIndex = Math.floor(
-//         Math.random() * (data.synonyms.length + 1)
-//       );
-
-//       // 处理中文字段
-//       if (Array.isArray(item.synonym.中文)) {
-//         const shuffled = shuffleArray(item.synonym.中文);
-//         shuffled.push("无"); // 添加第七项
-//         item.synonym.中文 = shuffled;
-//       }
-
-//       // 插入到对应位置
-//       data.synonyms.splice(insertIndex, 0, item.synonym);
-//       data.answers.splice(insertIndex, 0, item.answer);
-//     });
-
-//     // 重新编号
-//     for (let i = 0; i < data.synonyms.length; i++) {
-//       const newIndex = i + 1;
-//       if (data.synonyms[i].hasOwnProperty("序号")) {
-//         data.synonyms[i]["序号"] = newIndex;
-//       }
-//       if (
-//         typeof data.answers[i] === "object" &&
-//         data.answers[i] !== null &&
-//         data.answers[i].hasOwnProperty("序号")
-//       ) {
-//         data.answers[i]["序号"] = newIndex;
-//       }
-//       if (data.synonyms[i]["排除"] === "试题") {
-//         data.answers[i]["正确答案"] = data.answers[i]["中文"];
-//       }
-//     }
-//   }
-
-//   // 是否增加拼写
-//   if (none_of_above && is_spell_number > 0 && !checkedSpell.value) {
-//     // 有拼写
-//     getSpellVocabulary(data["nid"])
-//       .then((res) => {
-//         // console.log('res: ', res);
-//         return res.flatMap((item) => {
-//           lock_spell.value = Boolean(
-//             item["lock_spell"] === "true" ||
-//               item["lock_spell"] === true ||
-//               item["lock_spell"] === 1
-//           );
-//           // console.log('item: ', item["data_words"]);
-//           let dataString = item["data_words"]
-//             .replace(/(\W)'|'(\W)/g, '$1"$2')
-//             .replace(/([{,]\s*)'([^']+?)'(\s*[:])/g, '$1"$2"$3');
-//           return JSON.parse(dataString);
-//         });
-//       })
-//       .then((spell_vocabulary_list) => {
-//         if (spell_vocabulary_list.length > is_spell_number) {
-//           // 随机选择 is_spell_number 个元素
-//           const shuffled = spell_vocabulary_list.sort(
-//             () => 0.5 - Math.random()
-//           );
-//           spell_vocabulary_list = shuffled.slice(0, is_spell_number);
-//         }
-//         // console.log("spell_vocabulary_list", spell_vocabulary_list);
-//         // 更新 data.synonyms
-//         data.synonyms.forEach((synonym) => {
-//           synonym.is_spell = false;
-//           spell_vocabulary_list.forEach((spellItem) => {
-//             if (spellItem["英文"] === synonym["英文"]) {
-//               synonym["中文"] = spellItem["中文"];
-//               const getRandomEnglish = (englishText, correctAnswer) => {
-//                 // 如果答案是“以上都不对”，返回“正确答案”
-//                 if (englishText === "以上都不对") {
-//                   // 如果正确答案中包含“；”，随机选择一个结果
-//                   if (correctAnswer.includes("；")) {
-//                     const options = correctAnswer.split("；");
-//                     const randomIndex = Math.floor(
-//                       Math.random() * options.length
-//                     );
-//                     return options[randomIndex];
-//                   } else {
-//                     // 不包含“；”，返回完整的正确答案
-//                     return correctAnswer;
-//                   }
-//                 } else {
-//                   // 原有逻辑：处理包含 "；" 的情况，随机选择一个结果
-//                   if (englishText.includes("；")) {
-//                     const options = englishText.split("；");
-//                     const randomIndex = Math.floor(
-//                       Math.random() * options.length
-//                     );
-//                     return options[randomIndex];
-//                   } else {
-//                     // 不包含 "；"，返回原始字符串
-//                     return englishText;
-//                   }
-//                 }
-//               };
-
-//               synonym["英文"] = getRandomEnglish(
-//                 spellItem["答案"],
-//                 spellItem["正确答案"]
-//               );
-//               synonym.is_spell = true;
-//             }
-//           });
-//         });
-//         return data;
-//       })
-//       .then((data) => {
-//         // 分组处理
-//         function replaceOptionInSynonyms(data) {
-//           // 获取所有 "正确答案" 列表
-//           const correctAnswersMap = data.answers.reduce((map, answer) => {
-//             map[answer.英文] = answer.中文; // 构建 英文 -> 中文 的映射
-//             return map;
-//           }, {});
-
-//           // 遍历每个 synonym 项
-//           data.synonyms.forEach((synonym) => {
-//             // 检查是否存在 "选项" 字段，如果不存在则跳过
-//             if (!synonym.hasOwnProperty("选项")) {
-//               // console.log("跳过没有“选项”字段的项: ", synonym);
-//               return; // 跳过当前循环，继续下一个
-//             }
-
-//             // 检查 "is_spell" 字段，如果为 true，则跳过
-//             if (synonym.is_spell === true) {
-//               // console.log("跳过 is_spell 为 true 的项: ", synonym);
-//               return; // 跳过当前循环，继续下一个
-//             }
-
-//             const option = synonym["选项"];
-
-//             // 检查 "选项" 不为 "" 且不为 undefined
-//             if (option !== "" && option !== undefined) {
-//               // console.log('option', option);
-//               const correctAnswer = correctAnswersMap[synonym["英文"]]; // 获取对应的正确答案
-//               const correctAnswerArray = correctAnswer.includes("；")
-//                 ? correctAnswer.split("；")
-//                 : [correctAnswer];
-//               // console.log('synonym["英文"]: ', synonym["英文"]);
-//               // console.log('correctAnswer: ', correctAnswer);
-//               let availableIndices = [];
-
-//               // 收集可以替换的索引（不包括“以上都不对”和“正确答案”）
-//               synonym["中文"].forEach((item, index) => {
-//                 if (
-//                   item !== "以上都不对" &&
-//                   !correctAnswerArray.includes(item)
-//                 ) {
-//                   availableIndices.push(index);
-//                 }
-//               });
-
-//               if (availableIndices.length > 0) {
-//                 // 如果选项包含 "/", 则拆分成多个选项
-//                 const options = option.includes("；")
-//                   ? option.split("；")
-//                   : [option];
-
-//                 // 替换多个选项
-//                 options.forEach((opt) => {
-//                   // 如果选项已经存在于 "中文" 数组中，跳过
-//                   if (synonym["中文"].includes(opt)) {
-//                     // console.log(`选项“${opt}”已经存在，跳过`);
-//                     return; // 跳过此选项，继续下一个
-//                   }
-
-//                   if (availableIndices.length > 0) {
-//                     const randomIndex =
-//                       availableIndices[
-//                         Math.floor(Math.random() * availableIndices.length)
-//                       ];
-//                     // console.log(
-//                     //   `在位置 ${randomIndex} 处替换“${synonym["中文"][randomIndex]}”为“${opt}”`
-//                     // );
-//                     synonym["中文"][randomIndex] = opt; // 随机位置替换选项内容
-
-//                     // 替换后移除已使用的索引
-//                     availableIndices = availableIndices.filter(
-//                       (index) => index !== randomIndex
-//                     );
-//                   }
-//                 });
-//               }
-//             }
-//           });
-
-//           return data;
-//         }
-//         data = replaceOptionInSynonyms(data);
-
-//         return data;
-//       })
-//       .then((data) => {
-//         data = getZhenduoxuan(data);
-
-//         data.answers.forEach((item) => {
-//           if (item.英文 === "for + 时间段") {
-//             console.log("for + 时间段");
-//             console.log("答案", item.中文);
-//             console.log("正确答案", item.正确答案);
-//           }
-//         });
-//         data.synonyms.forEach((item) => {
-//           if (item.英文 === "for + 时间段") {
-//             console.log("中文", item.中文);
-//           }
-//         });
-//         return data;
-//       })
-//       .then((data) => {
-//         // 放回试题
-//         if (shiti_backup.length > 0) {
-//           insertBackupIntoData(data, shiti_backup);
-//         }
-//         console.log("data_youpinxie: ", data);
-//         redirect();
-//       });
-//   } else {
-//     // 无拼写
-
-//     function replaceOptionInSynonyms(data) {
-//       // 获取所有 "正确答案" 列表
-//       const correctAnswersMap = data.answers.reduce((map, answer) => {
-//         map[answer.英文] = answer.中文; // 构建 英文 -> 中文 的映射
-//         return map;
-//       }, {});
-
-//       // 遍历每个 synonym 项
-//       data.synonyms.forEach((synonym) => {
-//         // 检查是否存在 "选项" 字段，如果不存在则跳过
-//         if (!synonym.hasOwnProperty("选项")) {
-//           // console.log("跳过没有“选项”字段的项: ", synonym);
-//           return; // 跳过当前循环，继续下一个
-//         }
-
-//         // 检查 "is_spell" 字段，如果为 true，则跳过
-//         if (synonym.is_spell === true) {
-//           // console.log("跳过 is_spell 为 true 的项: ", synonym);
-//           return; // 跳过当前循环，继续下一个
-//         }
-
-//         const option = synonym["选项"];
-
-//         // 检查 "选项" 不为 "" 且不为 undefined
-//         if (option !== "" && option !== undefined) {
-//           const correctAnswer = correctAnswersMap[synonym["英文"]]; // 获取对应的正确答案
-//           const correctAnswerArray = correctAnswer.includes("；")
-//             ? correctAnswer.split("；")
-//             : [correctAnswer];
-//           // console.log('synonym["英文"]: ', synonym["英文"]);
-//           // console.log('correctAnswer: ', correctAnswer);
-//           let availableIndices = [];
-
-//           // 收集可以替换的索引（不包括“以上都不对”和“正确答案”）
-//           synonym["中文"].forEach((item, index) => {
-//             if (item !== "以上都不对" && !correctAnswerArray.includes(item)) {
-//               availableIndices.push(index);
-//             }
-//           });
-
-//           if (availableIndices.length > 0) {
-//             // 如果选项包含 "/", 则拆分成多个选项
-//             const options = option.includes("；")
-//               ? option.split("；")
-//               : [option];
-
-//             // 替换多个选项
-//             options.forEach((opt) => {
-//               // 如果选项已经存在于 "中文" 数组中，跳过
-//               if (synonym["中文"].includes(opt)) {
-//                 // console.log(`选项“${opt}”已经存在，跳过`);
-//                 return; // 跳过此选项，继续下一个
-//               }
-
-//               if (availableIndices.length > 0) {
-//                 const randomIndex =
-//                   availableIndices[
-//                     Math.floor(Math.random() * availableIndices.length)
-//                   ];
-//                 // console.log(
-//                 //   `在位置 ${randomIndex} 处替换“${synonym["中文"][randomIndex]}”为“${opt}”`
-//                 // );
-//                 synonym["中文"][randomIndex] = opt; // 随机位置替换选项内容
-
-//                 // 替换后移除已使用的索引
-//                 availableIndices = availableIndices.filter(
-//                   (index) => index !== randomIndex
-//                 );
-//               }
-//             });
-//           }
-//         }
-//       });
-
-//       return data;
-//     }
-
-//     data = replaceOptionInSynonyms(data);
-
-//     data = getZhenduoxuan(data);
-//     data.answers.forEach((item) => {
-//       if (item.英文 === "for + 时间段") {
-//         console.log("for + 时间段");
-//         console.log("答案", item.中文);
-//         console.log("正确答案", item.正确答案);
-//       }
-//     });
-//     data.synonyms.forEach((item) => {
-//       if (item.英文 === "for + 时间段") {
-//         // console.log("中文", item.中文);
-//         console.log("---");
-//         item.中文.forEach((item2) => {
-//           console.log(item2);
-//         });
-//       }
-//     });
-//     // 放回试题
-//     if (shiti_backup.length > 0) {
-//       insertBackupIntoData(data, shiti_backup);
-//     }
-//     console.log("data_wupinxie: ", data);
-//     redirect();
-//     function printPlantDebug(data) {
-//       if (
-//         !data ||
-//         !Array.isArray(data.answers) ||
-//         !Array.isArray(data.synonyms)
-//       ) {
-//         console.warn("[plant-debug] data 结构不完整");
-//         return;
-//       }
-
-//       // 1️⃣ 打印 answers 中的 plant
-//       const plantAnswer = data.answers.find((a) => a.英文 === "plant");
-
-//       console.log("========== 🌱 PLANT DEBUG ==========");
-
-//       if (!plantAnswer) {
-//         console.warn("❌ answers 中未找到英文为 plant 的项");
-//       } else {
-//         console.log("🧩 answers 中的 plant：");
-//         console.log("  英文:", plantAnswer.英文);
-//         console.log("  中文:", plantAnswer.中文);
-//         console.log("  正确答案:", plantAnswer.正确答案);
-//         console.log("  序号:", plantAnswer.序号);
-//       }
-
-//       // 2️⃣ 打印 synonyms 中对应的 plant 选项
-//       const plantSynonym = data.synonyms.find((s) => s.英文 === "plant");
-
-//       if (!plantSynonym) {
-//         console.warn("❌ synonyms 中未找到英文为 plant 的项");
-//       } else {
-//         console.log("🧩 synonyms 中的 plant：");
-//         console.log("  英文:", plantSynonym.英文);
-//         console.log("  序号:", plantSynonym.序号);
-
-//         if (Array.isArray(plantSynonym.中文)) {
-//           console.log("  选项列表：");
-//           plantSynonym.中文.forEach((opt, idx) => {
-//             console.log(`    [${idx}]`, opt);
-//           });
-//         } else {
-//           console.log("  中文字段（非数组）:", plantSynonym.中文);
-//         }
-
-//         if ("选项" in plantSynonym) {
-//           console.log("  选项字段(选项):", plantSynonym.选项);
-//         }
-//         if ("排除" in plantSynonym) {
-//           console.log("  排除:", plantSynonym.排除);
-//         }
-//       }
-
-//       // 3️⃣ 对齐性检查（是否一致）
-//       if (plantAnswer && plantSynonym && Array.isArray(plantSynonym.中文)) {
-//         const matchInOptions = plantSynonym.中文.includes(plantAnswer.中文);
-//         console.log(
-//           "🔍 answers.中文 是否在 synonym.中文 选项中:",
-//           matchInOptions
-//         );
-
-//         if (!matchInOptions) {
-//           console.warn(
-//             "⚠️ 不一致：answers.中文 不存在于选项中（这是你现在的核心 bug）"
-//           );
-//         }
-//       }
-
-//       console.log("====================================");
-//     }
-//     printPlantDebug(data);
-//   }
-// };
 const lastSpeakTime = ref(0);
 
 // 跳转下一面
@@ -2483,10 +613,10 @@ const speakWord = async (english, answer) => {
   const now = Date.now();
   const timeDiff = now - lastSpeakTime.value;
 
-  // 检查是否在5秒限制内
-  if (timeDiff < 5000) {
+  // 检查是否在2秒限制内
+  if (timeDiff < 2000) {
     // 显示提示消息
-    showToast("每5秒只能一次，可以尝试pro模式解除限制");
+    showToast("每2秒只能一次，可以尝试pro模式解除限制");
     return;
   }
 
@@ -2582,7 +712,11 @@ const runGoToNextPage = (...args) => {
     lock_spell,
     router,
     getSpellVocabulary,
-    device_type:"pc",
+    device_type: "pc",
+    complete_status: false,
+    isBroken: false,
+    listening_number_user: listening_number_user.value,
+    writingwords_number_user: writingwords_number_user.value,
   });
 };
 const handleRegularMode = () => {
@@ -2597,6 +731,10 @@ const handleRegularMode = () => {
       0,
       originalData.value[gotoIndex.value]["is_spell_number"],
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   }
 
@@ -2610,6 +748,10 @@ const handleRegularMode = () => {
       0,
       originalData.value[gotoIndex.value]["is_spell_number"],
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   }
 
@@ -2623,6 +765,10 @@ const handleRegularMode = () => {
       0,
       originalData.value[gotoIndex.value]["is_spell_number"],
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   }
 };
@@ -2637,6 +783,10 @@ const handleSwipeMode = () => {
       1,
       originalData.value[gotoIndex.value]["is_spell_number"],
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   } else {
     runGoToNextPage(
@@ -2648,6 +798,10 @@ const handleSwipeMode = () => {
       0,
       originalData.value[gotoIndex.value]["is_spell_number"],
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   }
 };
@@ -2862,6 +1016,9 @@ const startReview = () => {
       basicPreExam: basicPreExam.value,
       reviewRequired: reviewRequired.value,
       navTitle: currentTitle,
+      isBroken: isBroken.value,
+      listening_number_user: listening_number_user.value,
+      writingwords_number_user: writingwords_number_user.value,
     },
   });
 };
@@ -2929,7 +1086,7 @@ const onLoadReviewData = async (title = "全部") => {
         const date = new Date(item.create_time);
         const viewDate = new Date(item.view_time);
         const formatter = new Intl.DateTimeFormat("zh-CN", {
-          year: "numeric",
+          year: "2-digit",
           month: "long",
           day: "numeric",
           hour: "numeric",
@@ -3070,6 +1227,7 @@ function showAnimation() {
 }
 
 const gotoItem = (index) => {
+  forceShowReviewButtons.value = false;
   indexAnswer.value = index;
   flagReviewList.value = true;
   // 投票模式
@@ -3205,15 +1363,19 @@ const gotoItem = (index) => {
     showToast(`已完成\n正确率为${accuracy}%`);
     return;
   }
-  // 考试模式开始，弹出答案选择
+  // 考试模式开始：冰封先预习，否则进入模式选择。
   if (originalData.value[index]["type"] == 2) {
-    handleConfirmCheckAnswer();
+    forceShowReviewButtons.value =
+      originalData.value[index]["swipe_status"] == 0;
+    if (forceShowReviewButtons.value) {
+      handleConfirmCheckAnswer();
+    } else {
+      showChooseMode.value = true;
+    }
     return;
   }
 
-  if (
-    originalData.value[index]["swipe_status"] == 0
-  ) {
+  if (originalData.value[index]["swipe_status"] == 0) {
     handleConfirmCheckAnswer();
   } else {
     showChooseMode.value = true;
@@ -3223,6 +1385,7 @@ const gotoItem = (index) => {
 // 是否提前查看答案
 
 const spellWordsList = ref([]);
+const forceShowReviewButtons = ref(false);
 const handleConfirmCheckAnswer = () => {
   isLoading.value = true;
   getSpellVocabulary(originalData.value[gotoIndex.value]["nid"]).then((res) => {
@@ -3308,6 +1471,7 @@ watch(showAnswerSheet, (newVal) => {
   selfCheck.value = true;
   if (!newVal) {
     handleAnswerSheetClose();
+    forceShowReviewButtons.value = false;
   } else {
     createTimeAnswer.value = new Date();
     // console.log("createTimeAnswer:", createTimeAnswer.value);
@@ -3326,13 +1490,14 @@ const handlePageUnload = () => {
 // 提前查看答案
 const dialogPosition = ref({ x: 0, y: 0 });
 const viewAnswer = (item, index) => {
+  gotoIndex.value = index;
   console.log("item: ", item);
   // console.log("item: ", item.attempt);
   // console.log("index: ", index);
   console.log("originalData: ", originalData.value[index]);
   if (item.attempt == 0) {
     gotoIndex.value = index;
-    showCheckAnswerSheet.value = true;
+    handleConfirmCheckAnswer();
     return;
   }
   if (item.rate >= 3) {
@@ -3373,6 +1538,10 @@ const viewAnswer = (item, index) => {
   })
     .then(() => {
       showAnimationShine();
+      if (showAnswerSheet.value) {
+        showChooseMode.value = false;
+        return;
+      }
       isLoading.value = true;
       getSpellVocabulary(originalData.value[index]["nid"]).then((res) => {
         console.log("res: ", res);
@@ -3416,13 +1585,13 @@ const viewAnswer = (item, index) => {
         }
         // 调用updateView并处理其promise
         if (item.attempt > 0) {
-          updateView().then((res) => {
+          updateView().then(async (res) => {
             originalData.value = [];
             pageIndexOriginalData.value = 0;
             finishedOriginalData.value = false;
-            loadingOriginalData.value = false; // 重新触发加载
-            onLoadOriginalData(); // 手动调用onLoad以重新开始加载过程
+            loadingOriginalData.value = false;
             activeTabs.value = 0;
+            await onLoadOriginalData();
           });
         }
       });
@@ -3488,29 +1657,99 @@ const completeNumberList = ref([]);
 // textbook单词表
 const textbookData = ref([]);
 const showTextbookPop = ref(false);
+const reviewProgress = ref(0);
+const hasEnoughWords = ref(false);
 const meaningShow = ref(false);
 const meaningTitle = ref("");
 const meaningData = ref({
   高考: { 英文: "", 中文: "" },
   教材: [{ 中文: "", 模块: "", 教材: "" }],
 });
+const matchGameWords = ref([]);
+const isBroken = computed(
+  () => reviewProgress.value === 100 && hasEnoughWords.value
+);
+watch(
+  isBroken,
+  (newVal) => {
+    // 只有当 isBroken 从 false 变为 true 时才触发
+    if (newVal === true) {
+      handleEarningHalf();
+    }
+  },
+  { immediate: false }
+);
 
+// 定义发送请求的方法
+const handleEarningHalf = async () => {
+  try {
+    let params = new URLSearchParams();
+    // 假设后端对应的接口方法名为 updatePenaltyStatus
+    params.append("method", "handleEarningHalf");
+    params.append("username", username.value);
+
+    const response = await axios.post("words/", params);
+
+    if (response.data.success) {
+    }
+  } catch (error) {
+    console.error("同步减半状态失败:", error);
+  }
+};
 const showTextbook = () => {
-  showTextbookPop.value = true;
+  if (!isBroken.value) {
+    showToast("暂时无需回顾");
+    return;
+  }
+  const toast = showLoadingToast({
+    duration: 0,
+    forbidClick: true,
+    message: "加载数据...",
+    loadingType: "spinner",
+  });
+
   async function queryTextbook() {
-    // 查询textbook
     let params = new URLSearchParams();
     params.append("method", "queryTextbook");
     params.append("username", username.value);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
+    return await axios.post("words/", params).then((ret) => ret.data);
   }
+
   queryTextbook().then((res) => {
-    if (res.length != 0) {
-      textbookData.value = JSON.parse(res[0]["textbook"]);
+    if (res.length !== 0) {
+      // 1. 解析数据
+      let parsedData = JSON.parse(res[0]["textbook"]);
+
+      // 2. 🔥 过滤掉答案为“以上都不对”的单词
+      textbookData.value = parsedData.filter(
+        (item) => item.答案 && !item.答案.includes("以上都不对")
+      );
+
+      // 3. 排序
       textbookData.value.sort((a, b) => b.times - a.times);
       console.log("textbookData: ", textbookData.value);
+
+      // 取前18个，不够则提示 (这里的 length 已经是过滤后的真实有效数量了)
+      if (textbookData.value.length < 18) {
+        showConfirmDialog({
+          title: "单词数量不足",
+          theme: "round-button",
+          showCancelButton: false,
+          message: `当前只有 ${textbookData.value.length} 个有效单词，暂时无法生成连线游戏\n继续挑战积累更多词汇吧！`,
+        }).then(() => {
+          showTextbookPop.value = false;
+        });
+        return;
+      }
+
+      // 取前18个，转成游戏组件需要的格式
+      matchGameWords.value = textbookData.value.slice(0, 18).map((item) => ({
+        英文: item.英文,
+        答案: item.答案,
+        times: item.times,
+      }));
+      toast.close();
+      showTextbookPop.value = true;
     } else {
       showConfirmDialog({
         title: "你还没有尝试单词挑战",
@@ -3523,65 +1762,14 @@ const showTextbook = () => {
     }
   });
 };
-const getVocabularyMeaning = (index) => {
-  const word = textbookData.value[index].英文;
-  async function getWordMeaning() {
-    // 查询单词含义
-    let params = new URLSearchParams();
-    params.append("method", "getTextbookMeaning");
-    params.append("word", word);
-    return await axios.post("words/", params).then((ret) => {
-      return ret.data;
-    });
-  }
-  showLoadingToast({
-    message: "加载中...",
-    duration: 0,
+const gotoWordMatchGame = () => {
+  router.push({
+    path: "/wordMatchGamePc",
+    state: {
+      words: JSON.stringify(matchGameWords.value),
+      username: JSON.stringify(username.value),
+    },
   });
-  getWordMeaning()
-    .then((res) => {
-      // console.log("res", res);
-      const sortOrder = [
-        "七上",
-        "七下",
-        "八上",
-        "八下",
-        "九上",
-        "九下",
-        "必修一",
-        "必修二",
-        "必修三",
-        "选修一",
-        "选修二",
-        "选修三",
-        "选修四",
-      ];
-      res["教材"].sort((a, b) => {
-        return sortOrder.indexOf(a.教材) - sortOrder.indexOf(b.教材);
-      });
-      meaningTitle.value = word;
-      if (res["教材"] == []) {
-        meaningData.value["教材"] = ["无"];
-      } else {
-        meaningData.value["教材"] = res["教材"];
-      }
-
-      if (Object.keys(res["高考"]).length === 0) {
-        meaningData.value["高考"]["中文"] = "无";
-      } else {
-        meaningData.value["高考"]["中文"] = res["高考"]["中文"];
-        meaningData.value["高考"]["英文"] = res["高考"]["英文"];
-      }
-      // console.log("meaningData", meaningData.value);
-    })
-    .then((res) => {
-      closeToast();
-      meaningShow.value = true;
-    })
-    .catch((err) => {
-      closeToast();
-      showFailToast("查询失败");
-    });
 };
 
 // 导航分类
@@ -3591,6 +1779,30 @@ const tabsName = ref([]);
 // 加载数据
 const originalData = ref([]);
 const showStars = ref(false);
+const swipeRef = ref(null);
+const blueSwipeRef = ref(null);
+const prevSwipe = () => {
+  swipeRef.value?.prev();
+};
+const nextSwipe = () => {
+  swipeRef.value?.next();
+};
+const prevBlueSwipe = () => {
+  blueSwipeRef.value?.prev();
+};
+const nextBlueSwipe = () => {
+  blueSwipeRef.value?.next();
+};
+const carouselItems = computed(() => {
+  return originalData.value
+    .map((item, index) => ({ ...item, originalIndex: index }))
+    .filter((item) => item.type != 4 && item.type != 2 && item.is_pinned && item.rate < 3);
+});
+const blueCarouselItems = computed(() => {
+  return originalData.value
+    .map((item, index) => ({ ...item, originalIndex: index }))
+    .filter((item) => item.type == 2 && item.rate < 3);
+});
 const loadingOriginalData = ref(false);
 const finishedOriginalData = ref(false);
 const pageIndexOriginalData = ref(0);
@@ -3605,6 +1817,21 @@ const formattedRate = (rate) => {
     // 保留一位小数
     return (rate - 3).toFixed(1);
   }
+};
+const shouldHideFromList = (item) => {
+  return (
+    (item.type != 4 && item.is_pinned && item.rate < 3) ||
+    (item.type == 2 && item.rate < 3)
+  );
+};
+const blueSwipeRateIcon = (item) => {
+  if (item.rate < 3) {
+    return cryEmoji;
+  }
+  return smileEmoji;
+};
+const shouldShowListFrozen = (item) => {
+  return item.type != 2 && item.swipe_status == 0 && item.rate < 3;
 };
 
 // 分页加载
@@ -3761,7 +1988,7 @@ const onLoadOriginalData = async (title = "全部") => {
         const date = new Date(item.create_time);
         const viewDate = new Date(item.view_time);
         const formatter = new Intl.DateTimeFormat("zh-CN", {
-          year: "numeric",
+          year: "2-digit",
           month: "long",
           day: "numeric",
           hour: "numeric",
@@ -3793,13 +2020,13 @@ const onLoadOriginalData = async (title = "全部") => {
   //   missyouFlag.value = false;
   // }
 
-  if (
-    !sessionStorage.getItem("missyouAnimationShown") &&
-    missyouFlag.value == true
-  ) {
-    showAnimationShineMissYou();
-    sessionStorage.setItem("missyouAnimationShown", "true");
-  }
+  // if (
+  //   !sessionStorage.getItem("missyouAnimationShown") &&
+  //   missyouFlag.value == true
+  // ) {
+  //   showAnimationShineMissYou();
+  //   sessionStorage.setItem("missyouAnimationShown", "true");
+  // }
   return originalData.value;
 };
 
@@ -3866,6 +2093,7 @@ function showAnimationShineThreeStar() {
 const missyouRef = ref(null);
 const missyouFlag = ref(false);
 const missDays = ref(2);
+const flagMissingThunder = ref(false);
 function showAnimationShineMissYou() {
   missyouRef.value.show();
 
@@ -3883,6 +2111,8 @@ const flagSwipe = ref(1);
 const usercoins = ref(0);
 const userdiamonds = ref(0);
 const userflowers = ref(0);
+const listening_number_user = ref(0);
+const writingwords_number_user = ref(0);
 const getPassiveRef = ref(null);
 function showPassiveMagic() {
   if (getPassiveRef.value.visible) {
@@ -4090,6 +2320,10 @@ async function handleConfirmChallenge() {
       0,
       0,
       "pc",
+      flagMissingThunder.value,
+      isBroken.value,
+      listening_number_user.value,
+      writingwords_number_user.value
     );
   }
 }
@@ -4618,7 +2852,10 @@ const onCalendarClose = () => {
 
 // 滑动模式
 const gotoReviewWordSwipe = (item, index) => {
-  if(originalData.value[index].swipe_status === 1) {
+  if (
+    originalData.value[index].swipe_status === 1 &&
+    !forceShowReviewButtons.value
+  ) {
     showChooseMode.value = true;
     return;
   }
@@ -4640,64 +2877,85 @@ const gotoWordSwipe = (item, index) => {
 };
 
 const isSkipLoading = ref(false);
-const skipSwipeReview = (item, index) => {
+const skipSwipeReview = (item) => {
+  // 动态判断当前花费
+  const currentPrice = isBroken.value ? 5 : 4;
+
+  // 动态构建提示信息，如果 isBroken 为 true，则加入红色的 HTML 字符串
+  const dialogMessage = isBroken.value
+    ? `<div style="color: red; margin-bottom: 8px; font-weight: bold;">💔 消费提升</div>需要花费${currentPrice}朵🌸，确定跳过吗？`
+    : `需要花费${currentPrice}朵🌸，确定跳过吗？`;
+
   showConfirmDialog({
     title: "跳过滑动复习🌸",
-    message: "需要花费4朵🌸，确定跳过吗？",
+    message: dialogMessage,
+    allowHtml: true,
     theme: "round-button",
-  }).then( async () => {
+  }).then(async () => {
     isSkipLoading.value = true;
     let params = new URLSearchParams();
     params.append("method", "skipSwipeReview");
     params.append("username", username.value);
     params.append("nid", item.nid);
-    params.append("price_skip", 4);
+    // 把动态价格发送给后端
+    params.append("price_skip", currentPrice);
     const response = await axios.post("words/", params);
     isSkipLoading.value = false;
     if (response.data.status === "success") {
       userflowers.value = response.data.flowers_after_skip;
-      originalData.value[index].swipe_status = 1;
+      const index = originalData.value.findIndex((d) => d.nid === item.nid); // ✅ 定义 index
+      if (index !== -1) {
+        originalData.value[index] = {
+          ...originalData.value[index],
+          swipe_status: 1,
+        };
+      }
       showChooseMode.value = true;
     } else {
       showToast(response.data.message);
     }
-
-
   });
 };
 
 // 更新版本提示
 const showUpdate = () => {
   // 使用版本号来管理更新提示
-  const UPDATE_VERSION = "v4"; // 新版本号
+  const UPDATE_VERSION = "v5"; // 新版本号
   const lastShownTime = localStorage.getItem(
-    `wordSwipeReview_${UPDATE_VERSION}`
+    `wordSwipeReview_${UPDATE_VERSION}_time`
   );
   const shownCount = parseInt(
-    localStorage.getItem(`wordSwipeReview_${UPDATE_VERSION}`) || "0"
+    localStorage.getItem(`wordSwipeReview_${UPDATE_VERSION}_count`) || "0"
   );
   const now = Date.now();
   const dayInMs = 24 * 60 * 60 * 1000;
 
   // 清理旧版本的 localStorage 数据
+  localStorage.removeItem(`wordSwipeReview_${UPDATE_VERSION}`);
   localStorage.removeItem("winStreakUpdateTime");
   localStorage.removeItem("winStreakUpdateCount");
 
-  // 如果显示次数小于5次，且（从未显示过 或 距离上次显示超过1天）
+  // 如果显示次数小于3次，且（从未显示过 或 距离上次显示超过1天）
   if (
     shownCount < 3 &&
     (!lastShownTime || now - parseInt(lastShownTime) > 1 * dayInMs)
   ) {
     showDialog({
-      title: "更新：预习游戏规则更改",
-      message: "首次预习强制滑动复习（付费跳过），游戏模式限制暂停次数",
+      title: "更新：闪电⚡️来临",
+      message:
+        "deepseek‑v4‑flash 接入单词背诵<br/>" +
+        "单词判定更智能、更高效、更准确<br/>" +
+        "每次提交产生的费用由老师统一承担，无需额外支付",
       theme: "round-button",
       allowHtml: true,
       messageAlign: "left",
     }).then(() => {
-      localStorage.setItem(`wordSwipeReview_${UPDATE_VERSION}`, now.toString());
       localStorage.setItem(
-        `wordSwipeReview_${UPDATE_VERSION}`,
+        `wordSwipeReview_${UPDATE_VERSION}_time`,
+        now.toString()
+      );
+      localStorage.setItem(
+        `wordSwipeReview_${UPDATE_VERSION}_count`,
         (shownCount + 1).toString()
       );
     });
@@ -4725,7 +2983,6 @@ const downloadNewversion = () => {
   //   console.log("非安卓环境");
   //   showToast("请在安卓App中更新");
   // }
-  
 };
 
 // 主题
@@ -4734,7 +2991,8 @@ onMounted(async () => {
   updateRemainingCount();
 
   // 检查安卓版本
-  // checkApkUpdate();
+  // checkApkUpdate({ forceUpdate: true });    // 强制更新
+  // checkApkUpdate({ showLatestToast: true });  // 可选更新
 
   // 检查是否已经显示过更新提示
   showUpdate();
@@ -4826,27 +3084,8 @@ onMounted(async () => {
   sessionStorage.removeItem("numberShowAnswer");
   sessionStorage.removeItem("numberTransparent");
   sessionStorage.removeItem("numberPrev");
-  // 弹出庆祝
-  // flagRate.value = history.state?.flagRate;
-  missyouFlag.value = history.state?.missyouflag;
-  // missDays.value = history.state?.missDays;
-  missDays.value = history.state?.missDays ?? NaN;
-  await nextTick(); // 等待页面完全渲染
+  sessionStorage.removeItem("numberPauseBlackOverlay");
 
-  // flagRate.value = 3;
-  // if (flagRate.value !== undefined) {
-  //   if (flagRate.value > 2.8) {
-  //     flagRate.value = 3;
-  //   }
-  //   if (
-  //     flagRate.value === 3 &&
-  //     !sessionStorage.getItem("shineThreeStarShown")
-  //   ) {
-  //     showAnimationShineThreeStar();
-  //     sessionStorage.setItem("shineThreeStarShown", "true");
-  //   }
-  // }
-  // console.log("flagRate: ", flagRate.value);
   // 加载数据
   originalData.value = [];
   let res = new Promise(async (resolve, reject) => {
@@ -4919,13 +3158,65 @@ onMounted(async () => {
       usercoins.value = res["data_coins"][0]["coins"];
       userdiamonds.value = res["data_coins"][0]["diamonds"];
       userflowers.value = res["data_coins"][0]["flowers"];
+      listening_number_user.value = res["listening_number_user"];
+      writingwords_number_user.value = res["writingwords_number_user"];
       // userdiamonds.value = 1;
       // console.log("usercoins: ", usercoins.value);
     });
     return "ok";
   });
-  // flagRate.value = 3;
-  // showPassiveMagic();
+  res = res.then(() => {
+    // 弹出庆祝
+    async function missTask() {
+      let params = new URLSearchParams();
+      params.append("method", "missTask");
+      params.append("user", username.value);
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
+    }
+    const today = new Date().toISOString().slice(0, 10); // "2026-04-06"
+    const missyouKey = `missyouAnimationShown_${username.value}_${today}`;
+
+    missTask().then((res_miss) => {
+      console.log("res_miss: ", res_miss);
+      flagMissingThunder.value = res_miss.complete_status;
+      if (res_miss.message != "无") {
+        missyouFlag.value = true;
+        missDays.value = res_miss.message;
+        // console.log("missDays.value: ", missDays.value);
+      }
+      if (!sessionStorage.getItem(missyouKey) && missyouFlag.value == true) {
+        showAnimationShineMissYou();
+        sessionStorage.setItem(missyouKey, "true");
+      }
+    });
+  });
+  res = res.then(() => {
+    // 得到回顾进度
+    async function getReviewProgress() {
+      let params = new URLSearchParams();
+      params.append("method", "getReviewProgress");
+      params.append("username", username.value);
+      return await axios.post("words/", params).then((ret) => {
+        return ret.data;
+      });
+    }
+
+    getReviewProgress().then((res) => {
+      console.log("回顾进度", res);
+      if (res.success) {
+        setTimeout(() => {
+          reviewProgress.value = res.progress;
+          // reviewProgress.value = 75;
+          hasEnoughWords.value = res.has_enough_words;
+          // console.log("hasEnoughWords.value: ", hasEnoughWords.value);
+          // hasEnoughWords.value = true;
+        }, 300);
+      }
+    });
+  });
+
   res = res.then(() => {
     localStorage.removeItem("giveBears");
     if (flagRate.value >= 3 && !localStorage.getItem("givePassiveMagic")) {
@@ -5066,6 +3357,9 @@ onMounted(async () => {
               <span class="coin-item" @click.stop="handleFlowerClick">
                 🌸 {{ userflowers }}
               </span>
+              <span v-if="flagMissingThunder" @click.stop="handleDiamondClick">
+                &nbsp;&nbsp;⚡️
+              </span>
             </div>
           </div>
         </template>
@@ -5132,65 +3426,197 @@ onMounted(async () => {
     <div class="main-content-wrapper">
       <!-- 左侧边栏 -->
       <div class="left-sidebar">
-        <!-- 本月日历 连胜 -->
-        <div class="streak-info">
-          <span style="color: black">连胜{{ daysWinningStreak }}天</span>
-          <span
-            style="margin-left: 1rem"
-            :style="{
-              color: has_enough_today ? '#FFD700' : '#d0d0d0',
-              filter: has_enough_today
-                ? 'brightness(1.2) saturate(1.5) hue-rotate(-40deg)'
-                : 'brightness(0.8) saturate(0.3)',
-              textShadow: has_enough_today ? '0 0 8px #FFD700' : 'none',
-            }"
-          >
-            {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
-          </span>
-        </div>
-
+        <!-- 连胜天数 -->
         <div
+          class="streak-info"
           style="
             display: flex;
-            justify-content: flex-start;
             align-items: center;
-            gap: 10px;
-            width: 160%;
+            justify-content: space-between;
+            width: 100%;
+            box-sizing: border-box;
           "
         >
-          <div style="">
+          <div style="display: flex; align-items: center; width: 66.66%">
+            <span
+              class="streak-days"
+              style="
+                color: black;
+                display: inline-flex;
+                align-items: center;
+                margin-right: 0;
+              "
+              >连胜{{ daysWinningStreak }}天</span
+            >
+
+            <span
+              class="today-status"
+              style="
+                margin-left: 1rem;
+                display: inline-flex;
+                align-items: center;
+              "
+              :style="{
+                color: has_enough_today ? '#FFD700' : '#d0d0d0',
+                filter: has_enough_today
+                  ? 'brightness(1.2) saturate(1.5) hue-rotate(-40deg)'
+                  : 'brightness(0.8) saturate(0.3)',
+                textShadow: has_enough_today ? '0 0 8px #FFD700' : 'none',
+              }"
+            >
+              {{ has_enough_today ? "获得今日🌸" : "未完成今日任务" }}
+            </span>
+          </div>
+
+          <div
+            style="width: 33.33%; padding-left: 10px; box-sizing: border-box"
+          >
             <van-button
               type="default"
               size="normal"
               plain
+              style="width: 100%; margin: 0"
               @click="showWinningCalendar = true"
             >
               查看连胜
             </van-button>
           </div>
-          <!-- 待复习按钮 -->
-          <div class="review-section" v-if="flagReview" style="width: 40%">
-            <van-badge :content="reviewList_first || ''" class="flashing-icon">
-              <van-button
-                block
-                plain
-                round
-                size="normal"
-                color="gray"
-                @click="showReviewList = true"
+        </div>
+
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin: 0 0 15px 0;
+            padding: 0;
+            box-sizing: border-box;
+          "
+        >
+          <div
+            class="review-btn-container"
+            style="display: flex; align-items: center; gap: 8px"
+            :style="{ margin: isBroken ? '0' : '0 0 0 20px' }"
+          >
+            <van-button
+              round
+              class="liquid-btn"
+              :class="{ 'is-broken': isBroken }"
+              :disabled="isBroken"
+              style="
+                width: 62px;
+                height: 62px;
+                padding: 0;
+                margin: 0;
+                flex-shrink: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+              "
+              :style="{ '--progress': reviewProgress + '%' }"
+              @click="showTextbook"
+            >
+              <template v-if="!isBroken">
+                <div class="water-group">
+                  <div class="water-layer water-layer1"></div>
+                  <div class="water-layer water-layer2"></div>
+                </div>
+                <span
+                  class="btn-text"
+                  style="line-height: 1"
+                  :style="{ color: reviewProgress > 40 ? '#fff' : '#ff976a' }"
+                >
+                  回顾
+                </span>
+              </template>
+
+              <div
+                v-else
+                class="broken-content"
+                @click="showTextbook"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                  justify-content: center;
+                  height: 100%;
+                "
               >
-                ⚡️ 待复习
-              </van-button>
-            </van-badge>
-            <img
-              :src="reviewList_first === 0 ? srcReview_first2 : srcReview_first"
-              class="review-mascot"
-            />
+                <span class="broken-heart" style="line-height: 1">💔</span>
+                <span
+                  class="broken-text"
+                  style="line-height: 1; margin-top: 2px"
+                  >需回顾</span
+                >
+              </div>
+            </van-button>
+
+            <div
+              v-if="isBroken"
+              class="penalty-warning"
+              style="margin: 0; line-height: 1.2; font-size: 12px"
+            >
+              所有收益减半<br />
+              消费增加<br />
+              回顾后恢复
+            </div>
           </div>
-          <div v-else class="review-complete" style="width: 40%">
-            <img :src="srcReview" class="review-complete-img" />
+
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              justify-content: flex-end;
+            "
+            :style="{ margin: isBroken ? '0 15px 0 0' : '0 30px 0 0' }"
+          >
+            <div
+              class="review-section"
+              v-if="flagReview"
+              style="display: flex; align-items: center; gap: 8px; margin: 0"
+            >
+              <van-badge
+                :content="reviewList_first || ''"
+                class="flashing-icon"
+                style="margin: 0; display: inline-flex"
+              >
+                <van-button
+                  block
+                  plain
+                  round
+                  size="normal"
+                  color="gray"
+                  style="margin: 0"
+                  @click="showReviewList = true"
+                >
+                  ⚡️ 待复习
+                </van-button>
+              </van-badge>
+
+              <img
+                :src="
+                  reviewList_first === 0 ? srcReview_first2 : srcReview_first
+                "
+                class="review-mascot"
+                style="display: block; margin: 0; max-height: 40px"
+              />
+            </div>
+
+            <div
+              v-else
+              class="review-complete"
+              style="display: flex; align-items: center; margin: 0 40px 0 0"
+            >
+              <img
+                :src="srcReview"
+                class="review-complete-img"
+                style="display: block; margin: 0; height: 60px"
+              />
+            </div>
           </div>
         </div>
+
         <!-- 本月日历 -->
         <div class="month-calendar">
           <!-- 月份标题 + 切换按钮 -->
@@ -5515,13 +3941,14 @@ onMounted(async () => {
               active-color="#999"
               @change="toggleMultiSelectMode"
             />
+
             <van-notice-bar
               class="notice-bar"
               left-icon="volume-o"
               scrollable
               :delay="1"
               :speed="80"
-              text="改进了预习方式和游戏模式的规则...有bug联系老师"
+              text="听力模式上线，祝愉快...有bug联系老师"
             />
           </div>
 
@@ -5545,10 +3972,551 @@ onMounted(async () => {
             v-model:active="activeTabs"
             @click-tab="onClickTab"
             shrink
-            swipeable
             sticky
           >
             <van-tab title="全部">
+              <!-- 轮播图 - 置顶重点任务 -->
+              <div
+                v-if="carouselItems.length > 0"
+                style="padding: 12px 0 0 12px; overflow: hidden;"
+              >
+<div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 6px;
+                    padding-right: 20px;
+                  "
+                >
+                  <div style="font-size: 12px; color: #999; margin-left: 4px;">
+                    共 {{ carouselItems.length }} 组作业任务
+                  </div>
+                  <!-- 新增：左右滑动控制按钮组 -->
+                  <div style="display: flex; gap: 8px;">
+                    <van-button 
+                      icon="arrow-left" 
+                      size="mini" 
+                      round 
+                      @click="prevSwipe" 
+                      style="width: 24px; height: 24px; padding: 0; background: rgba(0,0,0,0.05); border: none; color: #666;"
+                    />
+                    <van-button 
+                      icon="arrow" 
+                      size="mini" 
+                      round 
+                      @click="nextSwipe" 
+                      style="width: 24px; height: 24px; padding: 0; background: rgba(0,0,0,0.05); border: none; color: #666;"
+                    />
+                  </div>
+                </div>
+                <van-swipe
+                  ref="swipeRef"
+                  class="my-swipe"
+                  :autoplay="0"
+                  :loop="false"
+                  :width="280"
+                  style="
+                    border-radius: 18px;
+                    width: 100%;
+                    padding-right: 20px;
+                    box-sizing: border-box;
+                  "
+                >
+                  <van-swipe-item
+                    v-for="(item, index) in carouselItems"
+                    :key="index"
+                    @click="gotoItem(item.originalIndex)"
+                    style="padding: 0 8px 3px 8px"
+                  >
+                    <div
+                      :class="{ 'ice-frozen': item.swipe_status == 0 }"
+                      style="
+                        position: relative;
+                        background: linear-gradient(145deg, #ff7e5f, #ff6b6b);
+                        border-radius: 18px;
+                        height: 220px;
+                        padding: 20px 16px 16px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-end;
+                        color: white;
+                        box-shadow: 0 8px 20px rgba(255, 107, 107, 0.4);
+                        overflow: hidden;
+                        box-sizing: border-box;
+                      "
+                    >
+                      <!-- 冰封光效层 -->
+                      <template v-if="item.swipe_status == 0">
+                        <span class="ice-layer-prism" />
+                        <span class="ice-layer-glint" />
+                      </template>
+
+                      <!-- 背景光效 -->
+                      <div
+                        style="
+                          position: absolute;
+                          top: 0;
+                          left: 0;
+                          width: 100%;
+                          height: 45%;
+                          background: linear-gradient(
+                            180deg,
+                            rgba(255, 255, 255, 0.25) 0%,
+                            rgba(255, 255, 255, 0) 100%
+                          );
+                          pointer-events: none;
+                          z-index: 0;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          position: absolute;
+                          bottom: -20px;
+                          right: -20px;
+                          width: 120px;
+                          height: 120px;
+                          background: rgba(255, 255, 255, 0.15);
+                          border-radius: 50%;
+                          filter: blur(25px);
+                          pointer-events: none;
+                          z-index: 0;
+                        "
+                      ></div>
+
+                      <!-- 标签 -->
+                      <div
+                        style="
+                          position: absolute;
+                          top: 16px;
+                          left: 16px;
+                          z-index: 1;
+                        "
+                      >
+                        <van-tag
+                          round
+                          color="rgba(255,255,255,0.2)"
+                          text-color="#fff"
+                          style="
+                            border: 1px solid rgba(255, 255, 255, 0.4);
+                            backdrop-filter: blur(8px);
+                            padding: 3px 8px;
+                            font-size: 11px;
+                          "
+                        >
+                          <van-icon name="fire" style="margin-right: 2px" />
+                          老师作业
+                        </van-tag>
+                      </div>
+
+                      <!-- 时间 -->
+                      <div
+                        style="
+                          font-size: 12px;
+                          opacity: 0.9;
+                          margin-bottom: 6px;
+                          position: relative;
+                          z-index: 1;
+                          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                        "
+                      >
+                        待复习 · {{ item.create_time }}
+                      </div>
+
+                      <!-- 标题 -->
+                      <div
+                        style="
+                          font-weight: 800;
+                          font-size: 18px;
+                          line-height: 1.3;
+                          margin-bottom: 10px;
+                          min-height: calc(18px * 1.3 * 2);
+                          display: -webkit-box;
+                          -webkit-line-clamp: 2;
+                          -webkit-box-orient: vertical;
+                          overflow: hidden;
+                          text-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <span v-if="item.complete_status == 1">⚡️</span>
+                        {{ processedTitle(item.title) }}
+                      </div>
+
+                      <!-- 词数 + 星级 + 背次数 -->
+                      <div
+                        style="
+                          display: flex;
+                          align-items: center;
+                          margin-bottom: 12px;
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <div
+                          style="
+                            font-size: 13px;
+                            font-weight: bold;
+                            opacity: 0.95;
+                            margin-right: 10px;
+                          "
+                        >
+                          {{ item.answers ? item.answers.length : 0 }}词
+                        </div>
+                        <van-rate
+                          v-model="item.rate"
+                          :size="14"
+                          color="#ffd21e"
+                          void-icon="like"
+                          icon="like"
+                          void-color="rgba(255,255,255,0.35)"
+                          :count="3"
+                          readonly
+                          allow-half
+                          style="
+                            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+                          "
+                        />
+                        <div
+                          style="
+                            font-size: 12px;
+                            margin-left: 8px;
+                            opacity: 0.9;
+                          "
+                        >
+                          背<span style="font-weight: 700">{{
+                            item.attempt
+                          }}</span
+                          >次
+                        </div>
+                      </div>
+
+                      <!-- 底部操作栏 -->
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          align-items: center;
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            align-items: center;
+                            background: rgba(255, 255, 255, 0.25);
+                            backdrop-filter: blur(12px);
+                            padding: 5px 12px;
+                            border-radius: 16px;
+                            border: 1px solid rgba(255, 255, 255, 0.4);
+                          "
+                        >
+                          <van-icon
+                            name="play"
+                            size="15"
+                            style="margin-right: 4px"
+                          />
+                          <span style="font-size: 13px; font-weight: bold"
+                            >开始挑战</span
+                          >
+                        </div>
+                        <!-- 滑动提示箭头 -->
+                        <div class="swipe-hint-arrow">
+                          <van-icon name="arrow" size="13" />
+                          <van-icon name="arrow" size="13" />
+                          <van-icon name="arrow" size="13" />
+                        </div>
+                      </div>
+                    </div>
+                  </van-swipe-item>
+                  <van-swipe-item
+                    key="spacer"
+                    style="width: 8px; padding: 0"
+                    @click.stop
+                  >
+                    <div style="width: 8px"></div>
+                  </van-swipe-item>
+                  <template #indicator="{ active, total }">
+                    <div class="custom-indicator">
+                      {{ active + 1 }} / {{ total - 1 }}
+                    </div>
+                  </template>
+                </van-swipe>
+              </div>
+              <div
+                v-if="blueCarouselItems.length > 0"
+                style="padding: 12px 0 0 12px; overflow: hidden"
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 6px;
+                    padding-right: 20px;
+                  "
+                >
+                  <div style="font-size: 12px; color: #999; margin-left: 4px">
+                    一次全对就可以完成（非紧急作业）
+                  </div>
+                  <div style="display: flex; gap: 8px">
+                    <van-button
+                      icon="arrow-left"
+                      size="mini"
+                      round
+                      @click="prevBlueSwipe"
+                      style="
+                        width: 24px;
+                        height: 24px;
+                        padding: 0;
+                        background: rgba(0, 0, 0, 0.05);
+                        border: none;
+                        color: #666;
+                      "
+                    />
+                    <van-button
+                      icon="arrow"
+                      size="mini"
+                      round
+                      @click="nextBlueSwipe"
+                      style="
+                        width: 24px;
+                        height: 24px;
+                        padding: 0;
+                        background: rgba(0, 0, 0, 0.05);
+                        border: none;
+                        color: #666;
+                      "
+                    />
+                  </div>
+                </div>
+                <van-swipe
+                  ref="blueSwipeRef"
+                  class="my-swipe blue-swipe"
+                  :autoplay="0"
+                  :loop="false"
+                  :width="280"
+                  style="
+                    border-radius: 18px;
+                    width: 100%;
+                    padding-right: 20px;
+                    box-sizing: border-box;
+                  "
+                >
+                  <van-swipe-item
+                    v-for="(item, index) in blueCarouselItems"
+                    :key="`blue-${index}`"
+                    @click="gotoItem(item.originalIndex)"
+                    style="padding: 0 8px 3px 8px"
+                  >
+                    <div
+                      :class="{
+                        'ice-frozen': item.swipe_status == 0,
+                        'blue-complete': item.swipe_status != 0,
+                      }"
+                      style="
+                        position: relative;
+                        border-radius: 18px;
+                        height: 220px;
+                        padding: 20px 16px 16px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: flex-end;
+                        color: white;
+                        box-shadow: 0 8px 20px rgba(102, 163, 255, 0.28);
+                        overflow: hidden;
+                        box-sizing: border-box;
+                      "
+                    >
+                      <template v-if="item.swipe_status == 0">
+                        <span class="ice-layer-prism" />
+                        <span class="ice-layer-glint" />
+                      </template>
+
+                      <div
+                        style="
+                          position: absolute;
+                          top: 0;
+                          left: 0;
+                          width: 100%;
+                          height: 45%;
+                          background: linear-gradient(
+                            180deg,
+                            rgba(255, 255, 255, 0.25) 0%,
+                            rgba(255, 255, 255, 0) 100%
+                          );
+                          pointer-events: none;
+                          z-index: 0;
+                        "
+                      ></div>
+                      <div
+                        style="
+                          position: absolute;
+                          bottom: -20px;
+                          right: -20px;
+                          width: 120px;
+                          height: 120px;
+                          background: rgba(255, 255, 255, 0.15);
+                          border-radius: 50%;
+                          filter: blur(25px);
+                          pointer-events: none;
+                          z-index: 0;
+                        "
+                      ></div>
+
+                      <div
+                        style="
+                          position: absolute;
+                          top: 16px;
+                          left: 16px;
+                          z-index: 1;
+                        "
+                      >
+                        <van-tag
+                          round
+                          color="rgba(255,255,255,0.2)"
+                          text-color="#fff"
+                          style="
+                            border: 1px solid rgba(255, 255, 255, 0.4);
+                            backdrop-filter: blur(8px);
+                            padding: 3px 8px;
+                            font-size: 11px;
+                          "
+                        >
+                          <van-icon name="fire" style="margin-right: 2px" />
+                          待完成任务
+                        </van-tag>
+                      </div>
+
+                      <div
+                        style="
+                          font-size: 12px;
+                          opacity: 0.9;
+                          margin-bottom: 6px;
+                          position: relative;
+                          z-index: 1;
+                          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+                        "
+                      >
+                        待复习 · {{ item.create_time }}
+                      </div>
+
+                      <div
+                        style="
+                          font-weight: 800;
+                          font-size: 18px;
+                          line-height: 1.3;
+                          margin-bottom: 10px;
+                          min-height: calc(18px * 1.3 * 2);
+                          display: -webkit-box;
+                          -webkit-line-clamp: 2;
+                          -webkit-box-orient: vertical;
+                          overflow: hidden;
+                          text-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <span v-if="item.complete_status == 1">⚡️</span>
+                        {{ processedTitle(item.title) }}
+                      </div>
+
+                      <div
+                        style="
+                          display: flex;
+                          align-items: center;
+                          margin-bottom: 12px;
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <div
+                          style="
+                            font-size: 13px;
+                            font-weight: bold;
+                            opacity: 0.95;
+                            margin-right: 10px;
+                          "
+                        >
+                          {{ item.answers ? item.answers.length : 0 }}词
+                        </div>
+                        <img
+                          :src="blueSwipeRateIcon(item)"
+                          style="
+                            width: 22px;
+                            height: 22px;
+                            object-fit: contain;
+                            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+                          "
+                          alt="rate"
+                        />
+                        <div
+                          style="
+                            font-size: 12px;
+                            margin-left: 8px;
+                            opacity: 0.9;
+                          "
+                        >
+                          背<span style="font-weight: 700">{{
+                            item.attempt
+                          }}</span
+                          >次
+                        </div>
+                      </div>
+
+                      <div
+                        style="
+                          display: flex;
+                          justify-content: space-between;
+                          align-items: center;
+                          position: relative;
+                          z-index: 1;
+                        "
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            align-items: center;
+                            background: rgba(255, 255, 255, 0.25);
+                            backdrop-filter: blur(12px);
+                            padding: 5px 12px;
+                            border-radius: 16px;
+                            border: 1px solid rgba(255, 255, 255, 0.4);
+                          "
+                        >
+                          <van-icon
+                            name="play"
+                            size="15"
+                            style="margin-right: 4px"
+                          />
+                          <span style="font-size: 13px; font-weight: bold"
+                            >开始挑战</span
+                          >
+                        </div>
+                        <div class="swipe-hint-arrow">
+                          <van-icon name="arrow" size="13" />
+                          <van-icon name="arrow" size="13" />
+                          <van-icon name="arrow" size="13" />
+                        </div>
+                      </div>
+                    </div>
+                  </van-swipe-item>
+                  <van-swipe-item
+                    key="blue-spacer"
+                    style="width: 8px; padding: 0"
+                    @click.stop
+                  >
+                    <div style="width: 8px"></div>
+                  </van-swipe-item>
+                  <template #indicator="{ active, total }">
+                    <div class="custom-indicator">
+                      {{ active + 1 }} / {{ total - 1 }}
+                    </div>
+                  </template>
+                </van-swipe>
+              </div>
               <van-list
                 v-model="loadingOriginalData"
                 :finished="finishedOriginalData"
@@ -5556,13 +4524,18 @@ onMounted(async () => {
                 @load="onLoadOriginalData"
               >
                 <div v-for="(item, index) in originalData" :key="index">
-                  <div v-if="item.type == 4">
+                  <div v-if="item.type == 4 && !shouldHideFromList(item)">
                     <van-cell
                       is-link
                       center
                       clickable
                       @click="gotoItem(index)"
-                      :class="['custom-cell', { 'swipe-undone': item.swipe_status == 0 && item.attempt == 0 }]"
+                      :class="[
+                        'custom-cell',
+                        {
+                          'swipe-undone': item.swipe_status == 0,
+                        },
+                      ]"
                     >
                       <template #icon>
                         <img
@@ -5592,7 +4565,10 @@ onMounted(async () => {
                               margin-left: 0.2rem;
                             "
                           >
-                            {{ processedTitle(item.title) }}
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                         </div>
                       </template>
@@ -5620,7 +4596,12 @@ onMounted(async () => {
                     </van-cell>
                   </div>
                   <div
-                    v-if="item.type !== 2 && item.type != 3 && item.type != 4"
+                    v-if="
+                      item.type !== 2 &&
+                      item.type != 3 &&
+                      item.type != 4 &&
+                      !shouldHideFromList(item)
+                    "
                   >
                     <van-cell
                       is-link
@@ -5629,9 +4610,18 @@ onMounted(async () => {
                       @click="
                         isMultiSelectMode ? selectItem(index) : gotoItem(index)
                       "
-                      :class="{ 'pin-background': item.is_pinned && item.rate < 3, 'swipe-undone': (item.swipe_status == 0 && item.attempt == 0) }"
+                      :class="{
+                        'pin-background': item.is_pinned && item.rate < 3,
+                        'swipe-undone': item.swipe_status == 0,
+                        'ice-frozen': item.swipe_status == 0,
+                      }"
                       class="custom-cell"
                     >
+                      <!-- 冰封光效层，只在冰封时渲染 -->
+                      <template v-if="item.swipe_status == 0">
+                        <span class="ice-layer-prism" />
+                        <span class="ice-layer-glint" />
+                      </template>
                       <template #icon>
                         <div v-if="item.alias.includes('庆典')">
                           <img
@@ -5718,7 +4708,10 @@ onMounted(async () => {
                           />
 
                           <div style="margin-bottom: 7px; font-weight: 700">
-                            <div>{{ processedTitle(item.title) }}</div>
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                           <van-badge
                             content="Game"
@@ -5754,13 +4747,19 @@ onMounted(async () => {
                               color: lightgray;
                             "
                           >
-                            {{ processedTitle(item.title) }}
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                           <div
                             v-else
                             style="margin-bottom: 7px; font-weight: 700"
                           >
-                            {{ processedTitle(item.title) }}
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                           <van-badge
                             v-if="item.is_review_required == 1"
@@ -5806,42 +4805,6 @@ onMounted(async () => {
                           <div style="margin-top: 0.5rem">
                             {{ item.answers.length }}词
                           </div>
-                        </div>
-
-                        <div v-if="item.view == 0">
-                          <van-button
-                            style="color: gray; border: none"
-                            size="mini"
-                            @click.stop="viewAnswer(item, index)"
-                            class="button-container2"
-                          >
-                            <span class="button-content">
-                              <img
-                                src="../assets/close_eye.png"
-                                alt="Icon"
-                                class="button-icon"
-                              />
-                            </span>
-                          </van-button>
-                        </div>
-
-                        <div v-else>
-                          <van-button
-                            style="color: red; font-weight: 700; border: none"
-                            size="small"
-                            @click.stop="viewAnswer(item, index)"
-                            class="button-container2"
-                          >
-                            <span class="button-content">
-                              <img
-                                src="../assets/eye.png"
-                                alt="Icon"
-                                class="button-icon"
-                                style="margin-right: 0.1rem"
-                              />
-                              * {{ item.view }}
-                            </span>
-                          </van-button>
                         </div>
                       </template>
 
@@ -5974,6 +4937,7 @@ onMounted(async () => {
                           >
                             <van-icon
                               name="link-o"
+                              color="red"
                               style="margin-bottom: 1.7rem"
                             />
                             <van-icon
@@ -5991,14 +4955,30 @@ onMounted(async () => {
                       </template>
                     </van-cell>
                   </div>
-                  <div v-if="item.type == 2 || item.type == 3">
+                  <div
+                    v-if="
+                      (item.type == 2 || item.type == 3) &&
+                      !shouldHideFromList(item)
+                    "
+                  >
                     <van-cell
                       is-link
                       center
                       clickable
                       @click="gotoItem(index)"
-                      :class="['custom-cell', { 'swipe-undone': item.swipe_status == 0 && item.attempt == 0 }]"
+                      :class="[
+                        'custom-cell',
+                        {
+                          'swipe-undone': shouldShowListFrozen(item),
+                          'ice-frozen': shouldShowListFrozen(item),
+                        },
+                      ]"
                     >
+                      <!-- 冰封光效层，只在冰封时渲染 -->
+                      <template v-if="shouldShowListFrozen(item)">
+                        <span class="ice-layer-prism" />
+                        <span class="ice-layer-glint" />
+                      </template>
                       <template #icon>
                         <img
                           v-if="
@@ -6056,7 +5036,10 @@ onMounted(async () => {
                           "
                         >
                           <div style="margin-bottom: 7px; font-weight: 700">
-                            {{ processedTitle(item.title) }}
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                         </div>
 
@@ -6069,7 +5052,10 @@ onMounted(async () => {
                           "
                         >
                           <div style="margin-bottom: 0px; font-weight: 700">
-                            {{ processedTitle(item.title) }}
+                            <div v-if="item.complete_status == 1">
+                              ⚡️ {{ processedTitle(item.title) }}
+                            </div>
+                            <div v-else>{{ processedTitle(item.title) }}</div>
                           </div>
                         </div>
                       </template>
@@ -6083,7 +5069,18 @@ onMounted(async () => {
                       </template>
 
                       <template #label>
+                        <div
+                          v-if="item.type == 2"
+                          style="display: flex; align-items: center; height: 50px"
+                        >
+                          <img
+                            :src="blueSwipeRateIcon(item)"
+                            style="width: 42px; height: 42px; object-fit: contain"
+                            alt="rate"
+                          />
+                        </div>
                         <van-rate
+                          v-else
                           v-model="item.rate"
                           :size="50"
                           color="#ffd21e"
@@ -6169,13 +5166,18 @@ onMounted(async () => {
                   </div>
 
                   <div v-for="(item, index) in originalData" :key="index">
-                    <div v-if="item.type == 4">
+                    <div v-if="item.type == 4 && !shouldHideFromList(item)">
                       <van-cell
                         is-link
                         center
                         clickable
                         @click="gotoItem(index)"
-                        :class="['custom-cell', { 'swipe-undone': item.swipe_status == 0 && item.attempt == 0 }]"
+                        :class="[
+                          'custom-cell',
+                          {
+                            'swipe-undone': item.swipe_status == 0,
+                          },
+                        ]"
                       >
                         <template #icon>
                           <img
@@ -6205,7 +5207,10 @@ onMounted(async () => {
                                 margin-left: 0.2rem;
                               "
                             >
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
                             </div>
                           </div>
                         </template>
@@ -6233,7 +5238,12 @@ onMounted(async () => {
                       </van-cell>
                     </div>
                     <div
-                      v-if="item.type !== 2 && item.type != 3 && item.type != 4"
+                      v-if="
+                        item.type !== 2 &&
+                        item.type != 3 &&
+                        item.type != 4 &&
+                        !shouldHideFromList(item)
+                      "
                     >
                       <van-cell
                         is-link
@@ -6245,8 +5255,17 @@ onMounted(async () => {
                             : gotoItem(index)
                         "
                         class="custom-cell"
-                        :class="{ 'pin-background': item.is_pinned && item.rate < 3, 'swipe-undone': (item.swipe_status == 0 && item.attempt == 0) }"
+                        :class="{
+                          'pin-background': item.is_pinned && item.rate < 3,
+                          'swipe-undone': item.swipe_status == 0,
+                          'ice-frozen': item.swipe_status == 0,
+                        }"
                       >
+                        <!-- 冰封光效层，只在冰封时渲染 -->
+                        <template v-if="item.swipe_status == 0">
+                          <span class="ice-layer-prism" />
+                          <span class="ice-layer-glint" />
+                        </template>
                         <template #icon>
                           <div v-if="item.alias.includes('庆典')">
                             <img
@@ -6356,7 +5375,10 @@ onMounted(async () => {
                               "
                             />
                             <div style="margin-bottom: 7px; font-weight: 700">
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
                             </div>
                             <van-badge
                               content="Game"
@@ -6392,13 +5414,20 @@ onMounted(async () => {
                                 color: lightgray;
                               "
                             >
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
+                              { processedTitle(item.title) }}
                             </div>
                             <div
                               v-else
                               style="margin-bottom: 7px; font-weight: 700"
                             >
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
                             </div>
                             <van-badge
                               v-if="item.is_review_required == 1"
@@ -6447,42 +5476,6 @@ onMounted(async () => {
                             <div style="margin-top: 0.5rem">
                               {{ item.answers.length }}词
                             </div>
-                          </div>
-
-                          <div v-if="item.view == 0">
-                            <van-button
-                              style="color: gray; border: none"
-                              size="mini"
-                              @click.stop="viewAnswer(item, index)"
-                              class="button-container2"
-                            >
-                              <span class="button-content">
-                                <img
-                                  src="../assets/close_eye.png"
-                                  alt="Icon"
-                                  class="button-icon"
-                                />
-                              </span>
-                            </van-button>
-                          </div>
-
-                          <div v-else>
-                            <van-button
-                              style="color: red; font-weight: 700; border: none"
-                              size="small"
-                              @click.stop="viewAnswer(item, index)"
-                              class="button-container2"
-                            >
-                              <span class="button-content">
-                                <img
-                                  src="../assets/eye.png"
-                                  alt="Icon"
-                                  class="button-icon"
-                                  style="margin-right: 0.1rem"
-                                />
-                                * {{ item.view }}
-                              </span>
-                            </van-button>
                           </div>
                         </template>
 
@@ -6604,14 +5597,30 @@ onMounted(async () => {
                       </van-cell>
                     </div>
 
-                    <div v-if="item.type == 2 || item.type == 3">
+                    <div
+                      v-if="
+                        (item.type == 2 || item.type == 3) &&
+                        !shouldHideFromList(item)
+                      "
+                    >
                       <van-cell
                         is-link
                         center
                         clickable
                         @click="gotoItem(index)"
-                        :class="['custom-cell', { 'swipe-undone': item.swipe_status == 0 && item.attempt == 0 }]"
+                        :class="[
+                          'custom-cell',
+                          {
+                            'swipe-undone': shouldShowListFrozen(item),
+                            'ice-frozen': shouldShowListFrozen(item),
+                          },
+                        ]"
                       >
+                        <!-- 冰封光效层，只在冰封时渲染 -->
+                        <template v-if="shouldShowListFrozen(item)">
+                          <span class="ice-layer-prism" />
+                          <span class="ice-layer-glint" />
+                        </template>
                         <template #icon>
                           <img
                             v-if="
@@ -6671,7 +5680,10 @@ onMounted(async () => {
                             "
                           >
                             <div style="margin-bottom: 7px; font-weight: 700">
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
                             </div>
                           </div>
 
@@ -6684,7 +5696,10 @@ onMounted(async () => {
                             "
                           >
                             <div style="margin-bottom: 0px; font-weight: 700">
-                              {{ processedTitle(item.title) }}
+                              <div v-if="item.complete_status == 1">
+                                ⚡️ {{ processedTitle(item.title) }}
+                              </div>
+                              <div v-else>{{ processedTitle(item.title) }}</div>
                             </div>
                           </div>
                         </template>
@@ -6698,7 +5713,26 @@ onMounted(async () => {
                         </template>
 
                         <template #label>
+                          <div
+                            v-if="item.type == 2"
+                            style="
+                              display: flex;
+                              align-items: center;
+                              height: 50px;
+                            "
+                          >
+                            <img
+                              :src="blueSwipeRateIcon(item)"
+                              style="
+                                width: 42px;
+                                height: 42px;
+                                object-fit: contain;
+                              "
+                              alt="rate"
+                            />
+                          </div>
                           <van-rate
+                            v-else
                             v-model="item.rate"
                             :size="50"
                             color="#ffd21e"
@@ -6829,8 +5863,18 @@ onMounted(async () => {
           </div>
         </van-cell-group>
       </van-cell-group>
-      <div class="revview-button-group" v-if="originalData[gotoIndex]['swipe_status'] === 0">
-        <van-button :loading="isSkipLoading" loading-type type="danger" class="review-btn-skip" @click="skipSwipeReview(originalData[gotoIndex], gotoIndex)">
+      <div
+        class="revview-button-group"
+        v-if="originalData[gotoIndex]?.swipe_status === 0 || forceShowReviewButtons"
+      >
+        <van-button
+          plain
+          :loading="isSkipLoading"
+          loading-type
+          type="danger"
+          class="review-btn-skip"
+          @click="skipSwipeReview(originalData[gotoIndex], gotoIndex)"
+        >
           🌸 跳过
         </van-button>
         <van-button
@@ -6950,8 +5994,18 @@ onMounted(async () => {
           </transition-group>
         </van-cell-group>
       </van-cell-group>
-      <div class="revview-button-group" v-if="originalData[gotoIndex]['swipe_status'] === 0">
-        <van-button :loading="isSkipLoading" loading-type type="danger" class="review-btn-skip" @click="skipSwipeReview(originalData[gotoIndex], gotoIndex)">
+      <div
+        class="revview-button-group"
+        v-if="originalData[gotoIndex]?.swipe_status === 0 || forceShowReviewButtons"
+      >
+        <van-button
+          plain
+          :loading="isSkipLoading"
+          loading-type
+          type="danger"
+          class="review-btn-skip"
+          @click="skipSwipeReview(originalData[gotoIndex], gotoIndex)"
+        >
           🌸 跳过
         </van-button>
         <van-button
@@ -6985,39 +6039,53 @@ onMounted(async () => {
     </van-badge> -->
 
     <!-- 单词表textbook -->
-    <van-floating-bubble
-      axis="xy"
-      magnetic="x"
-      icon="vip-card-o"
-      @click="showTextbook"
-    />
-
     <van-popup
       closeable
       v-model:show="showTextbookPop"
-      position="bottom"
-      :style="{ height: '90%' }"
+      position="right"
+      :style="{ width: '50%', height: '100%' }"
       :overlay-style="{ backgroundColor: 'rgba(0, 0, 0, 1)' }"
     >
       <div style="display: flex; align-items: center">
-        <div style="font-size: 18px; font-weight: 700; margin: 1rem">
+        <div style="font-size: 19px; font-weight: 700; margin: 2rem">
           个人定制单词手册
         </div>
-        <div style="font-size: 12px; color: red; margin-top: 0.4rem">
-          单击显示单词讲解
-        </div>
+        <van-button
+          size="normal"
+          type="primary"
+          @click="gotoWordMatchGame"
+          style=""
+        >
+          开启回顾
+        </van-button>
       </div>
-      <van-cell-group inset style="margin-top: 0.5rem">
+      <van-cell-group inset>
         <van-cell-group>
-          <div v-for="(item, index) in textbookData" :key="index">
+          <div v-for="(item, index) in matchGameWords" :key="index">
             <van-cell
-              clickable
-              @click="getVocabularyMeaning(index)"
+              style="font-size: 15px"
               :title="item.英文"
-              :value="item.答案"
               :label="`累计${item.times}次`"
-              is-link
+              @click="speakWord(item.英文, item.正确答案)"
+              clickable
             >
+              <template #value>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    gap: 4px;
+                  "
+                >
+                  <span>{{ item.答案 }}</span>
+                  <img
+                    src="../assets/speaker.png"
+                    alt="speaker"
+                    style="width: 14px; height: auto"
+                  />
+                </div>
+              </template>
             </van-cell>
           </div>
         </van-cell-group>
@@ -7090,6 +6158,7 @@ onMounted(async () => {
         --van-dialog-button-height: 65px;
       "
       :style="{ maxWidth: '550px' }"
+      :close-on-click-overlay="true"
     >
       <template #title>
         <div>
@@ -7103,7 +6172,19 @@ onMounted(async () => {
                 width: 100%;
               "
             >
-              <div style="font-size: 17px; font-weight: bold">模式选择</div>
+              <div
+                style="
+                  font-size: 16px;
+                  font-weight: bold;
+                  display: flex;
+                  align-items: center;
+                "
+              >
+                <div v-if="originalData[gotoIndex]['complete_status']">
+                  ⚡️&nbsp;
+                </div>
+                <div>模式选择</div>
+              </div>
               <div
                 v-if="consumeText"
                 style="
@@ -7272,6 +6353,7 @@ onMounted(async () => {
         --van-dialog-button-height: 65px;
       "
       :style="{ maxWidth: '400px' }"
+      :close-on-click-overlay="true"
     >
       <template #title>
         <div>
@@ -7630,44 +6712,6 @@ onMounted(async () => {
                   {{ item.answers.length }}词
                 </div>
               </div>
-
-              <div v-if="item.view == 0">
-                <van-button
-                  style="color: gray; border: none"
-                  size="small"
-                  class="button-container2"
-                >
-                  <span class="button-content">
-                    <img
-                      src="../assets/close_eye.png"
-                      alt="Icon"
-                      class="button-icon"
-                    />
-                  </span>
-                </van-button>
-              </div>
-
-              <div v-else>
-                <van-button
-                  style="color: lightgray; font-weight: 700; border: none"
-                  size="small"
-                  class="button-container2"
-                >
-                  <span class="button-content">
-                    <img
-                      src="../assets/eyePc.png"
-                      alt="Icon"
-                      class="button-icon"
-                      style="
-                        margin-right: 0.1rem;
-                        font-size: 14px;
-                        margin-top: 2rem;
-                      "
-                    />
-                    * {{ item.view }}
-                  </span>
-                </van-button>
-              </div>
             </template>
 
             <template #label>
@@ -7819,7 +6863,11 @@ onMounted(async () => {
     <bearWarmup ref="bearWarmupRef" v-if="showbearWarmup" />
 
     <angryWolf ref="wolfBackRef" :dialogPosition="dialogPosition" />
-    <missyou ref="missyouRef" :days="missDays" />
+    <missyou
+      ref="missyouRef"
+      :days="missDays"
+      :flagMissingThunder="!!flagMissingThunder"
+    />
     <challengeConfirm
       ref="challengeConfirmRef"
       @confirm="handleConfirmChallenge"
@@ -7893,11 +6941,9 @@ onMounted(async () => {
 /* ========== 左侧边栏 ========== */
 .left-sidebar {
   width: 480px;
-  /* min-width: 320px;
-  max-width: 400px; */
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1.5rem 1rem;
+  padding: 0.5rem 1rem 1rem 1rem;
   background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
   border-right: 1px solid #e5e7eb;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
@@ -8207,9 +7253,7 @@ onMounted(async () => {
 /* 复习区域 */
 .review-section,
 .review-complete {
-  width: 200%;
-  margin-left: rem;
-  margin-top: rem;
+  /* width: 200%; */
   display: flex;
   align-items: center; /* 垂直居中对齐按钮和图片 */
   justify-content: flex-start; /* 内容靠左对齐 */
@@ -8319,7 +7363,7 @@ onMounted(async () => {
   max-width: 800px;
 }
 .swipe-undone {
-  color: #1A89FA; 
+  color: #1a89fa;
 }
 .custom-cell:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
@@ -8835,7 +7879,7 @@ onMounted(async () => {
   .left-sidebar {
     width: 420px;
     min-width: 380px;
-    padding: 1rem 0.8rem;
+    padding: 0.5rem 0.8rem;
   }
 
   .stats-container {
@@ -9121,5 +8165,510 @@ onMounted(async () => {
 
 .revview-button-group .review-btn-start {
   flex: 3;
+}
+
+/* ─── 冰封容器 ─────────────────────────────────────── */
+.ice-frozen {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    #e8f6ff 0%,
+    #d4eeff 30%,
+    #e0f4ff 60%,
+    #cce8ff 100%
+  ) !important;
+  border: 1px solid rgba(140, 210, 255, 0.5) !important;
+  box-shadow: 0 2px 12px rgba(80, 180, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(140, 210, 255, 0.3) !important;
+}
+
+/* ─── 慢速主光带（::before 独占） ───────────────────── */
+.ice-frozen::before {
+  content: "";
+  position: absolute;
+  /* 比容器更高更宽，配合 skew 不留白边 */
+  top: -20%;
+  left: -100%;
+  width: 60%;
+  height: 140%;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(220, 245, 255, 0.25) 40%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(220, 245, 255, 0.25) 60%,
+    rgba(255, 255, 255, 0) 90%,
+    transparent 100%
+  );
+  transform: skewX(-15deg);
+  animation: ice-sweep-slow 5s ease-in-out infinite;
+}
+
+@keyframes ice-sweep-slow {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 160%;
+  }
+}
+
+/* ─── 快速细光条（::after 独占） ────────────────────── */
+.ice-frozen::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 30%;
+  height: 140%;
+  pointer-events: none;
+  z-index: 11;
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(200, 240, 255, 0.3) 45%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(200, 240, 255, 0.3) 55%,
+    rgba(255, 255, 255, 0) 80%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: ice-sweep-fast 2.8s ease-in-out 0.4s infinite;
+}
+
+@keyframes ice-sweep-fast {
+  0% {
+    left: -60%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: 130%;
+    opacity: 0;
+  }
+}
+
+/* ─── 棱镜彩虹 + 星形闪光（van-cell 内的 span 子元素） ─ */
+/* 因为伪元素只有两个，第三四层用子元素 */
+.ice-frozen .ice-layer-prism {
+  position: absolute;
+  top: -20%;
+  left: -80%;
+  width: 45%;
+  height: 140%;
+  pointer-events: none;
+  z-index: 9;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(180, 220, 255, 0.1) 30%,
+    rgba(200, 255, 240, 0.08) 45%,
+    rgba(220, 240, 255, 0.15) 50%,
+    rgba(180, 210, 255, 0.1) 65%,
+    transparent
+  );
+  transform: skewX(-10deg);
+  animation: ice-sweep-prism 7s ease-in-out 1.2s infinite;
+}
+
+@keyframes ice-sweep-prism {
+  0% {
+    left: -80%;
+  }
+  50% {
+    left: 140%;
+  }
+  100% {
+    left: -80%;
+  }
+}
+
+.ice-frozen .ice-layer-glint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+  background: radial-gradient(
+      circle at 18% 40%,
+      rgba(255, 255, 255, 0.95) 0px,
+      rgba(220, 245, 255, 0.4) 2px,
+      transparent 7px
+    ),
+    radial-gradient(
+      circle at 72% 25%,
+      rgba(255, 255, 255, 0.9) 0px,
+      rgba(200, 240, 255, 0.3) 2px,
+      transparent 5px
+    ),
+    radial-gradient(
+      circle at 45% 70%,
+      rgba(255, 255, 255, 0.85) 0px,
+      rgba(210, 242, 255, 0.3) 1px,
+      transparent 5px
+    ),
+    radial-gradient(
+      circle at 88% 55%,
+      rgba(255, 255, 255, 0.9) 0px,
+      rgba(220, 245, 255, 0.3) 2px,
+      transparent 6px
+    );
+  animation: ice-glint 3.5s ease-in-out infinite;
+}
+
+@keyframes ice-glint {
+  0% {
+    opacity: 0.3;
+  }
+  25% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  75% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+/* ─── 文字层级置顶 ───────────────────────────────────── */
+.ice-frozen .van-cell__title,
+.ice-frozen .van-cell__value,
+.ice-frozen .van-cell__label {
+  color: #2a7abf;
+  position: relative;
+  z-index: 13;
+}
+
+/* 回顾按钮 */
+/* 按钮外壳设置 */
+.liquid-btn {
+  position: relative;
+  overflow: hidden; /* 核心：切掉溢出的“水” */
+  background-color: #fff3eb; /* 空状态时的浅橙色底色 */
+  border: 2px solid #ff976a !important; /* 外围橙色边框 */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 按钮文字层 */
+.btn-text {
+  position: relative;
+  z-index: 10;
+  font-size: 15px;
+  font-weight: bold;
+  transition: color 0.4s ease; /* 变色过渡 */
+}
+
+/* 水波容器组 */
+.water-group {
+  position: absolute;
+  left: -50%;
+  /* 魔法高度公式：0%时水落下，100%时水淹没顶部 */
+  top: calc(130% - (var(--progress) * 1.5));
+  width: 200%;
+  height: 200%;
+  z-index: 1;
+  /* 水面升降的平滑动画 */
+  transition: top 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 两个水波共用属性 */
+.water-layer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+
+/* 第一层深色主水波 */
+.water-layer1 {
+  background-color: #ff976a; /* 你的主题橙色 */
+  border-radius: 38%;
+  animation: liquid-spin 4s linear infinite;
+}
+
+/* 第二层浅色辅水波，用来制造 3D 景深交错感 */
+.water-layer2 {
+  background-color: rgba(255, 151, 106, 0.5); /* 半透明橙色 */
+  border-radius: 42%;
+  animation: liquid-spin 6s linear infinite;
+}
+
+/* 无限旋转动画 */
+@keyframes liquid-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* 心碎状态下的按钮外壳 */
+.liquid-btn.is-broken {
+  background-color: #ebedf0 !important; /* Vant 标准灰色背景 */
+  border: 2px solid #c8c9cc !important; /* 灰色边框 */
+  cursor: not-allowed;
+  opacity: 1; /* 覆盖 disabled 默认的半透明 */
+}
+
+/* 心碎内容容器 */
+.broken-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.broken-heart {
+  font-size: 18px;
+  filter: grayscale(100%); /* 让心碎图标也带上灰色调 */
+  margin-bottom: 2px;
+}
+
+.broken-text {
+  font-size: 11px;
+  color: #969799;
+  font-weight: normal;
+}
+
+/* 确保水波纹在心碎状态下不显示 (虽然 v-if 已经处理，但这能防止切换瞬间的闪烁) */
+.is-broken .water-group {
+  display: none;
+}
+
+/* --- 以下是你之前的原有样式，保持不变 --- */
+.liquid-btn {
+  position: relative;
+  overflow: hidden;
+  background-color: #fff3eb;
+  border: 2px solid #ff976a !important;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-text {
+  position: relative;
+  z-index: 10;
+  font-size: 15px;
+  font-weight: bold;
+  transition: color 0.4s ease;
+}
+.water-group {
+  position: absolute;
+  left: -50%;
+  top: calc(130% - (var(--progress) * 1.5));
+  width: 200%;
+  height: 200%;
+  z-index: 1;
+  transition: top 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.water-layer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+}
+.water-layer1 {
+  background-color: #ff976a;
+  border-radius: 38%;
+  animation: liquid-spin 4s linear infinite;
+}
+.water-layer2 {
+  background-color: rgba(255, 151, 106, 0.5);
+  border-radius: 42%;
+  animation: liquid-spin 6s linear infinite;
+}
+@keyframes liquid-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- 按钮和提示文字的外层容器 --- */
+.review-btn-container {
+  display: flex;
+  flex-direction: row; /* 🔥 核心修改 1：改为水平排列 (从左到右) */
+  align-items: center; /* 🔥 核心修改 2：强制内部元素垂直居中对齐 */
+  margin-left: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+/* --- 美化提示文字（右侧多行版） --- */
+.penalty-warning {
+  margin-top: 0; /* 取消之前的顶部间距 */
+  margin-left: 12px; /* 🔥 核心修改 3：增加左侧间距，与左边的按钮拉开呼吸感 */
+  font-size: 11px;
+  color: #ee0a24;
+  font-weight: 500;
+  text-align: left; /* 🔥 核心修改 4：放在右侧时，文字左对齐视觉更整齐 */
+  background-color: #fef0f0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(238, 10, 36, 0.1);
+  line-height: 1.5;
+}
+
+/* ========== 轮播图 ========== */
+
+.custom-indicator {
+  position: absolute;
+  right: 28px;
+  bottom: 46px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  z-index: 20;
+}
+
+/* 轮播图冰封改为浅红色 */
+.my-swipe {
+  overflow: visible !important;
+}
+.my-swipe .van-swipe__track {
+  overflow: visible !important;
+}
+.blue-swipe {
+  margin-bottom: 12px;
+}
+.blue-swipe .blue-complete {
+  background: linear-gradient(145deg, #4f9cff, #2f80ed);
+}
+.my-swipe .ice-frozen {
+  background: linear-gradient(
+    135deg,
+    #fff0f0 0%,
+    #ffe4e4 30%,
+    #fff0f0 60%,
+    #ffd6d6 100%
+  ) !important;
+  border: 1px solid rgba(255, 140, 140, 0.5) !important;
+  box-shadow: 0 2px 12px rgba(255, 80, 80, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(255, 140, 140, 0.3) !important;
+}
+.my-swipe .ice-frozen::before {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(255, 220, 220, 0.25) 40%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 220, 220, 0.25) 60%,
+    rgba(255, 255, 255, 0) 90%,
+    transparent 100%
+  );
+}
+.my-swipe .ice-frozen::after {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(255, 200, 200, 0.3) 45%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(255, 200, 200, 0.3) 55%,
+    rgba(255, 255, 255, 0) 80%,
+    transparent 100%
+  );
+}
+.my-swipe .ice-frozen div {
+  color: #000000 !important;
+}
+.my-swipe .ice-frozen .van-tag {
+  color: #000000 !important;
+}
+.blue-swipe .ice-frozen {
+  background: linear-gradient(
+    135deg,
+    #eef7ff 0%,
+    #d8edff 34%,
+    #f4fbff 62%,
+    #b9dcff 100%
+  ) !important;
+  border: 1px solid rgba(80, 158, 235, 0.5) !important;
+  box-shadow: 0 10px 24px rgba(76, 145, 220, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(80, 158, 235, 0.24) !important;
+}
+.blue-swipe .ice-frozen::before {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 10%,
+    rgba(220, 240, 255, 0.35) 40%,
+    rgba(255, 255, 255, 0.7) 50%,
+    rgba(220, 240, 255, 0.35) 60%,
+    rgba(255, 255, 255, 0) 90%,
+    transparent 100%
+  );
+}
+.blue-swipe .ice-frozen::after {
+  background: linear-gradient(
+    to right,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(190, 225, 255, 0.38) 45%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(190, 225, 255, 0.38) 55%,
+    rgba(255, 255, 255, 0) 80%,
+    transparent 100%
+  );
+}
+
+/* 滑动提示箭头 */
+.swipe-hint-arrow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.85;
+}
+.swipe-hint-arrow .van-icon:nth-child(1) {
+  animation: swipe-bounce 1.2s ease-in-out infinite;
+  animation-delay: 0s;
+}
+.swipe-hint-arrow .van-icon:nth-child(2) {
+  animation: swipe-bounce 1.2s ease-in-out infinite;
+  animation-delay: 0.15s;
+}
+.swipe-hint-arrow .van-icon:nth-child(3) {
+  animation: swipe-bounce 1.2s ease-in-out infinite;
+  animation-delay: 0.3s;
+}
+@keyframes swipe-bounce {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(5px);
+    opacity: 1;
+  }
 }
 </style>
